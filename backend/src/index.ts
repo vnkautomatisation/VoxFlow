@@ -1,4 +1,5 @@
-﻿import express from 'express'
+﻿import multicanalRoutes from './routes/multicanal/index'
+import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -63,6 +64,7 @@ app.use('/api/v1/admin',    adminRoutes)
 app.use('/api/v1/ai',        aiRoutes)
 app.use('/api/v1/sms',       smsRoutes)
 app.use('/api/v1/analytics', analyticsRoutes)
+app.use('/api/v1/omni',        multicanalRoutes)
 app.use('/api/v1/supervision', supervisionRoutes)
 app.use('/api/v1/queues',     queuesRoutes)
 app.use('/api/v1/telephony', telephonyRoutes)
@@ -119,6 +121,7 @@ app.listen(config.app.port, () => {
 })
 
 export default app
+
 
 
 
