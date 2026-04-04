@@ -1,0 +1,22 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --voxflow-purple: #534AB7;
+  --voxflow-teal: #0F6E56;
+  --voxflow-blue: #185FA5;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  max-width: 100vw;
+  min-height: 100vh;
+  background-color: #030712;
+  color: #ffffff;
+}
