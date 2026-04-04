@@ -14,6 +14,7 @@ import adminRoutes   from './routes/admin/index'
 import aiRoutes        from './routes/ai/index'
 import smsRoutes       from './routes/sms/index'
 import analyticsRoutes from './routes/analytics/index'
+import supervisionRoutes from './routes/supervision/index'
 import queuesRoutes     from './routes/queues/index'
 import telephonyRoutes from './routes/telephony/index'
 import crmRoutes        from './routes/crm/index'
@@ -62,6 +63,7 @@ app.use('/api/v1/admin',    adminRoutes)
 app.use('/api/v1/ai',        aiRoutes)
 app.use('/api/v1/sms',       smsRoutes)
 app.use('/api/v1/analytics', analyticsRoutes)
+app.use('/api/v1/supervision', supervisionRoutes)
 app.use('/api/v1/queues',     queuesRoutes)
 app.use('/api/v1/telephony', telephonyRoutes)
 app.use('/api/v1/crm',        crmRoutes)
@@ -117,9 +119,6 @@ app.listen(config.app.port, () => {
 })
 
 export default app
-
-
-
 
 
 
