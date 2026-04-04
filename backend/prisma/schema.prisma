@@ -1,0 +1,171 @@
+﻿// VoxFlow — Schéma Prisma (base de données multi-tenant)
+// Fournisseur : Supabase (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// ── Organisations (multi-tenant) ─────────────────────────────
+model Organization {
+  id           String      @id @default(cuid())
+  name         String
+  slug         String      @unique
+  plan         Plan        @default(STARTER)
+  status       OrgStatus   @default(ACTIVE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  users        User[]
+  phoneNumbers PhoneNumber[]
+  queues       Queue[]
+  agents       Agent[]
+  calls        Call[]
+  subscription Subscription?
+
+  @@index([slug])
+}
+
+// ── Utilisateurs ─────────────────────────────────────────────
+model User {
+  id             String      @id @default(cuid())
+  email          String      @unique
+  name           String
+  role           Role        @default(AGENT)
+  status         UserStatus  @default(ACTIVE)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// ── Agents ────────────────────────────────────────────────────
+model Agent {
+  id             String      @id @default(cuid())
+  userId         String      @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  status         AgentStatus @default(OFFLINE)
+  extension      String?
+  createdAt      DateTime    @default(now())
+
+  @@index([organizationId])
+}
+
+// ── Numéros de téléphone ──────────────────────────────────────
+model PhoneNumber {
+  id             String      @id @default(cuid())
+  number         String      @unique
+  twilioSid      String      @unique
+  country        String      @default("CA")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@index([organizationId])
+}
+
+// ── Files d'attente ───────────────────────────────────────────
+model Queue {
+  id             String      @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@index([organizationId])
+}
+
+// ── Appels ────────────────────────────────────────────────────
+model Call {
+  id             String        @id @default(cuid())
+  twilioSid      String        @unique
+  from           String
+  to             String
+  duration       Int           @default(0)
+  status         CallStatus    @default(RINGING)
+  direction      CallDirection @default(INBOUND)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  startedAt      DateTime      @default(now())
+  endedAt        DateTime?
+  recordingUrl   String?
+  transcription  String?
+  aiSummary      String?
+  notes          String?
+
+  @@index([organizationId])
+  @@index([twilioSid])
+}
+
+// ── Abonnements Stripe ────────────────────────────────────────
+model Subscription {
+  id               String   @id @default(cuid())
+  stripeId         String   @unique
+  status           String
+  plan             Plan
+  organizationId   String   @unique
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  currentPeriodEnd DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ── Enums ─────────────────────────────────────────────────────
+enum Role {
+  OWNER
+  ADMIN
+  SUPERVISOR
+  AGENT
+}
+
+enum Plan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  TRIAL
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum AgentStatus {
+  ONLINE
+  OFFLINE
+  ON_CALL
+  BREAK
+  BUSY
+}
+
+enum CallStatus {
+  RINGING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  FAILED
+  BUSY
+  NO_ANSWER
+  CANCELLED
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}

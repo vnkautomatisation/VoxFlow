@@ -1,0 +1,73 @@
+﻿# ── Environnement ──────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+*.env
+
+# ── Node.js ────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+
+# ── Next.js ────────────────────────────────────
+frontend/.next/
+frontend/out/
+frontend/.vercel
+frontend/next-env.d.ts
+
+# ── Build outputs ──────────────────────────────
+dist/
+build/
+*.tsbuildinfo
+
+# ── Uploads & Media ────────────────────────────
+backend/uploads/recordings/*
+backend/uploads/transcriptions/*
+backend/uploads/exports/*
+backend/uploads/temp/*
+!backend/uploads/**/.gitkeep
+
+# ── Logs ───────────────────────────────────────
+logs/
+*.log
+backend/logs/*
+!backend/logs/.gitkeep
+
+# ── OS Windows ─────────────────────────────────
+Thumbs.db
+desktop.ini
+.BIN/
+*.lnk
+
+# ── OS Mac ─────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── IDE ────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ── Tests ──────────────────────────────────────
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# ── Prisma ─────────────────────────────────────
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+
+# ── SSL / Secrets ──────────────────────────────
+infra/ssl/*.pem
+infra/ssl/*.key
+infra/ssl/*.crt
