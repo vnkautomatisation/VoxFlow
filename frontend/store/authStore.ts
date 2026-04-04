@@ -59,3 +59,4 @@ export const getDashboardRoute = (role: Role): string => {
     default:           return '/login'
   }
 }
+
