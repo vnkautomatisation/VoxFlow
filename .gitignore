@@ -71,3 +71,23 @@ backend/prisma/dev.db-journal
 infra/ssl/*.pem
 infra/ssl/*.key
 infra/ssl/*.crt
+
+# ── Visual Studio ──────────────────────────────
+.vs/
+*.slnx
+*.sqlite
+*.sqlite-journal
+*.vsidx
+*.wsuo
+*.backup.json
+VSWorkspaceState.json
+
+# ── SÉCURITÉ — Ne jamais committer ─────────────
+github-recovery-codes.txt
+*recovery-codes*
+*recovery-codes*.txt
+
+# ── Fichiers solution VS ────────────────────────
+*.sln
+*.suo
+*.user
