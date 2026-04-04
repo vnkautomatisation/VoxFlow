@@ -14,6 +14,7 @@ import adminRoutes   from './routes/admin/index'
 import aiRoutes        from './routes/ai/index'
 import smsRoutes       from './routes/sms/index'
 import analyticsRoutes from './routes/analytics/index'
+import onboardingRoutes from './routes/onboarding/index'
 import agentRoutes   from './routes/agent/index'
 import webhookRoutes from './routes/webhooks/index'
 
@@ -28,7 +29,7 @@ const limiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max:      10, // 10 tentatives de login par 15min
+  max:      100, // 10 tentatives de login par 15min
   message:  { success: false, error: 'Trop de tentatives de connexion' },
 })
 
@@ -58,6 +59,7 @@ app.use('/api/v1/admin',    adminRoutes)
 app.use('/api/v1/ai',        aiRoutes)
 app.use('/api/v1/sms',       smsRoutes)
 app.use('/api/v1/analytics', analyticsRoutes)
+app.use('/api/v1/onboarding', onboardingRoutes)
 app.use('/api/v1/agent',    agentRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
 
@@ -109,5 +111,8 @@ app.listen(config.app.port, () => {
 })
 
 export default app
+
+
+
 
 
