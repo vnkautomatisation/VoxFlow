@@ -11,6 +11,9 @@ import healthRoutes  from './routes/health/index'
 import authRoutes    from './routes/auth/index'
 import ownerRoutes   from './routes/owner/index'
 import adminRoutes   from './routes/admin/index'
+import aiRoutes        from './routes/ai/index'
+import smsRoutes       from './routes/sms/index'
+import analyticsRoutes from './routes/analytics/index'
 import agentRoutes   from './routes/agent/index'
 import webhookRoutes from './routes/webhooks/index'
 
@@ -52,6 +55,9 @@ app.use('/api/v1/health',   healthRoutes)
 app.use('/api/v1/auth',     authLimiter, authRoutes)
 app.use('/api/v1/owner',    ownerRoutes)
 app.use('/api/v1/admin',    adminRoutes)
+app.use('/api/v1/ai',        aiRoutes)
+app.use('/api/v1/sms',       smsRoutes)
+app.use('/api/v1/analytics', analyticsRoutes)
 app.use('/api/v1/agent',    agentRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
 
@@ -103,4 +109,5 @@ app.listen(config.app.port, () => {
 })
 
 export default app
+
 
