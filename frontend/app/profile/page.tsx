@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
 import { authApi } from "@/lib/authApi"
 import { getDashboardRoute } from "@/store/authStore"
+import { Shield } from "lucide-react"
 
 export default function ProfilePage() {
-  const { user, isAuth, accessToken, setAuth } = useAuthStore()
+  const { user, isAuth, accessToken } = useAuthStore()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -116,10 +117,30 @@ export default function ProfilePage() {
           </form>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
           <p className="text-white font-medium text-sm mb-1">Email</p>
           <p className="text-gray-400 text-sm">{user.email}</p>
           <p className="text-gray-600 text-xs mt-1">L email ne peut pas etre change. Contactez le support.</p>
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <button
+            onClick={() => router.push("/profile/security")}
+            className="w-full flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-purple-900/50 rounded-lg flex items-center justify-center">
+                <Shield className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="text-left">
+                <p className="text-white text-sm font-medium">Securite du compte</p>
+                <p className="text-gray-500 text-xs">2FA, sessions, journal d activite</p>
+              </div>
+            </div>
+            <svg className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>

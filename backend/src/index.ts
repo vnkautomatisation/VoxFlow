@@ -1,4 +1,5 @@
-﻿import integrationsRoutes from './routes/integrations/index'
+﻿import securityRoutes     from './routes/security/index'
+import integrationsRoutes from './routes/integrations/index'
 import ai2Routes        from './routes/ai_advanced/index'
 import multicanalRoutes from './routes/multicanal/index'
 import express from 'express'
@@ -66,6 +67,7 @@ app.use('/api/v1/admin',    adminRoutes)
 app.use('/api/v1/ai',        aiRoutes)
 app.use('/api/v1/sms',       smsRoutes)
 app.use('/api/v1/analytics', analyticsRoutes)
+app.use('/api/v1/security',     securityRoutes)
 app.use('/api/v1/integrations', integrationsRoutes)
 app.use('/api/v1/ai2',         ai2Routes)
 app.use('/api/v1/omni',        multicanalRoutes)
@@ -125,6 +127,7 @@ app.listen(config.app.port, () => {
 })
 
 export default app
+
 
 
 

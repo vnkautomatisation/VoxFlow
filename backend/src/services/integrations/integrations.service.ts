@@ -252,7 +252,7 @@ export class IntegrationsService {
       })
 
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as any
         const contacts = data.results || []
 
         for (const contact of contacts) {
@@ -316,3 +316,4 @@ export class IntegrationsService {
 }
 
 export const integrationsService = new IntegrationsService()
+

@@ -1,65 +1,82 @@
 ﻿# VoxFlow — Plateforme SaaS Call Center
 
-> Un produit de **VNK Automatisation Inc.**
+> Un produit de **VNK Automatisation Inc.** | Montreal, Quebec, Canada
 
-## Description
-VoxFlow est une plateforme SaaS de call center complète avec 3 niveaux d'utilisateurs :
-- **Owner** (VNK) — Gestion globale, facturation, revenus
-- **Admin** — Entreprises clientes, gestion de leurs agents
-- **Agent** — Interface de travail, softphone WebRTC, CRM
+## Stack
 
-## Stack technique
+| Composant | Technologie |
+|-----------|-------------|
+| Frontend  | Next.js 14, TypeScript, Tailwind, Lucide React |
+| Backend   | Node.js, Express, TypeScript |
+| BDD       | Supabase (PostgreSQL) |
+| Cache     | Upstash Redis |
+| Telephonie| Twilio Voice WebRTC |
+| Paiements | Stripe |
+| IA        | OpenAI Whisper + GPT-4o mini |
+| Deploy    | Railway (backend) + Vercel (frontend) |
 
-| Couche          | Technologie                        |
-|-----------------|------------------------------------|
-| Frontend        | Next.js 14 + TypeScript            |
-| Backend         | Node.js + Express                  |
-| Base de données | Supabase (PostgreSQL)              |
-| Cache           | Redis (Upstash)                    |
-| Téléphonie      | Twilio (VoIP, WebRTC, SMS)        |
-| Paiements       | Stripe                             |
-| IA              | OpenAI Whisper + GPT-4o mini       |
-| Emails          | Resend                             |
-| Déploiement     | Vercel (front) + Railway (back)   |
+## URLs locales
 
-## Structure du projet
+| Service   | URL |
+|-----------|-----|
+| Frontend  | http://localhost:3001 |
+| Backend   | http://localhost:4000 |
+| API Health| http://localhost:4000/api/v1/health |
 
-\\\
-VoxFlow/
-├── frontend/          # Next.js 14 — interface utilisateur
-├── backend/           # Node.js — API REST + WebSockets
-├── assets/            # Logos, images, audio partagés
-├── docs/              # Documentation projet
-├── scripts/           # Scripts utilitaires
-├── infra/             # Docker, Nginx, SSL
-└── .github/           # CI/CD GitHub Actions
-\\\
+## Comptes de test
 
-## Démarrage rapide
+| Role  | Email | Mot de passe |
+|-------|-------|-------------|
+| Owner | owner@voxflow.io | VoxFlow123! |
+| Admin | admin@test.com | VoxFlow123! |
+| Agent | agent@test.com | VoxFlow123! |
 
-\\\powershell
-# 1. Variables d'environnement
-Copy-Item frontend\.env.example frontend\.env.local
-Copy-Item backend\.env.example  backend\.env
+## Pages principales
 
-# 2. Docker (Postgres + Redis local)
-docker-compose up -d
+| Page | URL |
+|------|-----|
+| Landing | /marketing |
+| Login | /login |
+| Register | /register |
+| Onboarding | /onboarding |
+| Owner Dashboard | /owner/dashboard |
+| Admin Dashboard | /admin/dashboard |
+| CRM | /admin/crm |
+| Routage ACD | /admin/queues |
+| Supervision | /admin/supervision |
+| Boite unifiee | /admin/inbox |
+| IA + Dialer | /admin/ia |
+| Integrations | /admin/integrations |
+| Agent Dashboard | /agent/dashboard |
+| Profil | /profile |
+| Securite | /profile/security |
 
-# 3. Frontend
-cd frontend
-npm install
-npm run dev
+## 10 Phases completees
 
-# 4. Backend (nouveau terminal)
-cd backend
-npm install
-npm run dev
-\\\
+| Phase | Description | Statut |
+|-------|-------------|--------|
+| 1 | Auth JWT + roles + BDD | COMPLETE |
+| 2 | Onboarding + Register + Email | COMPLETE |
+| 3 | CRM Contacts complet | COMPLETE |
+| 4 | Softphone Pro + Popup flottant | COMPLETE |
+| 5 | Routage ACD avance | COMPLETE |
+| 6 | Supervision temps reel | COMPLETE |
+| 7 | Multicanal (WhatsApp+Chat+Email) | COMPLETE |
+| 8 | IA avancee + Power Dialer | COMPLETE |
+| 9 | Integrations API | COMPLETE |
+| 10 | Securite 2FA + Deploiement | COMPLETE |
 
-URLs de développement :
-- Frontend : http://localhost:3000
-- Backend  : http://localhost:4000
-- Redis UI : http://localhost:8081
+## Deploiement
+
+### Backend (Railway)
+1. railway.app > New Project > GitHub > VoxFlow/backend
+2. Configurer les variables .env.production.example
+3. Railway deploie automatiquement
+
+### Frontend (Vercel)
+1. vercel.com > New Project > GitHub > VoxFlow/frontend
+2. Root directory: frontend
+3. Configurer les variables d environnement
 
 ---
-© 2026 VNK Automatisation Inc. — Tous droits réservés
+VNK Automatisation Inc. - 2026
