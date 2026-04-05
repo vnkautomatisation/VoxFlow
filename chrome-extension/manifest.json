@@ -1,0 +1,42 @@
+﻿{
+  "manifest_version": 3,
+  "name": "VoxFlow Dialer",
+  "version": "1.0.0",
+  "description": "Dialer VoIP natif — Appels, Caller Insights, Click-to-call",
+  "icons": {
+    "16":  "icons/icon.svg",
+    "48":  "icons/icon.svg",
+    "128": "icons/icon.svg"
+  },
+  "action": {
+    "default_title": "VoxFlow — Ouvrir le dialer",
+    "default_icon": {
+      "16":  "icons/icon.svg",
+      "48":  "icons/icon.svg",
+      "128": "icons/icon.svg"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "notifications",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:4000/*",
+    "http://localhost:3001/*",
+    "https://*.ngrok-free.dev/*"
+  ]
+}

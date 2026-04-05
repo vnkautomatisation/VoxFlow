@@ -1,4 +1,4 @@
-﻿import securityRoutes     from './routes/security/index'
+import securityRoutes     from './routes/security/index'
 import integrationsRoutes from './routes/integrations/index'
 import ai2Routes        from './routes/ai_advanced/index'
 import multicanalRoutes from './routes/multicanal/index'
@@ -31,13 +31,13 @@ const app = express()
 // ── Rate limiting ────────────────────────────────────────────────
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max:      100,
+  max: 1000,
   message:  { success: false, error: 'Trop de requêtes, réessayez plus tard' },
 })
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max:      100, // 10 tentatives de login par 15min
+  max: 200, // 10 tentatives de login par 15min
   message:  { success: false, error: 'Trop de tentatives de connexion' },
 })
 
@@ -127,6 +127,7 @@ app.listen(config.app.port, () => {
 })
 
 export default app
+
 
 
 

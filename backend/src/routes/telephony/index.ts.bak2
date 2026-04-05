@@ -60,23 +60,12 @@ router.post("/call/outbound", authenticate, async (req: AuthRequest, res: Respon
       started_at:      new Date().toISOString(),
     }).select().single()
 
-    // Lancer le vrai appel Twilio
-    const twilioCall = await twilioService.makeOutboundCall({
-      to,
-      from:        fromNumber || process.env.TWILIO_PHONE_NUMBER || "",
-      callbackUrl: BACKEND() + "/api/v1/telephony/webhook/answer",
-      statusUrl:   BACKEND() + "/api/v1/telephony/webhook/status",
-    })
+    // Mode WebRTC : l appel est initié par Twilio.Device.connect() côté client
+    // On enregistre juste l appel en DB et on retourne les infos
+    // Le vrai appel sera établi quand Twilio appellera /webhook/voice
+    console.log("[VoxFlow] Appel WebRTC vers:", to, "| Call ID:", (call as any)?.id)
 
-    console.log("[Twilio] Appel sortant:", twilioCall.sid, "->", to)
-
-    if ((call as any)?.id) {
-      await supabaseAdmin.from("calls")
-        .update({ twilio_sid: twilioCall.sid })
-        .eq("id", (call as any).id)
-    }
-
-    sendSuccess(res, { call: { ...(call as any), twilio_sid: twilioCall.sid }, contact }, 201)
+    sendSuccess(res, { call: { ...(call as any) }, contact }, 201)
   } catch (err: any) {
     console.error("[Twilio ERROR outbound]", err.message)
     sendError(res, "Erreur Twilio: " + err.message, 500)
@@ -296,43 +285,82 @@ router.get("/lookup/:phone", authenticate, async (req: AuthRequest, res: Respons
 //  WEBHOOKS TWILIO
 // ════════════════════════════════════════════════════════════
 
-// Appel entrant
+// ════════════════════════════════════════════════════════════
+//  WEBHOOK VOICE — Appels entrants ET sortants WebRTC
+//  Twilio appelle ce webhook pour tous les appels
+//  - Entrant : client appelle +16627035718
+//  - Sortant : Device.connect({params:{To:number}})
+// ════════════════════════════════════════════════════════════
 router.post("/webhook/voice", async (req: Request, res: Response) => {
   try {
     const { From, To, CallSid } = req.body
     const orgId = String(req.query.orgId || "org_test_001")
-    console.log(`[Twilio] Entrant: ${From} -> ${To} | SID: ${CallSid}`)
 
-    const contact = orgId ? await findContactByPhone(From, orgId) : null
+    console.log(`[Twilio] Webhook voice: From=${From} To=${To} SID=${CallSid}`)
 
-    if (orgId) {
+    // Trouver un agent disponible
+    const { data: agentsData } = await supabaseAdmin
+      .from("agents")
+      .select("user_id")
+      .eq("organization_id", orgId)
+      .eq("status", "ONLINE")
+      .limit(1)
+
+    const agentIdentity = agentsData?.length ? agentsData[0].user_id : "agent-default"
+    console.log(`[Twilio] Agent cible: ${agentIdentity}`)
+
+    // Appel SORTANT WebRTC : To = numéro destination (pas le numéro Twilio)
+    if (To && To !== process.env.TWILIO_PHONE_NUMBER && !To.includes("voxflow")) {
+      // Enregistrer l'appel sortant
       await supabaseAdmin.from("calls").insert({
         organization_id: orgId,
         twilio_sid:      CallSid,
-        from_number:     From,
+        from_number:     process.env.TWILIO_PHONE_NUMBER || From,
         to_number:       To,
-        direction:       "INBOUND",
+        direction:       "OUTBOUND",
         status:          "RINGING",
-        contact_id:      contact?.id || null,
         started_at:      new Date().toISOString(),
+      }).catch(() => {})
+
+      // TwiML : composer le numéro destination
+      const VoiceResponse = (require("twilio")).twiml.VoiceResponse
+      const response = new VoiceResponse()
+      const dial = response.dial({
+        callerId:  process.env.TWILIO_PHONE_NUMBER || From,
+        record:    "record-from-answer-dual",
+        timeout:   30,
       })
+
+      if (/^\+?[0-9]{7,}$/.test(To.replace(/\s/g, ""))) {
+        dial.number(To)
+      } else {
+        dial.client(To)
+      }
+
+      res.set("Content-Type", "text/xml")
+      res.send(response.toString())
+      return
     }
 
-    // Trouver agent disponible
-    let agentIdentity = "agent-default"
-    if (orgId) {
-      const { data: agents } = await supabaseAdmin
-        .from("agents")
-        .select("user_id")
-        .eq("organization_id", orgId)
-        .eq("status", "ONLINE")
-        .limit(1)
-      if (agents?.length) agentIdentity = agents[0].user_id
-    }
+    // Appel ENTRANT : client appelle le numéro Twilio
+    const contact = await findContactByPhone(From, orgId)
 
+    await supabaseAdmin.from("calls").insert({
+      organization_id: orgId,
+      twilio_sid:      CallSid,
+      from_number:     From,
+      to_number:       To,
+      direction:       "INBOUND",
+      status:          "RINGING",
+      contact_id:      contact?.id || null,
+      started_at:      new Date().toISOString(),
+    }).catch(() => {})
+
+    // Générer TwiML entrant → connecter à l'agent
     const twiml = twilioService.generateIncomingTwiML({ agentIdentity })
     res.set("Content-Type", "text/xml")
     res.send(twiml)
+
   } catch (err: any) {
     console.error("[Webhook voice error]", err.message)
     res.set("Content-Type", "text/xml")
@@ -340,54 +368,11 @@ router.post("/webhook/voice", async (req: Request, res: Response) => {
   }
 })
 
-// Statut appel
-router.post("/webhook/status", async (req: Request, res: Response) => {
-  try {
-    const { CallSid, CallStatus, CallDuration, RecordingUrl } = req.body
-    if (!CallSid) return res.json({ ok: true })
-
-    const statusMap: Record<string, string> = {
-      "queued":      "RINGING",
-      "ringing":     "RINGING",
-      "in-progress": "IN_PROGRESS",
-      "completed":   "COMPLETED",
-      "busy":        "BUSY",
-      "failed":      "FAILED",
-      "no-answer":   "NO_ANSWER",
-      "canceled":    "CANCELLED",
-    }
-
-    const update: any = { status: statusMap[CallStatus] || CallStatus.toUpperCase() }
-    if (CallDuration) update.duration = parseInt(CallDuration)
-    if (RecordingUrl) update.recording_url = RecordingUrl + ".mp3"
-    if (["completed","failed","busy","no-answer","canceled"].includes(CallStatus)) {
-      update.ended_at = new Date().toISOString()
-    }
-
-    await supabaseAdmin.from("calls").update(update).eq("twilio_sid", CallSid)
-
-    // Transcription auto si enregistrement
-    if (RecordingUrl) {
-      const { data: call } = await supabaseAdmin
-        .from("calls").select("id").eq("twilio_sid", CallSid).single()
-      if (call) {
-        twilioService.transcribeAudio(RecordingUrl + ".mp3", (call as any).id)
-          .catch((e: any) => console.error("[Whisper error]", e.message))
-      }
-    }
-
-    res.json({ ok: true })
-  } catch (err: any) {
-    console.error("[Webhook status error]", err.message)
-    res.json({ ok: true })
-  }
-})
-
 // Voicemail
 router.post("/webhook/voicemail", async (req: Request, res: Response) => {
   try {
     const { CallSid, RecordingUrl, From, To } = req.body
-    const orgId = String(req.query.orgId || "org_test_001")
+    const orgId = String(req.query.orgId || "")
     console.log(`[Twilio] Voicemail: ${From} | ${RecordingUrl}`)
 
     if (orgId) {
@@ -433,7 +418,7 @@ router.get("/twiml/conference/:name", (req: Request, res: Response) => {
 })
 
 router.get("/twiml/voicemail", (req: Request, res: Response) => {
-  const orgId = String(req.query.orgId || "org_test_001")
+  const orgId = String(req.query.orgId || "")
   res.set("Content-Type", "text/xml")
   res.send(twilioService.generateVoicemailTwiML(orgId))
 })

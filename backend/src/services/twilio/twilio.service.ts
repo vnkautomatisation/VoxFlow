@@ -86,8 +86,15 @@ export class TwilioService {
       enqueue.task(JSON.stringify({ agentIdentity: opts.agentIdentity }))
     } else {
       // Connecter directement au client navigateur
-      const dial = response.dial({ callerId: phoneNumber, record: "record-from-answer-dual" })
-      dial.client(opts.agentIdentity)
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:4000"
+      const orgParam = ""
+      const dial = response.dial({
+        callerId: phoneNumber,
+        record: "record-from-answer-dual",
+        action: `${backendUrl}/api/v1/telephony/webhook/status`,
+        timeout: 30,
+      } as any)
+      dial.client(opts.agentIdentity as any)
     }
 
     return response.toString()

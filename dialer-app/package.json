@@ -1,0 +1,44 @@
+{
+  "name": "voxflow-dialer",
+  "version": "1.0.0",
+  "description": "VoxFlow Dialer",
+  "main": "main.js",
+  "author": "VNK Automatisation Inc.",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --publish never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "io.voxflow.dialer",
+    "productName": "VoxFlow Dialer",
+    "directories": { "output": "dist" },
+    "files": [ "main.js", "src/**/*" ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [ "x64" ]
+        }
+      ],
+      "icon": "src/icon.ico",
+      "sign": null,
+      "signingHashAlgorithms": null,
+      "certificateFile": null,
+      "certificatePassword": null
+    },
+    "nsis": {
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VoxFlow Dialer",
+      "runAfterFinish": true
+    }
+  }
+}

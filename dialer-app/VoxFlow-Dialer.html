@@ -1,0 +1,2858 @@
+sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>VoxFlow Dialer</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --ink: #111118;
+            --ink2: #18181f;
+            --ink3: #1f1f2a;
+            --ink4: #27273a;
+            --ink5: #30304a;
+            --line: #2e2e44;
+            --line2: #3a3a55;
+            --violet: #7b61ff;
+            --vi2: #6145ff;
+            --vi3: rgba(123,97,255,.13);
+            --vi4: rgba(123,97,255,.06);
+            --mint: #00d4aa;
+            --mi2: #00a884;
+            --mi3: rgba(0,212,170,.12);
+            --rose: #ff4d6d;
+            --ro2: #e03050;
+            --ro3: rgba(255,77,109,.12);
+            --sky: #38b6ff;
+            --sk3: rgba(56,182,255,.12);
+            --amber: #ffb547;
+            --am3: rgba(255,181,71,.12);
+            --txt: #eeeef8;
+            --tx2: #9898b8;
+            --tx3: #55557a;
+            --tx4: #35355a;
+            --font: 'DM Sans',sans-serif;
+            --mono: 'JetBrains Mono',monospace;
+            --rb: 14px;
+            --rs: 8px;
+            --rp: 20px;
+        }
+
+        html, body {
+            min-height: 100vh;
+            background: var(--ink);
+            font-family: var(--font);
+            color: var(--txt);
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 16px
+        }
+
+        .popup {
+            width: 360px;
+            height: 700px;
+            background: var(--ink2);
+            border-radius: 20px;
+            border: 1px solid var(--line);
+            box-shadow: 0 0 0 1px rgba(123,97,255,.08),0 40px 100px rgba(0,0,0,.9),0 12px 40px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative
+        }
+        /* ── TOAST ─────────────────────────────────────────────── */
+        .toast {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ink4);
+            border: 1px solid var(--line2);
+            border-radius: var(--rp);
+            padding: 6px 16px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--txt);
+            box-shadow: 0 8px 28px rgba(0,0,0,.6);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s;
+            z-index: 999;
+            white-space: nowrap
+        }
+
+            .toast.on {
+                opacity: 1
+            }
+        /* ── ROLE BADGE ─────────────────────────────────────────── */
+        .role-badge {
+            padding: 2px 8px;
+            border-radius: var(--rp);
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .07em
+        }
+
+            .role-badge.admin {
+                background: rgba(123,97,255,.2);
+                border: 1px solid rgba(123,97,255,.35);
+                color: var(--violet)
+            }
+
+            .role-badge.agent {
+                background: rgba(56,182,255,.15);
+                border: 1px solid rgba(56,182,255,.25);
+                color: var(--sky)
+            }
+        /* ── HEADER ─────────────────────────────────────────────── */
+        .hdr {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 14px;
+            background: var(--ink3);
+            border-bottom: 1px solid var(--line);
+            flex-shrink: 0
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--violet);
+            letter-spacing: -.2px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .logo-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--violet);
+            box-shadow: 0 0 8px var(--violet)
+        }
+
+        .hdr-mid {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px
+        }
+
+        .chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--ink4);
+            border: 1px solid var(--line);
+            border-radius: var(--rp);
+            padding: 3px 9px 3px 7px;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: var(--tx2);
+            cursor: pointer
+        }
+
+        .chip-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: all .3s
+        }
+
+            .chip-dot.on {
+                background: var(--mint);
+                box-shadow: 0 0 6px var(--mint)
+            }
+
+            .chip-dot.pause {
+                background: var(--amber);
+                box-shadow: 0 0 6px var(--amber)
+            }
+
+            .chip-dot.off {
+                background: var(--tx3);
+                box-shadow: none
+            }
+
+        .ext-chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(56,182,255,.08);
+            border: 1px solid rgba(56,182,255,.2);
+            border-radius: var(--rp);
+            padding: 3px 9px;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--sky);
+            font-family: var(--mono)
+        }
+
+        .hdr-r {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0
+        }
+
+        .ibt {
+            width: 28px;
+            height: 28px;
+            background: none;
+            border: none;
+            color: var(--tx3);
+            cursor: pointer;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .15s
+        }
+
+            .ibt:hover {
+                background: var(--ink4);
+                color: var(--txt)
+            }
+
+        .ssel {
+            background: none;
+            border: none;
+            color: var(--txt);
+            font-size: 10.5px;
+            font-family: var(--font);
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            -webkit-appearance: none
+        }
+
+            .ssel option {
+                background: #1f1f2a
+            }
+        /* ── TABS ─────────────────────────────────────────────────── */
+        .tabs {
+            display: flex;
+            background: var(--ink3);
+            border-bottom: 1px solid var(--line);
+            flex-shrink: 0;
+            overflow-x: auto;
+            scrollbar-width: none
+        }
+
+            .tabs::-webkit-scrollbar {
+                display: none
+            }
+
+        .tab {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            border-bottom: 2px solid transparent;
+            background: none;
+            color: var(--tx3);
+            font-size: 9px;
+            font-family: var(--font);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            padding: 9px 2px 7px;
+            cursor: pointer;
+            position: relative;
+            transition: all .15s;
+            white-space: nowrap
+        }
+
+            .tab.on {
+                color: var(--txt);
+                border-bottom-color: var(--violet);
+                background: rgba(123,97,255,.04)
+            }
+
+            .tab:hover:not(.on) {
+                color: var(--tx2)
+            }
+
+        .tbdg {
+            position: absolute;
+            top: 4px;
+            right: 2px;
+            background: var(--rose);
+            color: #fff;
+            font-size: 8px;
+            font-weight: 800;
+            border-radius: 50%;
+            width: 13px;
+            height: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+        /* ── SCROLL ─────────────────────────────────────────────── */
+        .scroll {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden
+        }
+
+            .scroll::-webkit-scrollbar {
+                width: 3px
+            }
+
+            .scroll::-webkit-scrollbar-thumb {
+                background: var(--line2);
+                border-radius: 2px
+            }
+        /* ── VIEW / PANE ────────────────────────────────────────── */
+        .view {
+            display: none
+        }
+
+            .view.on {
+                display: flex;
+                flex-direction: column
+            }
+
+        .pane {
+            display: none
+        }
+
+            .pane.on {
+                display: block
+            }
+
+        .p12 {
+            padding: 12px
+        }
+
+        .slbl {
+            font-size: 9px;
+            color: var(--tx3);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            margin-bottom: 9px;
+            display: flex;
+            align-items: center;
+            gap: 7px
+        }
+
+            .slbl::after {
+                content: '';
+                flex: 1;
+                height: 1px;
+                background: var(--line)
+            }
+        /* ── LOGIN ─────────────────────────────────────────────── */
+        .login-wrap {
+            padding: 28px 22px;
+            display: flex;
+            flex-direction: column
+        }
+
+        .lbrand {
+            text-align: center;
+            margin-bottom: 26px
+        }
+
+            .lbrand .nm {
+                font-size: 30px;
+                font-weight: 700;
+                color: var(--violet);
+                letter-spacing: -.5px
+            }
+
+            .lbrand .sb {
+                font-size: 11px;
+                color: var(--tx3);
+                margin-top: 4px
+            }
+
+        .field {
+            margin-bottom: 13px
+        }
+
+            .field label {
+                display: block;
+                font-size: 10px;
+                color: var(--tx3);
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: .07em;
+                margin-bottom: 5px
+            }
+
+            .field input {
+                width: 100%;
+                background: var(--ink3);
+                border: 1px solid var(--line);
+                border-radius: var(--rs);
+                padding: 9px 12px;
+                color: var(--txt);
+                font-size: 13px;
+                font-family: var(--font);
+                outline: none;
+                transition: border-color .15s
+            }
+
+                .field input:focus {
+                    border-color: var(--violet)
+                }
+
+        .btn-login {
+            width: 100%;
+            margin-top: 6px;
+            background: var(--violet);
+            border: none;
+            color: #fff;
+            padding: 12px;
+            border-radius: var(--rb);
+            font-size: 14px;
+            font-weight: 700;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: background .15s
+        }
+
+            .btn-login:hover {
+                background: var(--vi2)
+            }
+
+        .lerr {
+            display: none;
+            background: var(--ro3);
+            border: 1px solid rgba(255,77,109,.3);
+            border-radius: var(--rs);
+            padding: 8px 12px;
+            font-size: 11px;
+            color: var(--rose);
+            margin-bottom: 12px;
+            font-weight: 600
+        }
+        /* ── DIALER ─────────────────────────────────────────────── */
+        .dinput {
+            width: 100%;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rb);
+            color: var(--txt);
+            font-family: var(--mono);
+            font-size: 22px;
+            text-align: center;
+            letter-spacing: 4px;
+            padding: 12px 14px 11px;
+            outline: none;
+            transition: border-color .15s;
+            margin-bottom: 10px
+        }
+
+            .dinput:focus {
+                border-color: var(--violet)
+            }
+
+            .dinput::placeholder {
+                color: var(--tx4);
+                letter-spacing: 0;
+                font-size: 13px;
+                font-family: var(--font)
+            }
+
+        .kpad {
+            display: grid;
+            grid-template-columns: repeat(3,1fr);
+            gap: 1px;
+            background: var(--line);
+            border-radius: var(--rb);
+            overflow: hidden;
+            margin-bottom: 10px
+        }
+
+        .key {
+            background: var(--ink3);
+            border: none;
+            color: var(--txt);
+            padding: 12px 4px;
+            font-size: 17px;
+            font-family: var(--font);
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+            transition: background .1s
+        }
+
+            .key:hover {
+                background: var(--ink4)
+            }
+
+            .key:active {
+                background: var(--ink5)
+            }
+
+        .ksub {
+            font-size: 8px;
+            color: var(--tx3);
+            letter-spacing: .12em;
+            font-weight: 600
+        }
+
+        .key.sp {
+            color: var(--violet)
+        }
+
+        .btn-call {
+            width: 100%;
+            background: linear-gradient(135deg,var(--mint),var(--mi2));
+            border: none;
+            color: #001a14;
+            padding: 12px;
+            border-radius: var(--rb);
+            font-size: 13px;
+            font-weight: 700;
+            font-family: var(--font);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all .15s;
+            box-shadow: 0 4px 22px rgba(0,212,170,.25)
+        }
+
+            .btn-call:hover {
+                box-shadow: 0 6px 28px rgba(0,212,170,.4);
+                transform: translateY(-1px)
+            }
+
+            .btn-call:disabled {
+                background: var(--ink4);
+                color: var(--tx3);
+                cursor: not-allowed;
+                box-shadow: none;
+                transform: none
+            }
+
+        .dial-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+            .dial-actions .btn-call {
+                flex: 1
+            }
+
+        .btn-del {
+            width: 52px;
+            height: 52px;
+            flex-shrink: 0;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: 50%;
+            color: var(--tx2);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s
+        }
+
+            .btn-del.visible {
+                display: flex
+            }
+
+            .btn-del:hover {
+                background: var(--ro3);
+                border-color: rgba(255,77,109,.3);
+                color: var(--rose);
+                transform: scale(1.05)
+            }
+        /* Recents */
+        .ri {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,.04)
+        }
+
+        .ricon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+            .ricon.in {
+                background: var(--mi3);
+                color: var(--mint)
+            }
+
+            .ricon.out {
+                background: var(--sk3);
+                color: var(--sky)
+            }
+
+            .ricon.miss {
+                background: var(--ro3);
+                color: var(--rose)
+            }
+        /* ── QUEUE ─────────────────────────────────────────────── */
+        .qs-grid {
+            display: grid;
+            grid-template-columns: repeat(3,1fr);
+            gap: 6px;
+            margin-bottom: 14px
+        }
+
+        .qs-card {
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rs);
+            padding: 10px 8px;
+            text-align: center
+        }
+
+        .qs-val {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: var(--mono);
+            line-height: 1
+        }
+
+        .qs-lbl {
+            font-size: 9px;
+            color: var(--tx3);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-top: 3px
+        }
+
+        .qi {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 10px;
+            border-radius: var(--rs);
+            border: 1px solid var(--line);
+            margin-bottom: 5px;
+            background: var(--ink3);
+            cursor: pointer;
+            transition: border-color .15s
+        }
+
+            .qi:hover {
+                border-color: var(--violet)
+            }
+
+            .qi.hot {
+                border-color: rgba(255,77,109,.3);
+                background: rgba(255,77,109,.03)
+            }
+
+        .qi-pos {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--ink4);
+            border: 1px solid var(--line2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--mono);
+            color: var(--tx2);
+            flex-shrink: 0
+        }
+
+            .qi-pos.r1 {
+                background: var(--ro3);
+                border-color: rgba(255,77,109,.35);
+                color: var(--rose)
+            }
+
+            .qi-pos.r2 {
+                background: var(--am3);
+                border-color: rgba(255,181,71,.3);
+                color: var(--amber)
+            }
+
+        .qi-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .qi-name {
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .qi-sub {
+            font-size: 10px;
+            color: var(--tx3);
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .qi-wait {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--amber);
+            background: var(--am3);
+            border-radius: 4px;
+            padding: 1px 5px
+        }
+
+            .qi-wait.hot {
+                color: var(--rose);
+                background: var(--ro3)
+            }
+
+        .btn-take {
+            background: var(--vi3);
+            border: 1px solid rgba(123,97,255,.25);
+            color: var(--violet);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap
+        }
+
+            .btn-take:hover {
+                background: rgba(123,97,255,.22)
+            }
+        /* ── AGENTS ─────────────────────────────────────────────── */
+        .ai {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            border-radius: var(--rs);
+            border: 1px solid var(--line);
+            margin-bottom: 5px;
+            background: var(--ink3)
+        }
+
+        .aav {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+            border: 2px solid transparent;
+            position: relative
+        }
+
+            .aav.on {
+                border-color: var(--mint);
+                box-shadow: 0 0 10px rgba(0,212,170,.2)
+            }
+
+            .aav.busy {
+                border-color: var(--rose);
+                box-shadow: 0 0 10px rgba(255,77,109,.18)
+            }
+
+            .aav.pause {
+                border-color: var(--amber);
+                box-shadow: 0 0 8px rgba(255,181,71,.18)
+            }
+
+            .aav.off {
+                border-color: var(--line2);
+                opacity: .45
+            }
+
+            .aav .live-dot {
+                position: absolute;
+                bottom: 0;
+                right: 0;
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                border: 2px solid var(--ink3)
+            }
+
+                .aav .live-dot.on {
+                    background: var(--mint);
+                    animation: lpulse 2s ease-in-out infinite
+                }
+
+                .aav .live-dot.busy {
+                    background: var(--rose)
+                }
+
+                .aav .live-dot.pause {
+                    background: var(--amber)
+                }
+
+                .aav .live-dot.off {
+                    background: var(--tx3)
+                }
+
+        @keyframes lpulse {
+            0%,100% {
+                box-shadow: 0 0 0 0 rgba(0,212,170,.5)
+            }
+
+            50% {
+                box-shadow: 0 0 0 3px rgba(0,212,170,0)
+            }
+        }
+
+        .ainfo {
+            flex: 1;
+            min-width: 0
+        }
+
+        .aname {
+            font-size: 12px;
+            font-weight: 600
+        }
+
+        .asub {
+            font-size: 10px;
+            color: var(--tx3);
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap
+        }
+
+        .aext {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--sky);
+            background: var(--sk3);
+            border-radius: 4px;
+            padding: 1px 6px
+        }
+
+        .ast {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em
+        }
+
+            .ast.on {
+                color: var(--mint)
+            }
+
+            .ast.busy {
+                color: var(--rose)
+            }
+
+            .ast.pause {
+                color: var(--amber)
+            }
+
+            .ast.off {
+                color: var(--tx3)
+            }
+
+        .atimer {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--tx2);
+            font-weight: 600
+        }
+
+        .acall-num {
+            font-size: 10px;
+            color: var(--tx3);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .sup-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 3px
+        }
+
+        .btn-sup {
+            background: var(--ink4);
+            border: 1px solid var(--line2);
+            color: var(--tx2);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap
+        }
+
+            .btn-sup.listen:hover {
+                background: var(--sk3);
+                border-color: rgba(56,182,255,.3);
+                color: var(--sky)
+            }
+
+            .btn-sup.whisper:hover {
+                background: var(--vi3);
+                border-color: rgba(123,97,255,.3);
+                color: var(--violet)
+            }
+
+            .btn-sup.barge:hover {
+                background: var(--ro3);
+                border-color: rgba(255,77,109,.3);
+                color: var(--rose)
+            }
+        /* Agent xfer (in-call) */
+        .axfer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,.04)
+        }
+        /* ── IN-CALL ─────────────────────────────────────────────── */
+        #view-calling .hdr {
+            background: linear-gradient(135deg,#0e0e1c,#12121f)
+        }
+
+        .ct {
+            padding: 22px 16px 16px;
+            text-align: center;
+            background: linear-gradient(180deg,#0d0d1f 0%,var(--ink2) 100%);
+            position: relative;
+            overflow: hidden
+        }
+
+            .ct::before {
+                content: '';
+                position: absolute;
+                top: -60px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 220px;
+                height: 220px;
+                border-radius: 50%;
+                background: radial-gradient(circle,rgba(123,97,255,.14) 0%,transparent 70%);
+                pointer-events: none
+            }
+
+        .cav {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            margin: 0 auto 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 23px;
+            font-weight: 700;
+            position: relative;
+            z-index: 1
+        }
+
+        .cav-ring {
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 2px solid rgba(123,97,255,.35);
+            animation: cavr 2.2s ease-in-out infinite
+        }
+
+        @keyframes cavr {
+            0%,100% {
+                transform: scale(1);
+                opacity: .6
+            }
+
+            50% {
+                transform: scale(1.07);
+                opacity: .15
+            }
+        }
+
+        .cname {
+            font-size: 16px;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+            margin-bottom: 2px
+        }
+
+        .cco {
+            font-size: 12px;
+            color: var(--tx3);
+            z-index: 1;
+            position: relative;
+            margin-bottom: 3px
+        }
+
+        .cnum {
+            font-size: 11px;
+            color: var(--tx2);
+            font-family: var(--mono);
+            z-index: 1;
+            position: relative
+        }
+
+        .cpill-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px
+        }
+
+        .cpill {
+            background: rgba(0,212,170,.14);
+            border: 1px solid rgba(0,212,170,.3);
+            color: var(--mint);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 11px;
+            border-radius: var(--rp);
+            letter-spacing: .06em;
+            text-transform: uppercase
+        }
+
+            .cpill.hold {
+                background: var(--am3);
+                border-color: rgba(255,181,71,.3);
+                color: var(--amber)
+            }
+
+            .cpill.muted {
+                background: var(--ro3);
+                border-color: rgba(255,77,109,.3);
+                color: var(--rose)
+            }
+
+        .ctimer {
+            font-family: var(--mono);
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--sky);
+            margin-top: 9px;
+            letter-spacing: 4px;
+            text-shadow: 0 0 24px rgba(56,182,255,.3)
+        }
+
+        .cbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 6px 12px;
+            background: var(--ink3);
+            border-top: 1px solid var(--line);
+            font-size: 10px;
+            color: var(--tx3);
+            font-weight: 600
+        }
+
+        .cbar-chip {
+            display: flex;
+            align-items: center;
+            gap: 4px
+        }
+
+            .cbar-chip svg {
+                width: 11px;
+                height: 11px
+            }
+
+        .qdot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--mint)
+        }
+
+        .rec-ind {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--rose);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            padding: 3px 9px;
+            background: var(--ro3);
+            border-radius: var(--rp);
+            border: 1px solid rgba(255,77,109,.25)
+        }
+
+            .rec-ind.on {
+                display: flex
+            }
+
+        .rec-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--rose);
+            animation: rb 1s ease-in-out infinite
+        }
+
+        @keyframes rb {
+            0%,100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .2
+            }
+        }
+
+        .cacts {
+            display: grid;
+            grid-template-columns: repeat(3,1fr);
+            gap: 1px;
+            background: var(--line)
+        }
+
+        .abt {
+            background: var(--ink3);
+            border: none;
+            color: var(--tx2);
+            padding: 13px 4px 11px;
+            font-size: 9px;
+            font-family: var(--font);
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            transition: all .15s;
+            text-transform: uppercase;
+            letter-spacing: .05em
+        }
+
+            .abt:hover {
+                background: var(--ink4);
+                color: var(--txt)
+            }
+
+            .abt svg {
+                width: 20px;
+                height: 20px
+            }
+
+            .abt.m-mute {
+                background: var(--ro3);
+                color: var(--rose)
+            }
+
+            .abt.m-hold {
+                background: var(--am3);
+                color: var(--amber)
+            }
+
+            .abt.m-rec {
+                background: rgba(255,77,109,.18);
+                color: var(--rose)
+            }
+
+            .abt.m-panel {
+                background: var(--vi3);
+                color: var(--violet)
+            }
+
+            .abt.locked {
+                opacity: .35;
+                cursor: not-allowed
+            }
+
+        .btn-hup {
+            margin: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: linear-gradient(135deg,var(--ro2),#c01040);
+            border: none;
+            color: #fff;
+            padding: 12px;
+            border-radius: var(--rb);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: var(--font);
+            width: calc(100% - 24px);
+            transition: all .15s;
+            box-shadow: 0 4px 22px rgba(255,77,109,.25)
+        }
+
+            .btn-hup:hover {
+                box-shadow: 0 6px 30px rgba(255,77,109,.4);
+                transform: translateY(-1px)
+            }
+
+        .cpanel {
+            display: none;
+            padding: 10px 12px;
+            border-top: 1px solid var(--line);
+            background: rgba(255,255,255,.012);
+            animation: panin .15s ease
+        }
+
+            .cpanel.on {
+                display: block
+            }
+
+        @keyframes panin {
+            from {
+                opacity: 0;
+                transform: translateY(-5px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .cpanel label {
+            font-size: 10px;
+            color: var(--tx3);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            display: block;
+            margin-bottom: 5px
+        }
+
+        .cpanel input, .cpanel textarea {
+            width: 100%;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rs);
+            color: var(--txt);
+            padding: 8px 10px;
+            font-size: 12px;
+            font-family: var(--font);
+            outline: none;
+            margin-bottom: 6px;
+            resize: none;
+            transition: border-color .15s
+        }
+
+            .cpanel input:focus, .cpanel textarea:focus {
+                border-color: var(--violet)
+            }
+
+        .prow {
+            display: flex;
+            gap: 6px;
+            align-items: center
+        }
+
+            .prow input {
+                margin-bottom: 0;
+                flex: 1
+            }
+
+        .pbtn {
+            background: var(--violet);
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: var(--rs);
+            font-size: 12px;
+            font-weight: 700;
+            font-family: var(--font);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .15s
+        }
+
+            .pbtn:hover {
+                background: var(--vi2)
+            }
+
+            .pbtn.mint {
+                background: var(--mi2)
+            }
+        /* Caller Insights */
+        .ins {
+            margin: 0 12px 12px;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rb);
+            padding: 12px
+        }
+
+        .ins-title {
+            font-size: 9px;
+            color: var(--tx3);
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            font-weight: 800;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .ins-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--tx3);
+            margin-bottom: 5px
+        }
+
+        .ins-val {
+            color: var(--txt);
+            font-weight: 600;
+            font-size: 11px;
+            text-align: right;
+            max-width: 58%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+            .ins-val.vi {
+                color: var(--violet)
+            }
+
+            .ins-val.mi {
+                color: var(--mint)
+            }
+
+            .ins-val.am {
+                color: var(--amber)
+            }
+
+            .ins-val.ro {
+                color: var(--rose)
+            }
+
+        .btn-crm {
+            width: 100%;
+            margin-top: 9px;
+            background: var(--vi4);
+            border: 1px solid rgba(123,97,255,.2);
+            color: var(--violet);
+            padding: 7px;
+            border-radius: var(--rs);
+            font-size: 11px;
+            font-family: var(--font);
+            font-weight: 700;
+            cursor: pointer;
+            transition: background .15s
+        }
+
+            .btn-crm:hover {
+                background: var(--vi3)
+            }
+        /* ── INCOMING ─────────────────────────────────────────────── */
+        .inc-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 22px;
+            flex: 1;
+            text-align: center
+        }
+
+        .inc-ring {
+            position: relative;
+            width: 84px;
+            height: 84px;
+            margin: 0 auto 18px
+        }
+
+            .inc-ring .cav {
+                margin: 0;
+                width: 84px;
+                height: 84px;
+                font-size: 27px
+            }
+
+        .wave {
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,212,170,.4);
+            animation: wv 1.6s ease-out infinite
+        }
+
+            .wave.w2 {
+                animation-delay: .45s;
+                inset: -16px;
+                border-color: rgba(0,212,170,.2)
+            }
+
+            .wave.w3 {
+                animation-delay: .9s;
+                inset: -25px;
+                border-color: rgba(0,212,170,.1)
+            }
+
+        @keyframes wv {
+            0% {
+                transform: scale(.85);
+                opacity: 1
+            }
+
+            100% {
+                transform: scale(1.1);
+                opacity: 0
+            }
+        }
+
+        .inc-lbl {
+            font-size: 11px;
+            color: var(--mint);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            margin-bottom: 14px;
+            animation: blk 1.3s ease-in-out infinite
+        }
+
+        @keyframes blk {
+            0%,100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .35
+            }
+        }
+
+        .inc-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 22px;
+            width: 100%
+        }
+
+        .btn-ref {
+            flex: 1;
+            background: var(--ro3);
+            border: 1px solid rgba(255,77,109,.3);
+            color: var(--rose);
+            padding: 13px;
+            border-radius: var(--rb);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: var(--font);
+            transition: all .15s
+        }
+
+            .btn-ref:hover {
+                background: rgba(255,77,109,.2)
+            }
+
+        .btn-ans {
+            flex: 1;
+            background: linear-gradient(135deg,var(--mint),var(--mi2));
+            border: none;
+            color: #001a14;
+            padding: 13px;
+            border-radius: var(--rb);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: var(--font);
+            transition: all .15s;
+            box-shadow: 0 4px 18px rgba(0,212,170,.3)
+        }
+
+            .btn-ans:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 6px 22px rgba(0,212,170,.4)
+            }
+        /* ── HISTORY ─────────────────────────────────────────────── */
+        .frow {
+            display: flex;
+            gap: 4px;
+            padding: 10px 12px 0;
+            overflow-x: auto;
+            scrollbar-width: none
+        }
+
+            .frow::-webkit-scrollbar {
+                display: none
+            }
+
+        .fc {
+            flex-shrink: 0;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            color: var(--tx3);
+            padding: 4px 10px;
+            border-radius: var(--rp);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+            .fc.on {
+                background: var(--vi3);
+                border-color: rgba(123,97,255,.3);
+                color: var(--violet)
+            }
+
+        .hi {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.04);
+            cursor: pointer;
+            transition: background .1s
+        }
+
+            .hi:hover {
+                background: rgba(255,255,255,.02)
+            }
+
+        .hico {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0
+        }
+
+        .hinfo {
+            flex: 1;
+            min-width: 0
+        }
+
+        .hname {
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .hmeta {
+            font-size: 10px;
+            color: var(--tx3);
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .hdur {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--tx2)
+        }
+
+        .htag {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: .04em
+        }
+
+            .htag.ok {
+                background: var(--mi3);
+                color: var(--mint)
+            }
+
+            .htag.miss {
+                background: var(--ro3);
+                color: var(--rose)
+            }
+
+            .htag.busy {
+                background: var(--am3);
+                color: var(--amber)
+            }
+
+        .hacts {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex-shrink: 0
+        }
+        /* ── VOICEMAILS ─────────────────────────────────────────── */
+        .vmi {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.04)
+        }
+
+        .vmh {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 5px
+        }
+
+        .vmn {
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .vmnew {
+            background: rgba(123,97,255,.2);
+            color: #c9b8ff;
+            font-size: 8px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: .05em
+        }
+
+        .vmtime {
+            font-size: 10px;
+            color: var(--tx3)
+        }
+
+        .vmtr {
+            font-size: 11px;
+            color: var(--tx2);
+            font-style: italic;
+            border-left: 2px solid var(--violet);
+            padding-left: 8px;
+            line-height: 1.65;
+            margin-top: 4px
+        }
+
+        .btn-play {
+            background: var(--vi3);
+            border: 1px solid rgba(123,97,255,.2);
+            color: var(--violet);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: var(--font)
+        }
+        /* ── SEARCH ─────────────────────────────────────────────── */
+        .sinp {
+            width: 100%;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rb);
+            color: var(--txt);
+            font-size: 13px;
+            padding: 10px 13px;
+            font-family: var(--font);
+            outline: none;
+            transition: border-color .15s;
+            margin-bottom: 11px
+        }
+
+            .sinp:focus {
+                border-color: var(--violet)
+            }
+
+        .coi {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px solid rgba(255,255,255,.04)
+        }
+
+        .coav {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+        .coinf {
+            flex: 1;
+            min-width: 0
+        }
+
+        .coname {
+            font-size: 13px;
+            font-weight: 600
+        }
+
+        .cosub {
+            font-size: 10px;
+            color: var(--tx3);
+            margin-top: 2px
+        }
+        /* ── WRAP-UP ─────────────────────────────────────────────── */
+        .wu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            padding: 40px;
+            flex: 1
+        }
+
+        .wu-ico {
+            color: var(--mint);
+            margin-bottom: 4px
+        }
+
+        .wu-ttl {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--mint)
+        }
+
+        .wu-dur {
+            font-size: 12px;
+            color: var(--tx3);
+            font-family: var(--mono)
+        }
+
+        .wu-sc {
+            margin-top: 12px;
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rb);
+            padding: 14px 18px;
+            width: 100%;
+            text-align: center
+        }
+
+        .wu-sc-lbl {
+            font-size: 10px;
+            color: var(--tx3);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 9px
+        }
+
+        .stars {
+            font-size: 24px;
+            cursor: pointer;
+            letter-spacing: 2px
+        }
+
+            .stars span {
+                transition: color .1s
+            }
+
+        .wu-tags {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            justify-content: center
+        }
+
+        .wu-tag {
+            background: var(--ink4);
+            border: 1px solid var(--line2);
+            color: var(--tx2);
+            padding: 4px 10px;
+            border-radius: var(--rp);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .15s
+        }
+
+            .wu-tag.picked {
+                background: var(--vi3);
+                border-color: rgba(123,97,255,.3);
+                color: var(--violet)
+            }
+        /* ── SHARED ─────────────────────────────────────────────── */
+        .bsm {
+            background: var(--mi3);
+            border: 1px solid rgba(0,212,170,.25);
+            color: var(--mint);
+            padding: 4px 9px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap
+        }
+
+            .bsm:hover {
+                background: rgba(0,212,170,.2)
+            }
+
+            .bsm.bl {
+                background: var(--sk3);
+                border-color: rgba(56,182,255,.25);
+                color: var(--sky)
+            }
+
+            .bsm.vi {
+                background: var(--vi3);
+                border-color: rgba(123,97,255,.25);
+                color: var(--violet)
+            }
+
+            .bsm.am {
+                background: var(--am3);
+                border-color: rgba(255,181,71,.25);
+                color: var(--amber)
+            }
+
+        .empty {
+            text-align: center;
+            color: var(--tx3);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 30px 16px
+        }
+        /* ── PERMISSION INFO BOX ───────────────────────────────── */
+        .perm-box {
+            background: var(--ink3);
+            border: 1px solid var(--line);
+            border-radius: var(--rs);
+            padding: 16px;
+            text-align: center;
+            margin: 16px 12px
+        }
+
+            .perm-box svg {
+                color: var(--tx3);
+                margin-bottom: 8px
+            }
+
+            .perm-box p {
+                font-size: 11px;
+                color: var(--tx3);
+                line-height: 1.6
+            }
+
+        svg {
+            display: inline-block;
+            vertical-align: middle
+        }
+
+        button:focus {
+            outline: none
+        }
+    </style>
+</head>
+<body>
+    <div class="popup" id="popup">
+        <div class="toast" id="toast"></div>
+
+        <!-- ═══ LOGIN ════════════════════════════════════════════ -->
+        <div class="view on" id="view-login">
+            <div class="hdr" style="justify-content:center">
+                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
+            </div>
+            <div class="login-wrap">
+                <div class="lbrand">
+                    <div class="nm">VoxFlow</div>
+                    <div class="sb">Plateforme Call Center Pro</div>
+                </div>
+                <div class="lerr" id="lerr"></div>
+                <div class="field"><label>URL Backend</label><input id="inp-url" value="http://localhost:4000" /></div>
+                <div class="field"><label>Email</label><input id="inp-email" type="email" placeholder="agent@company.com" /></div>
+                <div class="field"><label>Mot de passe</label><input id="inp-pass" type="password" placeholder="••••••••" /></div>
+                <button class="btn-login" id="btn-login">Se connecter</button>
+            </div>
+        </div>
+
+        <!-- ═══ INCOMING ══════════════════════════════════════════ -->
+        <div class="view" id="view-incoming">
+            <div class="hdr">
+                <div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div>VoxFlow</div>
+                <div class="rec-ind on" style="margin-left:auto"><div class="rec-dot" style="background:var(--mint)"></div>ENTRANT</div>
+            </div>
+            <div class="inc-wrap">
+                <div class="inc-ring">
+                    <div class="cav" id="inc-av" style="background:linear-gradient(135deg,#2d1a80,#3d1fa3)">?<div class="cav-ring"></div></div>
+                    <div class="wave"></div><div class="wave w2"></div><div class="wave w3"></div>
+                </div>
+                <div class="inc-lbl">● Appel entrant</div>
+                <div class="cname" id="inc-name">Inconnu</div>
+                <div class="cco" id="inc-co"></div>
+                <div class="cnum" id="inc-num"></div>
+                <div style="font-size:10px;color:var(--tx3);margin-top:8px" id="inc-hist"></div>
+                <div class="inc-btns">
+                    <button class="btn-ref" id="btn-refuse">✕ Refuser</button>
+                    <button class="btn-ans" id="btn-answer">✓ Décrocher</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ IN-CALL ════════════════════════════════════════════ -->
+        <div class="view" id="view-calling">
+            <div class="hdr">
+                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
+                <div class="rec-ind" id="rec-ind"><div class="rec-dot"></div>REC</div>
+                <div class="hdr-r">
+                    <div class="ext-chip" id="call-ext">EXT 201</div>
+                </div>
+            </div>
+            <div class="scroll">
+                <div class="ct">
+                    <div class="cav" id="call-av" style="position:relative"><div class="cav-ring"></div><span id="call-init">?</span></div>
+                    <div class="cname" id="call-name">—</div>
+                    <div class="cco" id="call-co"></div>
+                    <div class="cnum" id="call-num"></div>
+                    <div class="cpill-row">
+                        <div class="cpill" id="call-pill">En communication</div>
+                        <div class="rec-ind" id="rec-badge"><div class="rec-dot"></div>REC</div>
+                    </div>
+                    <div class="ctimer" id="call-timer">00:00</div>
+                </div>
+                <div class="cbar">
+                    <div class="cbar-chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="11" height="11"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg><div class="qdot"></div><span>HD Voice</span></div>
+                    <div class="cbar-chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="11" height="11"><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4" /></svg><span>WebRTC</span></div>
+                    <div class="cbar-chip" id="call-dir-lbl"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="11" height="11"><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg><span>Entrant</span></div>
+                </div>
+
+                <!-- Actions — filtrées par rôle -->
+                <div class="cacts" id="call-actions-grid">
+                    <button class="abt" id="btn-mute" onclick="doMute()">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>Muet
+                    </button>
+                    <button class="abt" id="btn-hold" onclick="doHold()">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>Attente
+                    </button>
+                    <button class="abt" id="btn-xt" onclick="doPanel('xfer')">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 01-4 4H3" /></svg>Transfert
+                    </button>
+                    <!-- Enregistrement — ADMIN seulement -->
+                    <button class="abt" id="btn-rec-btn" onclick="doRec()">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>Enreg.
+                    </button>
+                    <button class="abt" id="btn-notes" onclick="doPanel('notes')">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>Notes
+                    </button>
+                    <button class="abt" id="btn-kpad" onclick="doPanel('kpad')">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="3" width="3" height="3" rx="1" /><rect x="10" y="3" width="3" height="3" rx="1" /><rect x="16" y="3" width="3" height="3" rx="1" /><rect x="4" y="9" width="3" height="3" rx="1" /><rect x="10" y="9" width="3" height="3" rx="1" /><rect x="16" y="9" width="3" height="3" rx="1" /><rect x="7" y="15" width="9" height="3" rx="1" /></svg>Clavier
+                    </button>
+                </div>
+
+                <button class="btn-hup" onclick="hangup()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-3.33-2.67m-2.67-3.34a19.79 19.79 0 01-3.07-8.63A2 2 0 012 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.19" /><line x1="23" y1="1" x2="1" y2="23" /></svg>
+                    Raccrocher
+                </button>
+
+                <!-- Transfer Panel -->
+                <div class="cpanel" id="cpanel-xfer">
+                    <label>Transférer vers</label>
+                    <div style="display:flex;gap:4px;margin-bottom:8px">
+                        <button class="fc on" id="xt-b" onclick="setXT('blind',this)">Aveugle</button>
+                        <button class="fc" id="xt-a" onclick="setXT('attended',this)">Assisté</button>
+                        <button class="fc" id="xt-c" onclick="setXT('conf',this)">Conférence</button>
+                    </div>
+                    <div class="prow"><input id="xfer-inp" type="tel" placeholder="+1 514 000-0000 ou poste" /><button class="pbtn" onclick="execTransfer()">→ OK</button></div>
+                    <!-- Agents dispo (admin seulement dans le panel, agents voient numéro seulement) -->
+                    <div id="xfer-agents-section" style="display:none;margin-top:8px">
+                        <div style="font-size:9px;color:var(--tx3);font-weight:800;text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px">Agents disponibles</div>
+                        <div id="xfer-agents-list"></div>
+                    </div>
+                </div>
+
+                <!-- Notes Panel -->
+                <div class="cpanel" id="cpanel-notes">
+                    <label>Notes d'appel</label>
+                    <textarea id="notes-inp" rows="3" placeholder="Résumé, actions à faire, suivi..."></textarea>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <select id="call-outcome" style="flex:1;background:var(--ink3);border:1px solid var(--line);border-radius:var(--rs);color:var(--txt);padding:7px 9px;font-size:11px;font-family:var(--font);outline:none">
+                            <option>Résolu ✓</option>
+                            <option>Rappel requis 📞</option>
+                            <option>Escalade ⚠️</option>
+                            <option>Opportunité vente 💰</option>
+                            <option>Support technique 🔧</option>
+                            <option>Annulation ❌</option>
+                        </select>
+                        <button class="pbtn mint" onclick="saveNotes()">✓ Sauv.</button>
+                    </div>
+                </div>
+
+                <!-- DTMF -->
+                <div class="cpanel" id="cpanel-kpad">
+                    <label>DTMF — en cours d'appel</label>
+                    <div class="kpad" style="margin-bottom:0">
+                        <button class="key" onclick="dtmf('1')">1</button><button class="key" onclick="dtmf('2')">2<span class="ksub">ABC</span></button><button class="key" onclick="dtmf('3')">3<span class="ksub">DEF</span></button>
+                        <button class="key" onclick="dtmf('4')">4<span class="ksub">GHI</span></button><button class="key" onclick="dtmf('5')">5<span class="ksub">JKL</span></button><button class="key" onclick="dtmf('6')">6<span class="ksub">MNO</span></button>
+                        <button class="key" onclick="dtmf('7')">7<span class="ksub">PQRS</span></button><button class="key" onclick="dtmf('8')">8<span class="ksub">TUV</span></button><button class="key" onclick="dtmf('9')">9<span class="ksub">WXYZ</span></button>
+                        <button class="key" onclick="dtmf('*')">*</button><button class="key" onclick="dtmf('0')">0</button><button class="key" onclick="dtmf('#')">#</button>
+                    </div>
+                </div>
+
+                <!-- Caller Insights -->
+                <div class="ins" id="ins-box" style="display:none">
+                    <div class="ins-title">
+                        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                        Caller Insights
+                    </div>
+                    <div id="ins-rows"></div>
+                    <button class="btn-crm" onclick="openCRM()">Voir la fiche complète →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ MAIN ════════════════════════════════════════════════ -->
+        <div class="view" id="view-main">
+            <div class="hdr">
+                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
+                <div class="hdr-mid">
+                    <div class="ext-chip" id="main-ext">EXT 201</div>
+                    <div class="role-badge" id="role-badge">Agent</div>
+                </div>
+                <div class="hdr-r">
+                    <div class="chip">
+                        <div class="chip-dot on" id="sdot"></div>
+                        <select class="ssel" id="ssel" onchange="doStatus(this.value)">
+                            <option value="ONLINE">Disponible</option>
+                            <option value="BREAK">Pause</option>
+                            <option value="OFFLINE">Hors ligne</option>
+                        </select>
+                    </div>
+                    <button class="ibt" onclick="doLogout()" title="Déconnexion">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs filtrés par rôle -->
+            <div class="tabs" id="main-tabs">
+                <button class="tab on" onclick="goTab('dialer',this)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:block;margin:0 auto 2px"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>Dialer
+                </button>
+                <button class="tab" onclick="goTab('queue',this)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:block;margin:0 auto 2px"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>File d'att.
+                    <span class="tbdg" id="q-bdg" style="display:none">0</span>
+                </button>
+                <!-- Agents — ADMIN seulement -->
+                <button class="tab admin-only" id="tab-agents-btn" onclick="goTab('agents',this)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:block;margin:0 auto 2px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>Agents
+                </button>
+                <button class="tab" onclick="goTab('history',this)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:block;margin:0 auto 2px"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>Historique
+                </button>
+                <button class="tab" onclick="goTab('voicemails',this)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:block;margin:0 auto 2px"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07" /><path d="M2 2l20 20" /></svg>Msgs
+                    <span class="tbdg" id="vm-bdg" style="display:none">0</span>
+                </button>
+                <button class="tab" onclick="goTab('search',this)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:block;margin:0 auto 2px"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>Contacts
+                </button>
+            </div>
+
+            <div class="scroll">
+
+                <!-- DIALER -->
+                <div class="pane on" id="pane-dialer">
+                    <div class="p12">
+                        <input class="dinput" id="dinp" placeholder="+1 (514) 000-0000" type="tel" oninput="onDial()" onkeydown="if(event.key==='Enter')callNum()" />
+                        <div class="kpad">
+                            <button class="key" onclick="ak('1')">1</button>
+                            <button class="key" onclick="ak('2')">2<span class="ksub">ABC</span></button>
+                            <button class="key" onclick="ak('3')">3<span class="ksub">DEF</span></button>
+                            <button class="key" onclick="ak('4')">4<span class="ksub">GHI</span></button>
+                            <button class="key" onclick="ak('5')">5<span class="ksub">JKL</span></button>
+                            <button class="key" onclick="ak('6')">6<span class="ksub">MNO</span></button>
+                            <button class="key" onclick="ak('7')">7<span class="ksub">PQRS</span></button>
+                            <button class="key" onclick="ak('8')">8<span class="ksub">TUV</span></button>
+                            <button class="key" onclick="ak('9')">9<span class="ksub">WXYZ</span></button>
+                            <button class="key sp" onclick="ak('*')">*</button>
+                            <button class="key" id="key-zero"
+                                    onmousedown="startLong()" onmouseup="endLong()" onmouseleave="endLong()"
+                                    ontouchstart="startLong(event)" ontouchend="endLong()" ontouchcancel="endLong()"
+                                    onclick="if(!_lpdone)ak('0')">
+                                0<span class="ksub">+</span>
+                            </button>
+                            <button class="key sp" onclick="ak('#')">#</button>
+                        </div>
+                        <div class="dial-actions">
+                            <button class="btn-call" id="btn-call" disabled onclick="callNum()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
+                                Appeler
+                            </button>
+                            <button class="btn-del" id="btn-del" onclick="dk()">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" /><line x1="18" y1="9" x2="12" y2="15" /><line x1="12" y1="9" x2="18" y2="15" /></svg>
+                            </button>
+                        </div>
+                        <div id="recents-wrap"></div>
+                    </div>
+                </div>
+
+                <!-- QUEUE -->
+                <div class="pane" id="pane-queue">
+                    <div class="p12">
+                        <div class="qs-grid">
+                            <div class="qs-card"><div class="qs-val" id="qs-w" style="color:var(--violet)">0</div><div class="qs-lbl">En attente</div></div>
+                            <div class="qs-card"><div class="qs-val" id="qs-a" style="color:var(--amber)">0:00</div><div class="qs-lbl">Attente moy.</div></div>
+                            <div class="qs-card"><div class="qs-val" id="qs-d" style="color:var(--mint)">0</div><div class="qs-lbl">Traités auj.</div></div>
+                        </div>
+                        <div class="slbl">Appels en attente</div>
+                        <div id="q-list"><div class="empty">File vide ✓</div></div>
+                        <div class="slbl" style="margin-top:14px">Appels actifs</div>
+                        <div id="q-active"><div class="empty">Aucun appel actif</div></div>
+                    </div>
+                </div>
+
+                <!-- AGENTS — Admin seulement -->
+                <div class="pane" id="pane-agents">
+                    <div class="p12">
+                        <div class="qs-grid">
+                            <div class="qs-card"><div class="qs-val" id="ag-on" style="color:var(--mint)">0</div><div class="qs-lbl">En ligne</div></div>
+                            <div class="qs-card"><div class="qs-val" id="ag-busy" style="color:var(--rose)">0</div><div class="qs-lbl">En appel</div></div>
+                            <div class="qs-card"><div class="qs-val" id="ag-pause" style="color:var(--amber)">0</div><div class="qs-lbl">En pause</div></div>
+                        </div>
+                        <div class="slbl">Agents connectés</div>
+                        <div id="ag-list"><div class="empty">Aucun agent</div></div>
+                    </div>
+                </div>
+
+                <!-- HISTORY -->
+                <div class="pane" id="pane-history">
+                    <div class="frow">
+                        <button class="fc on" onclick="filterH('all',this)">Tous</button>
+                        <button class="fc" onclick="filterH('INBOUND',this)">Entrants</button>
+                        <button class="fc" onclick="filterH('OUTBOUND',this)">Sortants</button>
+                        <button class="fc" onclick="filterH('MISSED',this)">Manqués</button>
+                    </div>
+                    <div id="hist-list" style="padding-bottom:8px"></div>
+                </div>
+
+                <!-- VOICEMAILS -->
+                <div class="pane" id="pane-voicemails"><div id="vm-list"></div></div>
+
+                <!-- SEARCH -->
+                <div class="pane" id="pane-search">
+                    <div class="p12">
+                        <input class="sinp" id="sinp" placeholder="Nom, téléphone, email, entreprise..." oninput="doSearch(this.value)" />
+                        <div id="sres"><div class="empty">Tapez pour rechercher</div></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ═══ WRAP-UP ════════════════════════════════════════════ -->
+        <div class="view" id="view-wrapup">
+            <div class="hdr"><div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div>VoxFlow</div></div>
+            <div class="wu">
+                <svg class="wu-ico" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                <div class="wu-ttl">Appel terminé</div>
+                <div class="wu-dur" id="wu-dur">Durée : 00:00</div>
+                <div class="wu-sc">
+                    <div class="wu-sc-lbl">Évaluation de l'appel</div>
+                    <div class="stars" id="stars">
+                        <span onclick="star(1)" style="color:var(--tx3)">★</span>
+                        <span onclick="star(2)" style="color:var(--tx3)">★</span>
+                        <span onclick="star(3)" style="color:var(--tx3)">★</span>
+                        <span onclick="star(4)" style="color:var(--tx3)">★</span>
+                        <span onclick="star(5)" style="color:var(--tx3)">★</span>
+                    </div>
+                    <div class="wu-tags">
+                        <button class="wu-tag" onclick="this.classList.toggle('picked')">Résolu</button>
+                        <button class="wu-tag" onclick="this.classList.toggle('picked')">Rappel</button>
+                        <button class="wu-tag" onclick="this.classList.toggle('picked')">Vente</button>
+                        <button class="wu-tag" onclick="this.classList.toggle('picked')">Escalade</button>
+                        <button class="wu-tag" onclick="this.classList.toggle('picked')">Support</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- .popup -->
+
+    <script>
+        // ════════════════════════════════════════════════════════════
+        //  STATE
+        // ════════════════════════════════════════════════════════════
+        const S = {
+            url: localStorage.getItem('vf_url') || 'http://localhost:4000',
+            tok: localStorage.getItem('vf_tok') || null,
+            role: localStorage.getItem('vf_role') || 'AGENT',  // OWNER | ADMIN | AGENT
+            ext: '201',
+            status: 'ONLINE',
+            calls: [], vms: [], agents: [], queue: [],
+            callId: null, twSid: null, contact: null, dir: 'OUTBOUND',
+            muted: false, hold: false, rec: false,
+            tsec: 0, tint: null, panel: null, xt: 'blind',
+            hf: 'all', poll: null,
+            _inCo: null, _inNum: null,
+        }
+
+        // Helpers de permission
+        const isAdmin = () => S.role === 'ADMIN' || S.role === 'OWNER'
+        const isOwner = () => S.role === 'OWNER'
+
+        // ════════════════════════════════════════════════════════════
+        //  API
+        // ════════════════════════════════════════════════════════════
+        const api = async (p, o = {}) => {
+            const r = await fetch(S.url + p, {
+                ...o,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(S.tok ? { Authorization: 'Bearer ' + S.tok } : {}),
+                    ...(o.headers || {}),
+                },
+                body: o.body ? JSON.stringify(o.body) : undefined,
+            })
+            return r.json()
+        }
+
+        const showView = id => {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('on'))
+            document.getElementById('view-' + id).classList.add('on')
+        }
+
+        const toast = (msg, d = 2500) => {
+            const e = document.getElementById('toast')
+            e.textContent = msg; e.classList.add('on')
+            setTimeout(() => e.classList.remove('on'), d)
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  PERMISSIONS — appliquer restrictions de rôle
+        // ════════════════════════════════════════════════════════════
+        function applyRolePermissions() {
+            const admin = isAdmin()
+
+            // Badge rôle dans le header
+            const badge = document.getElementById('role-badge')
+            if (badge) {
+                badge.textContent = S.role === 'OWNER' ? 'Owner' : S.role === 'ADMIN' ? 'Admin' : 'Agent'
+                badge.className = 'role-badge ' + (admin ? 'admin' : 'agent')
+            }
+
+            // Onglet Agents — Admin seulement
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = admin ? '' : 'none'
+            })
+
+            // Bouton Enregistrement — Admin seulement
+            const recBtn = document.getElementById('btn-rec-btn')
+            if (recBtn) {
+                if (!admin) {
+                    recBtn.classList.add('locked')
+                    recBtn.onclick = () => toast('🔒 Réservé aux administrateurs')
+                }
+            }
+
+            // Transfert vers agents — Admin seulement dans le panel
+            // (le champ numéro reste pour agents, la liste agents est admin only)
+            const xferAgentSec = document.getElementById('xfer-agents-section')
+            if (xferAgentSec) {
+                xferAgentSec.style.display = 'none' // géré dans setXT
+            }
+
+            // Historique — Agent voit seulement ses appels (filtré côté API déjà)
+            // Supervision dans onglet Agents — géré dans rAgents()
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  INIT
+        // ════════════════════════════════════════════════════════════
+        async function init() {
+            document.getElementById('inp-url').value = S.url
+            document.getElementById('btn-login').onclick = doLogin
+            document.getElementById('inp-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+            document.getElementById('btn-answer').onclick = doAnswer
+            document.getElementById('btn-refuse').onclick = hangup
+            updDot()
+            showView('main')
+            loadDemo()
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  AUTH
+        // ════════════════════════════════════════════════════════════
+        async function doLogin() {
+            const url = document.getElementById('inp-url').value.trim().replace(/\/$/, '')
+            const email = document.getElementById('inp-email').value.trim()
+            const pass = document.getElementById('inp-pass').value
+            S.url = url; localStorage.setItem('vf_url', url)
+
+            const btn = document.getElementById('btn-login')
+            btn.textContent = 'Connexion...'; btn.disabled = true
+
+            const r = await api('/api/v1/auth/login', { method: 'POST', body: { email, password: pass } })
+
+            if (r.success && r.data?.accessToken) {
+                S.tok = r.data.accessToken
+                S.role = r.data.user?.role || 'AGENT'
+                localStorage.setItem('vf_tok', S.tok)
+                localStorage.setItem('vf_role', S.role)
+                applyRolePermissions()
+                showView('main')
+                await loadData()
+                startPoll()
+            } else {
+                showErr(r.message || 'Identifiants incorrects')
+                btn.textContent = 'Se connecter'; btn.disabled = false
+            }
+        }
+
+        function showErr(m) {
+            const e = document.getElementById('lerr')
+            e.textContent = m; e.style.display = 'block'
+            setTimeout(() => e.style.display = 'none', 4000)
+        }
+
+        function doLogout() {
+            localStorage.removeItem('vf_tok')
+            localStorage.removeItem('vf_role')
+            S.tok = null; stopPoll(); showView('login')
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  DATA
+        // ════════════════════════════════════════════════════════════
+        async function loadData() {
+            try {
+                const [cr, vr] = await Promise.all([
+                    api('/api/v1/telephony/calls?limit=30'),
+                    api('/api/v1/telephony/voicemails'),
+                ])
+                if (cr.success) { S.calls = cr.data || []; rRecents(); rHistory() }
+                if (vr.success) { S.vms = vr.data || []; rVMs() }
+            } catch { }
+            try {
+                const [qr, ar] = await Promise.all([
+                    api('/api/v1/queues/status'),
+                    api('/api/v1/supervision/agents'),
+                ])
+                if (qr.success) { S.queue = qr.data || []; rQueue() }
+                if (ar.success) { S.agents = ar.data || []; rAgents() }
+            } catch { }
+        }
+
+        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues/status'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = await api('/api/v1/supervision/agents'); if (ar.success) { S.agents = ar.data || []; rAgents() } } catch { } }, 5000) }
+        function stopPoll() { clearInterval(S.poll) }
+
+        // ════════════════════════════════════════════════════════════
+        //  TABS
+        // ════════════════════════════════════════════════════════════
+        const PANES = ['dialer', 'queue', 'agents', 'history', 'voicemails', 'search']
+        function goTab(id, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'))
+            btn.classList.add('on')
+            PANES.forEach(p => { const el = document.getElementById('pane-' + p); if (el) el.classList.toggle('on', p === id) })
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  STATUS
+        // ════════════════════════════════════════════════════════════
+        function doStatus(s) {
+            S.status = s; updDot()
+            api('/api/v1/telephony/status', { method: 'PATCH', body: { status: s } }).catch(() => { })
+        }
+        function updDot() {
+            const d = document.getElementById('sdot'); if (!d) return
+            const c = { ONLINE: 'var(--mint)', BREAK: 'var(--amber)', OFFLINE: 'var(--tx3)' }
+            const g = { ONLINE: '0 0 6px var(--mint)', BREAK: '0 0 6px var(--amber)', OFFLINE: 'none' }
+            d.style.background = c[S.status] || c.OFFLINE
+            d.style.boxShadow = g[S.status] || g.OFFLINE
+            d.className = 'chip-dot ' + (S.status === 'ONLINE' ? 'on' : S.status === 'BREAK' ? 'pause' : 'off')
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  DIALER
+        // ════════════════════════════════════════════════════════════
+        function ak(k) { const i = document.getElementById('dinp'); i.value += k; onDial() }
+        function dk() { const i = document.getElementById('dinp'); i.value = i.value.slice(0, -1); onDial() }
+
+        let _lpt = null, _lpdone = false
+        function startLong(e) {
+            if (e) e.preventDefault(); _lpdone = false
+            _lpt = setTimeout(() => {
+                _lpdone = true
+                const i = document.getElementById('dinp')
+                if (i.value.endsWith('0')) i.value = i.value.slice(0, -1)
+                ak('+')
+                const btn = document.getElementById('key-zero')
+                if (btn) { btn.style.background = 'var(--vi3)'; btn.style.color = 'var(--violet)'; setTimeout(() => { btn.style.background = ''; btn.style.color = '' }, 300) }
+            }, 500)
+        }
+        function endLong() { if (_lpt) { clearTimeout(_lpt); _lpt = null } }
+
+        function onDial() {
+            const v = document.getElementById('dinp').value.trim()
+            document.getElementById('btn-call').disabled = !v
+            document.getElementById('btn-del')?.classList.toggle('visible', v.length > 0)
+        }
+
+        async function callNum(n) {
+            const to = n || document.getElementById('dinp')?.value.trim(); if (!to) return
+            try {
+                const r = await api('/api/v1/telephony/call/outbound', { method: 'POST', body: { to } })
+                if (r.success) { S.callId = r.data.call?.id || null; S.twSid = r.data.call?.twilio_sid || null; S.contact = r.data.contact || null; S.dir = 'OUTBOUND'; startCall(to) }
+                else alert(r.message || 'Erreur appel')
+            } catch { alert('Erreur réseau') }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  START CALL
+        // ════════════════════════════════════════════════════════════
+        const ACP = [['#2d1a80', '#3d1fa3'], ['#1a356b', '#1a4d8f'], ['#1a4d3a', '#1a6b54'], ['#4d1a5a', '#6b1a80'], ['#4d2a1a', '#6b3a1a'], ['#1a3a4d', '#1a5270'], ['#3a4d1a', '#506b1a']]
+
+        function startCall(num) {
+            S.muted = false; S.hold = false; S.rec = false; S.tsec = 0; S.panel = null
+            const c = S.contact
+            const ini = c ? ((c.first_name || '')[0] + (c.last_name || '')[0]).toUpperCase() : (num[0] || '?').toUpperCase()
+            const pi = ini.charCodeAt(0) % ACP.length
+            const [c1, c2] = ACP[pi]
+
+            const av = document.getElementById('call-av')
+            av.style.background = `linear-gradient(135deg,${c1},${c2})`
+            document.getElementById('call-init').textContent = ini
+            document.getElementById('call-name').textContent = c ? c.first_name + ' ' + c.last_name : num
+            document.getElementById('call-co').textContent = c?.company || ''
+            document.getElementById('call-num').textContent = c ? num : ''
+            document.getElementById('call-timer').textContent = '00:00'
+            document.getElementById('call-ext').textContent = 'EXT ' + S.ext
+            document.getElementById('call-dir-lbl').querySelector('span').textContent = S.dir === 'INBOUND' ? 'Entrant' : 'Sortant'
+
+            // Insights
+            const ins = document.getElementById('ins-box')
+            if (c) {
+                ins.style.display = 'block'
+                document.getElementById('ins-rows').innerHTML = [
+                    c.email ? ir('Email', c.email) : '',
+                    c.phone ? ir('Téléphone', c.phone) : '',
+                    c.company ? ir('Entreprise', c.company) : '',
+                    c.pipeline_stage ? ir('Pipeline', c.pipeline_stage, 'vi') : '',
+                    c.total_calls ? ir('Appels totaux', c.total_calls + ' appels', 'mi') : '',
+                    c.last_call ? ir('Dernier appel', fmtD(c.last_call)) : '',
+                    c.tags?.length ? ir('Tags', c.tags.slice(0, 2).join(', ')) : '',
+                ].filter(Boolean).join('')
+            } else ins.style.display = 'none'
+
+            // Reset
+            document.querySelectorAll('.abt:not(.locked)').forEach(b => b.className = 'abt')
+            document.querySelectorAll('.cpanel').forEach(p => p.classList.remove('on'))
+            const pill = document.getElementById('call-pill'); pill.textContent = 'En communication'; pill.className = 'cpill'
+            document.getElementById('rec-badge').style.display = 'none'
+            document.getElementById('rec-ind').classList.remove('on')
+
+            showView('calling')
+            clearInterval(S.tint)
+            S.tint = setInterval(() => { S.tsec++; const el = document.getElementById('call-timer'); if (el) el.textContent = fmtT(S.tsec) }, 1000)
+        }
+
+        function ir(l, v, cls = '') { return `<div class="ins-row"><span>${l}</span><span class="ins-val ${cls}">${v}</span></div>` }
+
+        async function hangup() {
+            clearInterval(S.tint); const dur = S.tsec
+            if (S.callId) { const n = document.getElementById('notes-inp')?.value || ''; await api('/api/v1/telephony/call/' + S.callId + '/end', { method: 'PATCH', body: { duration: dur, notes: n } }).catch(() => { }) }
+            document.getElementById('wu-dur').textContent = 'Durée : ' + fmtT(dur)
+            document.querySelectorAll('#stars span').forEach(s => s.style.color = 'var(--tx3)')
+            showView('wrapup')
+            setTimeout(async () => {
+                S.callId = null; S.contact = null; S.twSid = null
+                const di = document.getElementById('dinp'); const ni = document.getElementById('notes-inp')
+                if (di) { di.value = ''; onDial() }; if (ni) ni.value = ''
+                showView('main'); await loadData()
+            }, 3200)
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  CALL ACTIONS
+        // ════════════════════════════════════════════════════════════
+        function doMute() {
+            S.muted = !S.muted
+            document.getElementById('btn-mute').className = 'abt' + (S.muted ? ' m-mute' : '')
+            updPill()
+            if (S.callId) api('/api/v1/telephony/call/' + S.callId + '/mute', { method: 'PATCH', body: { mute: S.muted } }).catch(() => { })
+            toast(S.muted ? '🔇 Micro coupé' : '🎙️ Micro actif')
+        }
+        function doHold() {
+            S.hold = !S.hold
+            document.getElementById('btn-hold').className = 'abt' + (S.hold ? ' m-hold' : '')
+            updPill()
+            if (S.callId) api('/api/v1/telephony/call/' + S.callId + '/hold', { method: 'PATCH', body: { hold: S.hold } }).catch(() => { })
+            toast(S.hold ? '⏸ Appel en attente' : '▶ Appel repris')
+        }
+        function doRec() {
+            if (!isAdmin()) { toast('🔒 Réservé aux administrateurs'); return }
+            S.rec = !S.rec
+            document.getElementById('btn-rec-btn').className = 'abt' + (S.rec ? ' m-rec' : '')
+            document.getElementById('rec-badge').style.display = S.rec ? 'flex' : 'none'
+            document.getElementById('rec-ind').classList.toggle('on', S.rec)
+            toast(S.rec ? '⏺ Enregistrement démarré' : '⏹ Enregistrement arrêté')
+        }
+        function updPill() {
+            const p = document.getElementById('call-pill')
+            if (S.hold) { p.textContent = '⏸ En attente'; p.className = 'cpill hold' }
+            else if (S.muted) { p.textContent = '🔇 Micro coupé'; p.className = 'cpill muted' }
+            else { p.textContent = 'En communication'; p.className = 'cpill' }
+        }
+
+        let _xt = 'blind'
+        function setXT(t, b) {
+            _xt = t
+            document.querySelectorAll('#cpanel-xfer .fc').forEach(x => x.classList.remove('on'))
+            b.classList.add('on')
+
+            // Agents dispo — Admin seulement
+            const sec = document.getElementById('xfer-agents-section')
+            const list = document.getElementById('xfer-agents-list')
+            if ((t === 'attended' || t === 'conf') && isAdmin()) {
+                sec.style.display = 'block'
+                const avail = S.agents.filter(a => a.status === 'ONLINE' && !a.current_call)
+                if (!avail.length) {
+                    list.innerHTML = '<div style="font-size:11px;color:var(--tx3);padding:6px 0">Aucun agent disponible</div>'
+                } else {
+                    list.innerHTML = avail.map(a => {
+                        const name = a.first_name + ' ' + a.last_name
+                        const ext = a.extension || a.ext || '—'
+                        return `<div class="axfer-row">
+              <div><span style="font-size:11px;font-weight:600">${name}</span><span class="aext" style="margin-left:6px">${ext}</span></div>
+              <button class="btn-take" onclick="xferToAgent('${ext}')">→ Transférer</button>
+            </div>`
+                    }).join('')
+                }
+            } else {
+                sec.style.display = 'none'
+            }
+        }
+
+        function xferToAgent(ext) { document.getElementById('xfer-inp').value = ext; execTransfer() }
+
+        async function execTransfer() {
+            const to = document.getElementById('xfer-inp').value.trim()
+            if (!to || !S.callId) return
+            await api('/api/v1/telephony/call/' + S.callId + '/transfer', { method: 'POST', body: { to, type: _xt } }).catch(() => { })
+            toast('→ Transfert en cours…')
+            if (_xt === 'blind') setTimeout(hangup, 900)
+        }
+
+        function saveNotes() {
+            const n = document.getElementById('notes-inp').value
+            if (n && S.callId) { api('/api/v1/telephony/call/' + S.callId + '/notes', { method: 'PATCH', body: { notes: n } }).catch(() => { }); toast('✓ Notes sauvegardées') }
+        }
+        function dtmf(k) { toast('DTMF: ' + k); console.log('[DTMF]', k) }
+        function openCRM() { window.open(S.url.replace(':4000', ':3001') + '/admin/crm', '_blank') }
+        function doAnswer() { S.contact = S._inCo || null; S.dir = 'INBOUND'; startCall(S._inNum || 'Entrant') }
+
+        function doPanel(name) {
+            const map = { xfer: 'cpanel-xfer', notes: 'cpanel-notes', kpad: 'cpanel-kpad' }
+            const btn = { xfer: 'btn-xt', notes: 'btn-notes', kpad: 'btn-kpad' }
+            const open = S.panel === name
+            Object.values(map).forEach(p => document.getElementById(p).classList.remove('on'))
+            Object.values(btn).forEach(b => document.getElementById(b).classList.remove('m-panel'))
+            S.panel = open ? null : name
+            if (!open) { document.getElementById(map[name]).classList.add('on'); document.getElementById(btn[name]).classList.add('m-panel') }
+        }
+
+        function star(n) { document.querySelectorAll('#stars span').forEach((s, i) => s.style.color = i < n ? 'var(--amber)' : 'var(--tx3)'); toast('★ Évaluation enregistrée') }
+
+        // ════════════════════════════════════════════════════════════
+        //  QUEUE
+        // ════════════════════════════════════════════════════════════
+        function rQueue() {
+            const waiting = S.queue.filter(q => q.status === 'waiting' || !q.status)
+            const active = S.queue.filter(q => q.status === 'active')
+            const bdg = document.getElementById('q-bdg'); bdg.textContent = waiting.length; bdg.style.display = waiting.length ? 'flex' : 'none'
+            document.getElementById('qs-w').textContent = waiting.length
+            document.getElementById('qs-d').textContent = S.queue.filter(q => q.status === 'completed').length || 0
+            const avg = waiting.length ? waiting.reduce((a, q) => a + (q.wait_seconds || 0), 0) / waiting.length : 0
+            document.getElementById('qs-a').textContent = fmtT(Math.round(avg))
+
+            const ql = document.getElementById('q-list')
+            if (!waiting.length) { ql.innerHTML = '<div class="empty">File vide ✓</div>' }
+            else ql.innerHTML = waiting.map((q, i) => {
+                const w = q.wait_seconds || (i + 1) * 52; const hot = w > 120; const n = q.caller_name || q.from_number || 'Inconnu'
+                const pc = i === 0 ? 'r1' : i === 1 ? 'r2' : ''
+                return `<div class="qi ${hot ? 'hot' : ''}" onclick="pickQ('${q.from_number || ''}')">
+          <div class="qi-pos ${pc}">${i + 1}</div>
+          <div class="qi-info"><div class="qi-name">${n}</div><div class="qi-sub"><span>${q.from_number || ''}</span><span class="qi-wait ${hot ? 'hot' : ''}">${fmtT(w)}</span></div></div>
+          <button class="btn-take" onclick="event.stopPropagation();pickQ('${q.from_number || ''}')">Prendre</button>
+        </div>`
+            }).join('')
+
+            const al = document.getElementById('q-active')
+            if (!active.length) { al.innerHTML = '<div class="empty">Aucun appel actif</div>' }
+            else al.innerHTML = active.map(q => `<div class="qi">
+        <div class="qi-pos" style="background:var(--mi3);border-color:rgba(0,212,170,.3);color:var(--mint)">●</div>
+        <div class="qi-info"><div class="qi-name">${q.caller_name || q.from_number || 'Inconnu'}</div>
+        <div class="qi-sub"><span>${q.agent_name || 'Agent'}</span><span class="qi-wait" style="color:var(--mint);background:var(--mi3)">${fmtT(q.duration || 0)}</span></div></div>
+      </div>`).join('')
+        }
+
+        function pickQ(num) { if (num) { S.dir = 'INBOUND'; callNum(num) } }
+
+        // ════════════════════════════════════════════════════════════
+        //  AGENTS — Supervision ADMIN seulement
+        // ════════════════════════════════════════════════════════════
+        function rAgents() {
+            const el = document.getElementById('ag-list')
+            if (!S.agents.length) { el.innerHTML = '<div class="empty">Aucun agent connecté</div>'; return }
+            const on = S.agents.filter(a => a.status === 'ONLINE' && !a.current_call).length
+            const busy = S.agents.filter(a => a.current_call || a.status === 'BUSY').length
+            const pause = S.agents.filter(a => a.status === 'BREAK').length
+            document.getElementById('ag-on').textContent = on
+            document.getElementById('ag-busy').textContent = busy
+            document.getElementById('ag-pause').textContent = pause
+            const stL = { online: 'Disponible', busy: 'En appel', break: 'En pause', offline: 'Hors ligne' }
+
+            el.innerHTML = S.agents.map((a, i) => {
+                const st = a.current_call ? 'busy' : (a.status || 'ONLINE').toLowerCase()
+                const name = a.name || (a.first_name ? a.first_name + ' ' + a.last_name : 'Agent ' + i)
+                const ext = a.extension || a.ext || (200 + i + 1)
+                const ini = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                const [bg1, bg2] = ACP[i % ACP.length]
+                const dur = a.call_duration || 0
+
+                // Supervision — admin seulement
+                const supBtns = (st === 'busy' && isAdmin()) ? `
+          <div class="sup-btns">
+            <button class="btn-sup listen"  onclick="supListen('${a.id || i}')">👂 Écouter</button>
+            <button class="btn-sup whisper" onclick="supWhisper('${a.id || i}')">🗣 Chuchoter</button>
+            <button class="btn-sup barge"   onclick="supBarge('${a.id || i}')">⚡ Rejoindre</button>
+          </div>` : ''
+
+                return `<div class="ai">
+          <div class="aav ${st}" style="background:linear-gradient(135deg,${bg1},${bg2})">
+            ${ini}<div class="live-dot ${st}"></div>
+          </div>
+          <div class="ainfo">
+            <div class="aname">${name}</div>
+            <div class="asub">
+              <span class="aext">${ext}</span>
+              <span class="ast ${st}">${stL[st] || st}</span>
+              ${dur ? `<span class="atimer">${fmtT(dur)}</span>` : ''}
+            </div>
+            ${a.current_call_number ? `<div class="acall-num">↔ ${a.current_call_number}</div>` : ''}
+          </div>
+          ${supBtns}
+        </div>`
+            }).join('')
+        }
+
+        function supListen(id) { toast('👂 Écoute activée'); api('/api/v1/supervision/listen/' + id, { method: 'POST' }).catch(() => { }) }
+        function supWhisper(id) { toast('🗣 Chuchotement actif'); api('/api/v1/supervision/whisper/' + id, { method: 'POST' }).catch(() => { }) }
+        function supBarge(id) { toast('⚡ Vous rejoignez l\'appel'); api('/api/v1/supervision/barge/' + id, { method: 'POST' }).catch(() => { }) }
+
+        // ════════════════════════════════════════════════════════════
+        //  HISTORY
+        // ════════════════════════════════════════════════════════════
+        let _hf = 'all'
+        function filterH(f, b) { _hf = f; document.querySelectorAll('.frow .fc').forEach(x => x.classList.remove('on')); b.classList.add('on'); rHistory() }
+
+        function rHistory() {
+            const el = document.getElementById('hist-list')
+            let d = S.calls
+            if (_hf === 'INBOUND') d = d.filter(c => c.direction === 'INBOUND')
+            if (_hf === 'OUTBOUND') d = d.filter(c => c.direction === 'OUTBOUND')
+            if (_hf === 'MISSED') d = d.filter(c => ['NO_ANSWER', 'MISSED'].includes(c.status))
+            if (!d.length) { el.innerHTML = '<div class="empty">Aucun appel</div>'; return }
+            const tm = { COMPLETED: { c: 'ok', l: 'Terminé' }, NO_ANSWER: { c: 'miss', l: 'Manqué' }, MISSED: { c: 'miss', l: 'Manqué' }, BUSY: { c: 'busy', l: 'Occupé' }, FAILED: { c: 'miss', l: 'Échec' } }
+            el.innerHTML = d.map(c => {
+                const name = c.contact ? c.contact.first_name + ' ' + c.contact.last_name : c.direction === 'INBOUND' ? c.from_number : c.to_number
+                const num = c.direction === 'INBOUND' ? c.from_number : c.to_number
+                const tag = tm[c.status] || { c: 'busy', l: c.status }
+                const isIn = c.direction === 'INBOUND'
+                return `<div class="hi">
+          <div class="hico" style="color:${isIn ? 'var(--mint)' : 'var(--sky)'};background:${isIn ? 'var(--mi3)' : 'var(--sk3)'}">${isIn ? '↓' : '↑'}</div>
+          <div class="hinfo">
+            <div class="hname">${name}</div>
+            <div class="hmeta"><span>${fmtD(c.started_at)}</span>${c.duration ? `<span class="hdur">${fmtT(c.duration)}</span>` : ''}<span class="htag ${tag.c}">${tag.l}</span></div>
+            ${c.notes ? `<div style="font-size:10px;color:var(--tx3);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">"${c.notes}"</div>` : ''}
+          </div>
+          <div class="hacts">
+            <button class="bsm" onclick="callNum('${num}')">Rappeler</button>
+            ${c.recording_url ? `<button class="bsm bl" onclick="playA('${c.recording_url}')">▶ Audio</button>` : ''}
+          </div>
+        </div>`
+            }).join('')
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  VOICEMAILS
+        // ════════════════════════════════════════════════════════════
+        function rVMs() {
+            const el = document.getElementById('vm-list')
+            const bdg = document.getElementById('vm-bdg')
+            const nc = S.vms.filter(v => v.status === 'NEW').length
+            bdg.textContent = nc; bdg.style.display = nc ? 'flex' : 'none'
+            if (!S.vms.length) { el.innerHTML = '<div class="empty">Aucun message vocal</div>'; return }
+            el.innerHTML = S.vms.map(v => `<div class="vmi">
+        <div class="vmh">
+          <div class="vmn">${v.contact ? v.contact.first_name + ' ' + v.contact.last_name : v.from_number}${v.status === 'NEW' ? '<span class="vmnew">Nouveau</span>' : ''}</div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <span class="vmtime">${fmtD(v.created_at)}</span>
+            ${v.recording_url ? `<button class="btn-play" onclick="playVM('${v.id}','${v.recording_url}')">▶</button>` : ''}
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${v.from_number || ''}${v.duration ? ' · ' + fmtT(v.duration) : ''}</div>
+        ${v.transcription ? `<div class="vmtr">"${v.transcription.substring(0, 160)}${v.transcription.length > 160 ? '…' : ''}"</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="bsm" onclick="callNum('${v.from_number}')">Rappeler</button>
+          <button class="bsm vi" onclick="markRead('${v.id}')">✓ Lu</button>
+        </div>
+      </div>`).join('')
+        }
+        function playVM(id, url) { new Audio(url).play().catch(() => toast('Audio indisponible')); markRead(id) }
+        function markRead(id) { S.vms = S.vms.map(v => v.id === id ? { ...v, status: 'LISTENED' } : v); api('/api/v1/telephony/voicemail/' + id + '/listen', { method: 'PATCH' }).catch(() => { }); rVMs() }
+
+        // ════════════════════════════════════════════════════════════
+        //  SEARCH
+        // ════════════════════════════════════════════════════════════
+        async function doSearch(q) {
+            const el = document.getElementById('sres')
+            if (!q || q.length < 2) { el.innerHTML = '<div class="empty">Tapez pour rechercher</div>'; return }
+            try {
+                const r = await api('/api/v1/crm/contacts?search=' + encodeURIComponent(q) + '&limit=8')
+                if (!r.success || !r.data?.length) { el.innerHTML = '<div class="empty">Aucun résultat</div>'; return }
+                el.innerHTML = r.data.map((c, i) => {
+                    const name = c.first_name + ' ' + c.last_name
+                    const ini = (c.first_name[0] || '') + (c.last_name[0] || '')
+                    const [bg1, bg2] = ACP[i % ACP.length]
+                    return `<div class="coi">
+            <div class="coav" style="background:linear-gradient(135deg,${bg1},${bg2})">${ini.toUpperCase()}</div>
+            <div class="coinf"><div class="coname">${name}</div><div class="cosub">${[c.company, c.phone, c.email].filter(Boolean).join(' · ')}</div></div>
+            ${c.phone ? `<button class="bsm" onclick="callNum('${c.phone}')">Appeler</button>` : ''}
+          </div>`
+                }).join('')
+            } catch { }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  RECENTS
+        // ════════════════════════════════════════════════════════════
+        function rRecents() {
+            const w = document.getElementById('recents-wrap')
+            const rs = S.calls.slice(0, 3); if (!rs.length) { w.innerHTML = ''; return }
+            w.innerHTML = `<div class="slbl" style="margin-top:14px">Récents</div>` + rs.map(c => {
+                const name = c.contact ? c.contact.first_name + ' ' + c.contact.last_name : c.direction === 'INBOUND' ? c.from_number : c.to_number
+                const num = c.direction === 'INBOUND' ? c.from_number : c.to_number
+                const isIn = c.direction === 'INBOUND'
+                const isMiss = ['NO_ANSWER', 'MISSED'].includes(c.status)
+                const cls = isMiss ? 'miss' : isIn ? 'in' : 'out'
+                const ico = isMiss ? '↗' : isIn ? '↓' : '↑'
+                return `<div class="ri">
+          <div class="ricon ${cls}">${ico}</div>
+          <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div><div style="font-size:10px;color:var(--tx3);margin-top:1px">${fmtD(c.started_at)}${c.duration ? ' · ' + fmtT(c.duration) : ''}</div></div>
+          <button class="bsm" onclick="callNum('${num}')">Rappeler</button>
+        </div>`
+            }).join('')
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  UTILS
+        // ════════════════════════════════════════════════════════════
+        const fmtT = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0')
+        const fmtD = dt => {
+            if (!dt) return ''
+            const d = new Date(dt), df = (Date.now() - d) / 1000
+            if (df < 60) return 'À l\'instant'
+            if (df < 3600) return Math.floor(df / 60) + 'min'
+            if (df < 86400) return Math.floor(df / 3600) + 'h'
+            return d.toLocaleDateString('fr-CA', { day: '2-digit', month: 'short' })
+        }
+        const playA = url => new Audio(url).play().catch(() => toast('Audio indisponible'))
+
+        // ════════════════════════════════════════════════════════════
+        //  DEMO DATA
+        // ════════════════════════════════════════════════════════════
+        function loadDemo() {
+            // Simuler un rôle ADMIN pour la démo (changer à 'AGENT' pour tester restrictions)
+            S.role = 'ADMIN'
+            applyRolePermissions()
+            updDot()
+
+            S.calls = [
+                { id: '1', direction: 'INBOUND', status: 'COMPLETED', from_number: '+15141234567', to_number: '+15149876543', started_at: new Date(Date.now() - 3 * 3600000).toISOString(), duration: 154, contact: { first_name: 'Clémence', last_name: 'Roux', company: 'Acme Corp' }, notes: 'Demande de devis 5 licences' },
+                { id: '2', direction: 'OUTBOUND', status: 'NO_ANSWER', from_number: '+15149876543', to_number: '+15140001122', started_at: new Date(Date.now() - 3600000).toISOString(), duration: 0, contact: null },
+                { id: '3', direction: 'INBOUND', status: 'COMPLETED', from_number: '+15143334455', to_number: '+15149876543', started_at: new Date(Date.now() - 7200000).toISOString(), duration: 312, contact: { first_name: 'Marc', last_name: 'Tremblay', company: 'Global Solutions' } },
+                { id: '4', direction: 'OUTBOUND', status: 'COMPLETED', from_number: '+15149876543', to_number: '+15145556677', started_at: new Date(Date.now() - 86400000).toISOString(), duration: 89, contact: { first_name: 'Sophie', last_name: 'Leblanc', company: 'TechStart Inc.' } },
+                { id: '5', direction: 'INBOUND', status: 'MISSED', from_number: '+15147778899', to_number: '+15149876543', started_at: new Date(Date.now() - 2 * 86400000).toISOString(), duration: 0, contact: null },
+                { id: '6', direction: 'OUTBOUND', status: 'COMPLETED', from_number: '+15149876543', to_number: '+15148889900', started_at: new Date(Date.now() - 3 * 86400000).toISOString(), duration: 230, contact: { first_name: 'David', last_name: 'Kim', company: 'Startup XYZ' } },
+            ]
+            S.vms = [
+                { id: 'v1', from_number: '+15141234567', status: 'NEW', created_at: new Date(Date.now() - 3600000).toISOString(), duration: 47, transcription: 'Bonjour, je voulais faire le suivi de notre réunion de la semaine dernière concernant le renouvellement de contrat. Pouvez-vous me rappeler?', contact: { first_name: 'Clémence', last_name: 'Roux' }, recording_url: '#' },
+                { id: 'v2', from_number: '+15143334455', status: 'NEW', created_at: new Date(Date.now() - 7200000).toISOString(), duration: 23, transcription: 'Bonjour c\'est Marc Tremblay, merci pour le rappel de ce matin.', contact: { first_name: 'Marc', last_name: 'Tremblay' }, recording_url: '#' },
+                { id: 'v3', from_number: '+15147778899', status: 'LISTENED', created_at: new Date(Date.now() - 86400000).toISOString(), duration: 15, transcription: 'Rappel demain matin si possible.', contact: null, recording_url: '#' },
+            ]
+            S.queue = [
+                { id: 'q1', from_number: '+15149991111', caller_name: 'Jean-Paul Martin', wait_seconds: 237, status: 'waiting' },
+                { id: 'q2', from_number: '+15149992222', caller_name: 'Isabelle Fontaine', wait_seconds: 89, status: 'waiting' },
+                { id: 'q3', from_number: '+15149993333', caller_name: 'Lucie Gagnon', wait_seconds: 35, status: 'waiting' },
+                { id: 'q4', from_number: '+15149994444', caller_name: 'Robert Chen', wait_seconds: 302, status: 'waiting' },
+                { id: 'q5', from_number: '+15149995555', caller_name: 'Inconnu', wait_seconds: 18, status: 'waiting' },
+                { id: 'a1', from_number: '+15149990000', caller_name: 'Anna Kovac', duration: 145, status: 'active', agent_name: 'Marie D.' },
+                { id: 'a2', from_number: '+15149990001', caller_name: 'Pierre Dubois', duration: 89, status: 'active', agent_name: 'Thomas R.' },
+                { id: 'a3', from_number: '+15149990002', caller_name: 'Liu Wei', duration: 234, status: 'active', agent_name: 'Léa M.' },
+            ]
+            S.agents = [
+                { id: 'ag1', first_name: 'Marie', last_name: 'Dubois', status: 'BUSY', extension: '201', current_call: true, current_call_number: '+15141230000', call_duration: 145 },
+                { id: 'ag2', first_name: 'Thomas', last_name: 'Rousseau', status: 'BUSY', extension: '202', current_call: true, current_call_number: '+15141231111', call_duration: 89 },
+                { id: 'ag3', first_name: 'Léa', last_name: 'Martin', status: 'BUSY', extension: '203', current_call: true, current_call_number: '+15141232222', call_duration: 234 },
+                { id: 'ag4', first_name: 'Kevin', last_name: 'Zhang', status: 'BREAK', extension: '204', current_call: false },
+                { id: 'ag5', first_name: 'Sara', last_name: 'Benali', status: 'ONLINE', extension: '205', current_call: false },
+                { id: 'ag6', first_name: 'Pierre', last_name: 'Morin', status: 'ONLINE', extension: '206', current_call: false },
+                { id: 'ag7', first_name: 'Aïcha', last_name: 'Diop', status: 'OFFLINE', extension: '207', current_call: false },
+            ]
+            rRecents(); rHistory(); rVMs(); rQueue(); rAgents()
+        }
+
+        init()
+    </script>
+</body>
+</html>

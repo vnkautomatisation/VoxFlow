@@ -171,4 +171,46 @@ router.post("/rules", authorize("ADMIN","OWNER"), async (req: AuthRequest, res: 
   } catch (err: any) { sendError(res, err.message) }
 })
 
+
+
+// ── REQUEUE — Remettre un appel en file ──────────────────────────
+router.post("/requeue", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { callId, fromNumber, queueId } = req.body
+    const orgId = req.user?.organizationId || ""
+
+    // Trouver la file par défaut si pas spécifiée
+    let targetQueueId = queueId
+    if (!targetQueueId) {
+      const { data: queues } = await supabaseAdmin
+        .from("queues")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("status", "ACTIVE")
+        .limit(1)
+      targetQueueId = queues?.[0]?.id || null
+    }
+
+    if (!targetQueueId) {
+      return sendError(res, "Aucune file disponible", 404)
+    }
+
+    // Enregistrer le retour en file
+    await supabaseAdmin.from("queue_entries").insert({
+      queue_id:        targetQueueId,
+      organization_id: orgId,
+      from_number:     fromNumber,
+      call_id:         callId,
+      status:          "WAITING",
+      position:        999, // Sera recalculé
+      entered_at:      new Date().toISOString(),
+      requeued:        true,
+    })
+
+    sendSuccess(res, { requeued: true, queueId: targetQueueId })
+  } catch(err: any) {
+    sendError(res, err.message)
+  }
+})
+
 export default router
