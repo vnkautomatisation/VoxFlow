@@ -99,7 +99,7 @@ export class OwnerService {
   }
 
   async assignNumber(phoneNumber: string, organizationId: string) {
-    const twilioNum = await twilioService.purchaseNumber(phoneNumber, organizationId)
+    const twilioNum = await twilioService.purchasePhoneNumber(phoneNumber, organizationId)
     const { data, error } = await supabaseAdmin
       .from("phone_numbers")
       .insert({
@@ -114,7 +114,7 @@ export class OwnerService {
   }
 
   async searchAvailableNumbers(country: string = "CA", areaCode?: string) {
-    return twilioService.searchNumbers(country, areaCode)
+    return twilioService.searchAvailableNumbers(country, areaCode)
   }
 
   async getRevenueDetails() {
@@ -136,3 +136,5 @@ export class OwnerService {
 }
 
 export const ownerService = new OwnerService()
+
+

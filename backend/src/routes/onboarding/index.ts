@@ -63,7 +63,7 @@ router.post("/step/2", async (req: AuthRequest, res: Response) => {
 
     // Achat du numero sur Twilio (ou simulation)
     try {
-      const num = await twilioService.purchaseNumber(phoneNumber, orgId)
+      const num = await twilioService.purchasePhoneNumber(phoneNumber, orgId)
       await supabaseAdmin.from("phone_numbers").insert({
         number: num.phoneNumber, twilio_sid: num.sid, organization_id: orgId, country: "CA"
       })
@@ -191,7 +191,7 @@ router.get("/numbers", async (req: AuthRequest, res: Response) => {
     const areaCode = req.query.areaCode ? String(req.query.areaCode) : undefined
 
     try {
-      const numbers = await twilioService.searchNumbers(country, areaCode)
+      const numbers = await twilioService.searchAvailableNumbers(country, areaCode)
       return sendSuccess(res, { numbers })
     } catch {
       // Numeros simules si Twilio pas configure
@@ -226,3 +226,4 @@ async function updateStep(orgId: string, step: number) {
 }
 
 export default router
+
