@@ -7,7 +7,6 @@ import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import cookieParser from 'cookie-parser'
-import rateLimit from 'express-rate-limit'
 import { config } from './config/env'
 
 // Routes
@@ -29,18 +28,6 @@ import webhookRoutes from './routes/webhooks/index'
 const app = express()
 
 // ── Rate limiting ────────────────────────────────────────────────
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
-  message:  { success: false, error: 'Trop de requêtes, réessayez plus tard' },
-})
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200, // 10 tentatives de login par 15min
-  message:  { success: false, error: 'Trop de tentatives de connexion' },
-})
-
 // ── Middlewares globaux ──────────────────────────────────────────
 app.use(helmet())
 app.use(cors({
@@ -51,8 +38,6 @@ app.use(cors({
 }))
 app.use(morgan(config.app.env === 'production' ? 'combined' : 'dev'))
 app.use(cookieParser())
-app.use(limiter)
-
 // Stripe webhook — body brut avant express.json()
 app.use('/api/v1/webhooks/stripe', express.raw({ type: 'application/json' }))
 
@@ -61,7 +46,7 @@ app.use(express.urlencoded({ extended: true }))
 
 // ── Routes ───────────────────────────────────────────────────────
 app.use('/api/v1/health',   healthRoutes)
-app.use('/api/v1/auth',     authLimiter, authRoutes)
+app.use('/api/v1/auth',     authRoutes)
 app.use('/api/v1/owner',    ownerRoutes)
 app.use('/api/v1/admin',    adminRoutes)
 app.use('/api/v1/ai',        aiRoutes)

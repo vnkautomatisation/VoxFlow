@@ -1,16 +1,13 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
-import { useCallStore } from "@/store/callStore"
 import { agentApi } from "@/lib/agentApi"
-import Softphone from "@/components/agent/Softphone"
 import CallHistory from "@/components/agent/CallHistory"
 import ScriptPanel from "@/components/agent/ScriptPanel"
-import NotesPanel from "@/components/agent/NotesPanel"
 
-type Tab = "softphone" | "history" | "scripts"
+type Tab = "history" | "scripts"
 
 const STATUS_OPTIONS = [
   { value: "ONLINE",  label: "Disponible",  color: "bg-green-500" },
@@ -20,14 +17,14 @@ const STATUS_OPTIONS = [
 
 export default function AgentDashboard() {
   const { user, isAuth, accessToken, logout } = useAuthStore()
-  const { agentStatus, setAgentStatus, activeCall, callState } = useCallStore()
   const router = useRouter()
 
-  const [calls,     setCalls]     = useState<any[]>([])
-  const [scripts,   setScripts]   = useState<any[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [activeTab, setActiveTab] = useState<Tab>("softphone")
-  const [showStatus, setShowStatus] = useState(false)
+  const [calls,       setCalls]       = useState<any[]>([])
+  const [scripts,     setScripts]     = useState<any[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [activeTab,   setActiveTab]   = useState<Tab>("history")
+  const [agentStatus, setAgentStatus] = useState("ONLINE")
+  const [showStatus,  setShowStatus]  = useState(false)
 
   useEffect(() => {
     if (!isAuth || !user) { router.push("/login"); return }
@@ -53,16 +50,9 @@ export default function AgentDashboard() {
 
   const handleStatusChange = async (status: string) => {
     setShowStatus(false)
-    setAgentStatus(status as any)
-    try {
-      await agentApi.setStatus(accessToken!, status)
-    } catch (err) { console.error(err) }
+    setAgentStatus(status)
+    try { await agentApi.setStatus(accessToken!, status) } catch {}
   }
-
-  const handleCallEnd = useCallback(() => {
-    loadData()
-    setActiveTab("softphone")
-  }, [loadData])
 
   if (!user) return null
 
@@ -70,8 +60,6 @@ export default function AgentDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-
-      {/* Header */}
       <div className="border-b border-gray-800 bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -81,17 +69,14 @@ export default function AgentDashboard() {
             </h1>
             <div className="flex gap-1">
               {[
-                { id: "softphone", label: "Softphone" },
-                { id: "history",   label: "Historique (" + calls.length + ")" },
-                { id: "scripts",   label: "Scripts (" + scripts.length + ")" },
+                { id: "history", label: "Historique (" + calls.length + ")" },
+                { id: "scripts", label: "Scripts (" + scripts.length + ")" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as Tab)}
                   className={"px-3 py-1.5 rounded-lg text-sm transition-colors " + (
-                    activeTab === tab.id
-                      ? "bg-gray-700 text-white"
-                      : "text-gray-400 hover:text-white"
+                    activeTab === tab.id ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"
                   )}
                 >
                   {tab.label}
@@ -99,9 +84,7 @@ export default function AgentDashboard() {
               ))}
             </div>
           </div>
-
           <div className="flex items-center gap-3">
-            {/* Statut agent */}
             <div className="relative">
               <button
                 onClick={() => setShowStatus(!showStatus)}
@@ -109,9 +92,6 @@ export default function AgentDashboard() {
               >
                 <div className={"w-2 h-2 rounded-full " + currentStatus.color}></div>
                 <span className="text-white text-sm">{currentStatus.label}</span>
-                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
               </button>
               {showStatus && (
                 <div className="absolute right-0 top-10 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
@@ -128,116 +108,26 @@ export default function AgentDashboard() {
                 </div>
               )}
             </div>
-
             <div className="text-right">
               <p className="text-white text-sm font-medium">{user.name}</p>
               <p className="text-blue-400 text-xs">{user.role}</p>
             </div>
             <button
               onClick={() => { logout(); router.push("/login") }}
-              className="border border-gray-700 text-gray-400 px-3 py-1.5 rounded-lg text-sm hover:border-gray-500 hover:text-white transition-colors"
+              className="border border-gray-700 text-gray-400 px-3 py-1.5 rounded-lg text-sm hover:text-white transition-colors"
             >
               Deconnexion
             </button>
           </div>
         </div>
       </div>
-
-      {/* Layout principal */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-
-        {activeTab === "softphone" && (
-          <div className="grid grid-cols-3 gap-4">
-
-            {/* Colonne gauche - Softphone */}
-            <div className="col-span-1">
-              <Softphone
-                onCallStart={() => setActiveTab("softphone")}
-                onCallEnd={handleCallEnd}
-              />
-            </div>
-
-            {/* Colonne droite - Notes + Info appel */}
-            <div className="col-span-2 space-y-4">
-
-              {/* Fiche client si appel actif */}
-              {activeCall && (
-                <div className="bg-gray-900 border border-blue-800 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center text-blue-300 font-bold text-lg">
-                      ?
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-lg">
-                        {activeCall.direction === "INBOUND" ? activeCall.from : activeCall.to}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {activeCall.direction === "INBOUND" ? "Appel entrant" : "Appel sortant"}
-                      </p>
-                    </div>
-                    <div className="ml-auto">
-                      <span className="bg-blue-900 text-blue-300 text-xs px-3 py-1 rounded-full animate-pulse">
-                        En communication
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">Direction</p>
-                      <p className="text-white mt-1">{activeCall.direction}</p>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">Debut appel</p>
-                      <p className="text-white mt-1">
-                        {activeCall.startedAt.toLocaleTimeString("fr-CA")}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <p className="text-gray-500 text-xs">Statut</p>
-                      <p className="text-green-400 mt-1">{callState}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              <NotesPanel />
-
-              {/* Scripts disponibles */}
-              {scripts.length > 0 && (
-                <div>
-                  <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-2">Scripts disponibles</h3>
-                  <ScriptPanel scripts={scripts} />
-                </div>
-              )}
-
-              {/* Stats rapides si pas d appel */}
-              {!activeCall && (
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Appels aujourd hui", value: calls.filter((c) => new Date(c.started_at).toDateString() === new Date().toDateString()).length },
-                    { label: "Completes",           value: calls.filter((c) => c.status === "COMPLETED").length },
-                    { label: "Duree moy.",          value: calls.length > 0 ? Math.round(calls.reduce((s, c) => s + (c.duration || 0), 0) / calls.length) + "s" : "0s" },
-                  ].map((s) => (
-                    <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                      <p className="text-gray-500 text-xs">{s.label}</p>
-                      <p className="text-white text-xl font-bold mt-1">{s.value}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {activeTab === "history" && (
           <div className="max-w-2xl">
             <h2 className="text-white font-semibold text-lg mb-4">Historique des appels</h2>
             <CallHistory calls={calls} />
           </div>
         )}
-
         {activeTab === "scripts" && (
           <div className="max-w-2xl">
             <h2 className="text-white font-semibold text-lg mb-4">Scripts d appel</h2>

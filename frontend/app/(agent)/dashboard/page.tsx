@@ -1,58 +1,155 @@
-﻿'use client'
+"use client"
 
-import { useAuthStore } from '@/store/authStore'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/store/authStore"
+import { useCallStore } from "@/store/callStore"
+import { agentApi } from "@/lib/agentApi"
+import CallHistory from "@/components/agent/CallHistory"
+import ScriptPanel from "@/components/agent/ScriptPanel"
+
+type Tab = "history" | "scripts"
+
+const STATUS_OPTIONS = [
+  { value: "ONLINE",  label: "Disponible",  color: "bg-green-500" },
+  { value: "BREAK",   label: "Pause",        color: "bg-amber-500" },
+  { value: "OFFLINE", label: "Hors ligne",   color: "bg-gray-500" },
+]
 
 export default function AgentDashboard() {
-  const { user, isAuth, logout } = useAuthStore()
+  const { user, isAuth, accessToken, logout } = useAuthStore()
+  const { agentStatus, setAgentStatus } = useCallStore()
   const router = useRouter()
 
+  const [calls,     setCalls]     = useState<any[]>([])
+  const [scripts,   setScripts]   = useState<any[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [activeTab, setActiveTab] = useState<Tab>("history")
+  const [showStatus, setShowStatus] = useState(false)
+
   useEffect(() => {
-    if (!isAuth) router.push('/login')
-  }, [isAuth, router])
+    if (!isAuth || !user) { router.push("/login"); return }
+    loadData()
+  }, [isAuth, user])
+
+  const loadData = useCallback(async () => {
+    if (!accessToken) return
+    setLoading(true)
+    try {
+      const [callsRes, scriptsRes] = await Promise.all([
+        agentApi.getCalls(accessToken, 20),
+        agentApi.getScripts(accessToken),
+      ])
+      if (callsRes.success)   setCalls(callsRes.data || [])
+      if (scriptsRes.success) setScripts(scriptsRes.data || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }, [accessToken])
+
+  const handleStatusChange = async (status: string) => {
+    setShowStatus(false)
+    setAgentStatus(status as any)
+    try {
+      await agentApi.setStatus(accessToken!, status)
+    } catch (err) { console.error(err) }
+  }
 
   if (!user) return null
 
-  return (
-    <div className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-4xl mx-auto">
+  const currentStatus = STATUS_OPTIONS.find((s) => s.value === agentStatus) || STATUS_OPTIONS[2]
 
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold text-white">
-            Vox<span className="text-blue-500">Flow</span>
-            <span className="text-gray-500 text-lg font-normal ml-3">Agent</span>
-          </h1>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="text-green-400 text-sm">Disponible</span>
+  return (
+    <div className="min-h-screen bg-gray-950">
+
+      {/* Header */}
+      <div className="border-b border-gray-800 bg-gray-900/50">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <h1 className="text-lg font-bold text-white">
+              Vox<span className="text-blue-500">Flow</span>
+              <span className="text-gray-500 text-sm font-normal ml-2">Agent</span>
+            </h1>
+            <div className="flex gap-1">
+              {[
+                { id: "history", label: "Historique (" + calls.length + ")" },
+                { id: "scripts", label: "Scripts (" + scripts.length + ")" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as Tab)}
+                  className={"px-3 py-1.5 rounded-lg text-sm transition-colors " + (
+                    activeTab === tab.id
+                      ? "bg-gray-700 text-white"
+                      : "text-gray-400 hover:text-white"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            <p className="text-gray-400 text-sm">{user.name}</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                onClick={() => setShowStatus(!showStatus)}
+                className="flex items-center gap-2 border border-gray-700 rounded-lg px-3 py-1.5 hover:border-gray-500 transition-colors"
+              >
+                <div className={"w-2 h-2 rounded-full " + currentStatus.color}></div>
+                <span className="text-white text-sm">{currentStatus.label}</span>
+                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showStatus && (
+                <div className="absolute right-0 top-10 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleStatusChange(opt.value)}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-700 transition-colors"
+                    >
+                      <div className={"w-2 h-2 rounded-full " + opt.color}></div>
+                      <span className="text-white text-sm whitespace-nowrap">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="text-right">
+              <p className="text-white text-sm font-medium">{user.name}</p>
+              <p className="text-blue-400 text-xs">{user.role}</p>
+            </div>
             <button
-              onClick={() => { logout(); router.push('/login') }}
-              className="border border-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm"
+              onClick={() => { logout(); router.push("/login") }}
+              className="border border-gray-700 text-gray-400 px-3 py-1.5 rounded-lg text-sm hover:border-gray-500 hover:text-white transition-colors"
             >
-              Déconnexion
+              Deconnexion
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Softphone placeholder */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center mb-4">
-          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-            </svg>
+      {/* Contenu */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+
+        {activeTab === "history" && (
+          <div className="max-w-2xl">
+            <h2 className="text-white font-semibold text-lg mb-4">Historique des appels</h2>
+            <CallHistory calls={calls} />
           </div>
-          <p className="text-gray-400 text-sm">Softphone WebRTC</p>
-          <p className="text-gray-600 text-xs mt-1">Phase 4 — À venir</p>
-        </div>
+        )}
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-white font-semibold mb-2">Interface Agent</h2>
-          <p className="text-gray-400 text-sm">Phase 4 — Softphone WebRTC + CRM à venir</p>
-        </div>
+        {activeTab === "scripts" && (
+          <div className="max-w-2xl">
+            <h2 className="text-white font-semibold text-lg mb-4">Scripts d appel</h2>
+            <ScriptPanel scripts={scripts} />
+          </div>
+        )}
 
       </div>
     </div>
