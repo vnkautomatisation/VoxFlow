@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express'
+﻿import { Router, Request, Response } from 'express'
 import { authenticate, AuthRequest } from '../../middleware/auth'
 import { twilioService } from '../../services/twilio/twilio.service'
 import { supabaseAdmin } from '../../config/supabase'
@@ -78,4 +78,29 @@ router.post('/voice/recording', async (req: Request, res: Response) => {
   }
 })
 
+
+// ── GET /telephony/recording-proxy — Proxy enregistrements Twilio ──────
+// Évite le popup auth navigateur en proxifiant via le backend authentifié
+router.get('/recording-proxy', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { url } = req.query as { url: string }
+    if (!url || !url.includes('twilio')) {
+      res.status(400).json({ error: 'URL invalide' }); return
+    }
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || ''
+    const authToken  = process.env.TWILIO_AUTH_TOKEN  || ''
+    const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64')
+    const upstream = await fetch(url, { headers: { Authorization: authHeader } })
+    if (!upstream.ok) { res.status(upstream.status).send('Erreur audio'); return }
+    const ct = upstream.headers.get('content-type') || 'audio/mpeg'
+    res.set('Content-Type', ct)
+    res.set('Cache-Control', 'private, max-age=3600')
+    const buf = await upstream.arrayBuffer()
+    res.send(Buffer.from(buf))
+  } catch (err: any) {
+    console.error('[recording-proxy]', err.message)
+    res.status(500).send('Erreur proxy')
+  }
+})
 export default router
+

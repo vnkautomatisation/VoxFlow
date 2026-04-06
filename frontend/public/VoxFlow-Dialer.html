@@ -2,6 +2,9 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/logo/voxflow-icon.svg">
+    <link rel="alternate icon" href="/icons/favicon.ico">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
     <title>VoxFlow Dialer</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -1962,6 +1965,143 @@ window.addEventListener('storage', function(e) {
 }
 .logo-dot { animation: ldot 2s ease-in-out infinite !important }
 </style>
+<style>
+/* ── SCROLL LISTES — toutes les panes ──────────────────────────── */
+#pane-queue .p12,
+#pane-agents .p12,
+#pane-history,
+#pane-voicemails,
+#pane-search .p12 {
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line2) transparent;
+}
+#pane-queue .p12::-webkit-scrollbar,
+#pane-agents .p12::-webkit-scrollbar,
+#pane-history::-webkit-scrollbar,
+#pane-voicemails::-webkit-scrollbar,
+#pane-search .p12::-webkit-scrollbar { width: 3px }
+#pane-queue .p12::-webkit-scrollbar-thumb,
+#pane-agents .p12::-webkit-scrollbar-thumb,
+#pane-history::-webkit-scrollbar-thumb,
+#pane-voicemails::-webkit-scrollbar-thumb,
+#pane-search .p12::-webkit-scrollbar-thumb {
+    background: var(--line2); border-radius: 2px
+}
+
+/* Récents — scroll si > 3 items */
+#recents-wrap {
+    max-height: 180px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line2) transparent;
+}
+#recents-wrap::-webkit-scrollbar { width: 3px }
+#recents-wrap::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px }
+
+/* ── WAVEFORM — visualiseur audio en cours d'appel ─────────────── */
+.wf-wrap {
+    display: none;
+    padding: 6px 12px 2px;
+    gap: 4px;
+    flex-direction: column;
+    background: rgba(0,0,0,.15);
+    border-top: 1px solid var(--line);
+}
+.wf-wrap.on { display: flex }
+.wf-row {
+    display: flex;
+    align-items: center;
+    gap: 8px
+}
+.wf-lbl {
+    font-size: 9px;
+    color: var(--tx3);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    width: 34px;
+    flex-shrink: 0;
+    text-align: right;
+}
+.wf-canvas {
+    flex: 1;
+    height: 26px;
+    border-radius: 6px;
+}
+</style>
+<style>
+/* ── CLAVIER DTMF FULLSCREEN ──────────────────────────────────── */
+.dtmf-overlay {
+    display: none;
+    flex-direction: column;
+    background: var(--ink2);
+}
+.dtmf-overlay.on { display: flex }
+.dtmf-back {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--ink3);
+    border-bottom: 1px solid var(--line);
+    border: none;
+    color: var(--tx2);
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--font);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    width: 100%;
+    text-align: left;
+    transition: color .15s;
+}
+.dtmf-back:hover { color: var(--txt) }
+.dtmf-display {
+    font-family: var(--mono);
+    font-size: 22px;
+    text-align: center;
+    letter-spacing: 4px;
+    color: var(--txt);
+    padding: 12px 16px 8px;
+    min-height: 48px;
+    background: var(--ink2);
+}
+.dtmf-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    flex: 1;
+}
+.dtmf-key {
+    background: var(--ink3);
+    border: none;
+    color: var(--txt);
+    padding: 18px 4px;
+    font-size: 20px;
+    font-family: var(--font);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: background .1s;
+    position: relative;
+}
+.dtmf-key:hover { background: var(--ink4) }
+.dtmf-key:active { background: var(--ink5) }
+.dtmf-key .ksub {
+    font-size: 8px;
+    color: var(--tx3);
+    letter-spacing: .12em;
+    font-weight: 600;
+}
+.dtmf-key.flash { background: var(--vi3) !important; color: var(--violet) }
+</style>
 </head>
 <body>
     <div class="popup" id="popup">
@@ -2034,7 +2174,17 @@ window.addEventListener('storage', function(e) {
                     <div class="cbar-chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="11" height="11"><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4" /></svg><span>WebRTC</span></div>
                     <div class="cbar-chip" id="call-dir-lbl"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="11" height="11"><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg><span>Entrant</span></div>
                 </div>
-
+                <!-- Waveform audio — visible pendant l'appel -->
+                <div class="wf-wrap" id="wf-wrap">
+                    <div class="wf-row">
+                        <span class="wf-lbl">Moi</span>
+                        <canvas class="wf-canvas" id="wf-local"></canvas>
+                    </div>
+                    <div class="wf-row">
+                        <span class="wf-lbl">Client</span>
+                        <canvas class="wf-canvas" id="wf-remote"></canvas>
+                    </div>
+                </div>
                 <!-- Actions — filtrées par rôle -->
                 <div class="cacts" id="call-actions-grid">
                     <button class="abt" id="btn-mute" onclick="doMute()">
@@ -2053,7 +2203,7 @@ window.addEventListener('storage', function(e) {
                     <button class="abt" id="btn-notes" onclick="doPanel('notes')">
                         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>Notes
                     </button>
-                    <button class="abt" id="btn-kpad" onclick="doPanel('kpad')">
+                    <button class="abt" id="btn-kpad" onclick="openDTMF()">
                         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="3" width="3" height="3" rx="1" /><rect x="10" y="3" width="3" height="3" rx="1" /><rect x="16" y="3" width="3" height="3" rx="1" /><rect x="4" y="9" width="3" height="3" rx="1" /><rect x="10" y="9" width="3" height="3" rx="1" /><rect x="16" y="9" width="3" height="3" rx="1" /><rect x="7" y="15" width="9" height="3" rx="1" /></svg>Clavier
                     </button>
                 </div>
@@ -2285,6 +2435,29 @@ window.addEventListener('storage', function(e) {
             </div>
         </div>
 
+    
+        <!-- ═══ DTMF OVERLAY ══════════════════════════════════════ -->
+        <div class="dtmf-overlay" id="dtmf-overlay">
+            <button class="dtmf-back" onclick="closeDTMF()">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                Retour
+            </button>
+            <div class="dtmf-display" id="dtmf-display"></div>
+            <div class="dtmf-grid">
+                <button class="dtmf-key" onclick="pressDTMF('1')">1</button>
+                <button class="dtmf-key" onclick="pressDTMF('2')">2<span class="ksub">ABC</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('3')">3<span class="ksub">DEF</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('4')">4<span class="ksub">GHI</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('5')">5<span class="ksub">JKL</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('6')">6<span class="ksub">MNO</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('7')">7<span class="ksub">PQRS</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('8')">8<span class="ksub">TUV</span></button>
+                <button class="dtmf-key" onclick="pressDTMF('9')">9<span class="ksub">WXYZ</span></button>
+                <button class="dtmf-key" style="color:var(--violet)" onclick="pressDTMF('*')">*</button>
+                <button class="dtmf-key" onclick="pressDTMF('0')">0<span class="ksub">+</span></button>
+                <button class="dtmf-key" style="color:var(--violet)" onclick="pressDTMF('#')">#</button>
+            </div>
+        </div>
     </div><!-- .popup -->
 
     <script>
@@ -2306,8 +2479,8 @@ window.addEventListener('storage', function(e) {
         }
 
         // Helpers de permission
-        const isAdmin = () => S.role === 'ADMIN' || S.role === 'OWNER'
-        const isOwner = () => S.role === 'OWNER'
+        window.isAdmin = () => S.role === 'ADMIN' || S.role === 'OWNER'
+        window.isOwner = () => S.role === 'OWNER'
 
         // ════════════════════════════════════════════════════════════
         //  API
@@ -2689,6 +2862,44 @@ window.addEventListener('storage', function(e) {
             if (!open) { document.getElementById(map[name]).classList.add('on'); document.getElementById(btn[name]).classList.add('m-panel') }
         }
 
+
+        // ── DTMF OVERLAY (style iPhone) ──────────────────────────────
+        function openDTMF() {
+            document.getElementById('view-calling').style.display = 'none'
+            var ov = document.getElementById('dtmf-overlay')
+            ov.classList.add('on')
+            document.getElementById('dtmf-display').textContent = ''
+            // Positionner l'overlay dans le popup
+            ov.style.position = 'absolute'
+            ov.style.inset = '0'
+            ov.style.zIndex = '500'
+            ov.style.borderRadius = '20px'
+            ov.style.overflow = 'hidden'
+        }
+        function closeDTMF() {
+            document.getElementById('dtmf-overlay').classList.remove('on')
+            document.getElementById('view-calling').style.display = ''
+        }
+        function pressDTMF(k) {
+            // Son DTMF
+            if (typeof window.vfDTMF === 'function') window.vfDTMF(k)
+            else if (typeof window.dtmf === 'function') window.dtmf(k)
+            // Envoyer au call Twilio
+            if (window.__VFCall) {
+                try { window.__VFCall.sendDigits(String(k)) } catch(e) {}
+            }
+            // Afficher dans le display
+            var d = document.getElementById('dtmf-display')
+            if (d) { d.textContent += k }
+            // Flash visuel sur la touche
+            var keys = document.querySelectorAll('.dtmf-key')
+            keys.forEach(function(btn) {
+                if (btn.textContent.trim().startsWith(k)) {
+                    btn.classList.add('flash')
+                    setTimeout(function() { btn.classList.remove('flash') }, 120)
+                }
+            })
+        }
         function star(n) { document.querySelectorAll('#stars span').forEach((s, i) => s.style.color = i < n ? 'var(--amber)' : 'var(--tx3)'); toast('★ Évaluation enregistrée') }
 
         // ════════════════════════════════════════════════════════════
@@ -2837,7 +3048,7 @@ window.addEventListener('storage', function(e) {
             </div>
           </div>`).join('')
         }
-        function playVM(id, url) { new Audio(url).play().catch(() => toast('Audio indisponible')); markRead(id) }
+        function playVM(id, url) { playA(url); markRead(id) }
         function markRead(id) { S.vms = S.vms.map(v => v.id === id ? { ...v, status: 'LISTENED' } : v); api('/api/v1/telephony/voicemail/' + id + '/listen', { method: 'PATCH' }).catch(() => { }); rVMs() }
 
         // ════════════════════════════════════════════════════════════
@@ -2895,7 +3106,55 @@ window.addEventListener('storage', function(e) {
             if (df < 86400) return Math.floor(df / 3600) + 'h'
             return d.toLocaleDateString('fr-CA', { day: '2-digit', month: 'short' })
         }
-        const playA = url => new Audio(url).play().catch(() => toast('Audio indisponible'))
+        function playA(url) {
+    if (!url) { toast('Aucun enregistrement'); return }
+    var tok = localStorage.getItem('vf_tok')
+    var base = localStorage.getItem('vf_url') || 'http://localhost:4000'
+
+    // Supprimer ancienne modal
+    var old = document.getElementById('vf-audio-modal')
+    if (old) old.remove()
+
+    // Créer modal
+    var m = document.createElement('div')
+    m.id = 'vf-audio-modal'
+    m.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;border-radius:20px'
+    m.innerHTML = '<div style="background:#18181f;border:1px solid #3a3a55;border-radius:16px;padding:20px;width:300px">' +
+        '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#55557a;margin-bottom:12px">▶ Enregistrement</div>' +
+        '<div id="vf-audio-status" style="font-size:12px;color:#9898b8;text-align:center;padding:8px 0">Chargement...</div>' +
+        '<audio id="vf-audio-el" controls style="width:100%;border-radius:8px;display:none"></audio>' +
+        '<button onclick="document.getElementById(\'vf-audio-modal\').remove()" ' +
+        'style="margin-top:12px;width:100%;background:#1f1f2a;border:1px solid #2e2e44;border-radius:8px;color:#9898b8;padding:8px;font-size:12px;cursor:pointer;font-family:var(--font)">Fermer</button>' +
+        '</div>'
+    document.getElementById('popup').appendChild(m)
+
+    // Charger via proxy avec Authorization
+    var proxyUrl = url.includes('twilio.com') && tok
+        ? base + '/api/v1/telephony/recording-proxy?url=' + encodeURIComponent(url)
+        : url
+
+    var headers = tok ? { Authorization: 'Bearer ' + tok } : {}
+
+    fetch(proxyUrl, { headers: headers })
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status)
+            return r.blob()
+        })
+        .then(function(blob) {
+            var blobUrl = URL.createObjectURL(blob)
+            var audio = document.getElementById('vf-audio-el')
+            var status = document.getElementById('vf-audio-status')
+            if (!audio || !status) return
+            audio.src = blobUrl
+            audio.style.display = 'block'
+            status.style.display = 'none'
+            audio.play().catch(function() {})
+        })
+        .catch(function(e) {
+            var status = document.getElementById('vf-audio-status')
+            if (status) { status.textContent = 'Erreur: ' + e.message; status.style.color = '#ff4d6d' }
+        })
+}
 
         // // loadDemo supprimé supprimé — données réelles uniquement
 
@@ -2936,12 +3195,12 @@ window.addEventListener('storage', function(e) {
         setTimeout(initTwilio, 1000)
         return
       }
-
-      fetch(url + '/api/v1/telephony/voice/token', {
-        headers: { Authorization: 'Bearer ' + tok }
-      })
+      fetch(url + '/api/v1/telephony/voice/token', { headers: { Authorization: 'Bearer ' + tok } })
       .then(function(r) { return r.json() })
       .then(function(data) {
+
+
+
         if (!data.success || !data.data || !data.data.token) {
           console.warn('[VF] Token WebRTC non disponible')
           return
@@ -3574,7 +3833,181 @@ setTimeout(async function() {
 }, 500)
 </script>
 
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  VoxFlow — Waveform Audio (micro + remote)
+// ══════════════════════════════════════════════════════════════════
+;(function() {
+  var _wfLocal  = null  // AnimationFrame local
+  var _wfRemote = null  // AnimationFrame remote
+  var _wfCtx    = null  // AudioContext
+
+  function getAC() {
+    if (!_wfCtx) _wfCtx = new (window.AudioContext || window.webkitAudioContext)()
+    if (_wfCtx.state === 'suspended') _wfCtx.resume()
+    return _wfCtx
+  }
+
+  function drawWave(canvas, analyser, color, raf) {
+    if (!canvas || !analyser) return null
+    var W = canvas.width = canvas.offsetWidth * window.devicePixelRatio
+    var H = canvas.height = canvas.offsetHeight * window.devicePixelRatio
+    var ctx = canvas.getContext('2d')
+    var buf = new Uint8Array(analyser.frequencyBinCount)
+
+    function frame() {
+      raf = requestAnimationFrame(frame)
+      analyser.getByteTimeDomainData(buf)
+
+      ctx.clearRect(0, 0, W, H)
+
+      // Fond subtil
+      ctx.fillStyle = 'rgba(27,27,40,0.6)'
+      ctx.fillRect(0, 0, W, H)
+
+      // Ligne centrale
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, H/2)
+      ctx.lineTo(W, H/2)
+      ctx.stroke()
+
+      // Waveform
+      ctx.strokeStyle = color
+      ctx.lineWidth = 1.5 * window.devicePixelRatio
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      ctx.shadowColor = color
+      ctx.shadowBlur = 6
+
+      ctx.beginPath()
+      var sliceW = W / buf.length
+      var x = 0
+      for (var i = 0; i < buf.length; i++) {
+        var v = buf[i] / 128.0
+        var y = (v * H) / 2
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+        x += sliceW
+      }
+      ctx.lineTo(W, H/2)
+      ctx.stroke()
+      ctx.shadowBlur = 0
+    }
+
+    frame()
+    return function() { if (raf) cancelAnimationFrame(raf) }
+  }
+
+  // Stopper les waveforms
+  var _stopLocal  = null
+  var _stopRemote = null
+
+  window.startWaveforms = function(twilioCall) {
+    var wrap = document.getElementById('wf-wrap')
+    var cLocal  = document.getElementById('wf-local')
+    var cRemote = document.getElementById('wf-remote')
+    if (!wrap || !cLocal || !cRemote) return
+
+    wrap.classList.add('on')
+
+    try {
+      var ac = getAC()
+
+      // ── Micro local ──────────────────────────────────────────
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        .then(function(stream) {
+          var src = ac.createMediaStreamSource(stream)
+          var an  = ac.createAnalyser()
+          an.fftSize = 512
+          an.smoothingTimeConstant = 0.8
+          src.connect(an)
+          _stopLocal = drawWave(cLocal, an, '#00d4aa', null)
+          // Stocker le stream pour cleanup
+          window.__wfLocalStream = stream
+        })
+        .catch(function(e) { console.warn('[WF] Micro:', e.message) })
+
+      // ── Audio remote (Twilio) ────────────────────────────────
+      if (twilioCall && twilioCall._mediaHandler) {
+        try {
+          var pc = twilioCall._mediaHandler.version.pc || twilioCall._mediaHandler._peerConnection
+          if (pc) {
+            var receivers = pc.getReceivers ? pc.getReceivers() : []
+            var audioReceiver = receivers.find(function(r) { return r.track && r.track.kind === 'audio' })
+            if (audioReceiver) {
+              var remoteStream = new MediaStream([audioReceiver.track])
+              var srcR = ac.createMediaStreamSource(remoteStream)
+              var anR  = ac.createAnalyser()
+              anR.fftSize = 512
+              anR.smoothingTimeConstant = 0.8
+              srcR.connect(anR)
+              _stopRemote = drawWave(cRemote, anR, '#7b61ff', null)
+            }
+          }
+        } catch(e) { console.warn('[WF] Remote:', e.message) }
+      }
+
+      // Fallback remote — simuler légère activité si pas de peerConnection
+      if (!_stopRemote) {
+        var anFake = ac.createAnalyser()
+        anFake.fftSize = 512
+        // Oscillateur silencieux pour avoir un "flatline" propre
+        var osc = ac.createOscillator()
+        var gainFake = ac.createGain()
+        gainFake.gain.value = 0.001
+        osc.connect(gainFake)
+        gainFake.connect(anFake)
+        osc.start()
+        window.__wfOsc = osc
+        _stopRemote = drawWave(cRemote, anFake, '#7b61ff', null)
+      }
+
+    } catch(e) { console.warn('[WF] Init:', e.message) }
+  }
+
+  window.stopWaveforms = function() {
+    var wrap = document.getElementById('wf-wrap')
+    if (wrap) wrap.classList.remove('on')
+    if (_stopLocal)  { _stopLocal();  _stopLocal  = null }
+    if (_stopRemote) { _stopRemote(); _stopRemote = null }
+    if (window.__wfLocalStream) {
+      window.__wfLocalStream.getTracks().forEach(function(t) { t.stop() })
+      window.__wfLocalStream = null
+    }
+    if (window.__wfOsc) {
+      try { window.__wfOsc.stop() } catch(e) {}
+      window.__wfOsc = null
+    }
+  }
+
+  // Hooker startCall et hangup
+  function waitFns(cb) {
+    if (typeof window.startCall === 'function' && typeof window.hangup === 'function') cb()
+    else setTimeout(function() { waitFns(cb) }, 300)
+  }
+
+  waitFns(function() {
+    var _origStart = window.startCall
+    window.startCall = function(num) {
+      if (_origStart) _origStart(num)
+      // Démarrer waveforms après 500ms (temps que Twilio connecte)
+      setTimeout(function() {
+        window.startWaveforms(window.__VFCall)
+      }, 500)
+    }
+
+    var _origHangup = window.hangup
+    window.hangup = async function() {
+      window.stopWaveforms()
+      if (_origHangup) await _origHangup()
+    }
+  })
+
+  console.log('[VoxFlow] Waveform prêt ✓')
+})()
+</script>
 </body>
 </html>
-
 

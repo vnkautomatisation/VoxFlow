@@ -1,255 +1,224 @@
-// ============================================================
-//  VoxFlow — frontend/hooks/useAgentDashboard.ts
-//  Hook central du portail agent
-//  - Charge calls, voicemails, contacts, scripts, stats, queue
-//  - Polling toutes les 30s
-//  - Écoute BroadcastChannel "voxflow_calls" depuis le dialer
-// ============================================================
-"use client"
-import { useState, useEffect, useRef, useCallback } from "react"
+'use client'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
-// ── Types ─────────────────────────────────────────────────────
-export type CallStatus = "COMPLETED" | "NO_ANSWER" | "MISSED" | "IN_PROGRESS" | "FAILED" | "CANCELLED"
+const API = () => (typeof window !== 'undefined' ? localStorage.getItem('vf_url') || 'http://localhost:4000' : 'http://localhost:4000')
+const TOK = () => (typeof window !== 'undefined' ? localStorage.getItem('vf_tok') || '' : '')
 
-export interface ApiCall {
-  id:           string
-  from_number:  string
-  to_number:    string
-  direction:    "INBOUND" | "OUTBOUND"
-  status:       CallStatus
-  duration?:    number
-  started_at:   string
-  ended_at?:    string
-  notes?:       string
-  contact?:     { id: string; first_name?: string; last_name?: string; company?: string } | null
-}
-
-export interface QueueEntry {
-  id:            string
-  from_number:   string
-  caller_name?:  string
-  wait_seconds:  number
-  priority:      number
-  status:        string
-}
-
-export interface Voicemail {
-  id:             string
-  from_number:    string
-  duration:       number
-  status:         "NEW" | "LISTENED" | "ARCHIVED"
-  transcription?: string
-  created_at:     string
-  contact?:       { first_name?: string; last_name?: string } | null
-}
-
-export interface Script {
-  id:        string
-  name:      string
-  content:   string
-  queue_id?: string | null
-}
-
-export interface Contact {
-  id:          string
-  first_name?: string
-  last_name?:  string
-  phone?:      string
-  email?:      string
-  company?:    string
-}
-
-export interface AgentStats {
-  calls_total:    number
-  calls_answered: number
-  calls_missed:   number
-  talk_seconds:   number
-  avg_duration:   number
-}
-
-export interface AgentGoals {
-  daily_calls_target: number
-  daily_answer_rate:  number
-  daily_talk_time:    number
-}
-
-// ── Config ────────────────────────────────────────────────────
-const API_URL       = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
-const POLL_INTERVAL = 30_000
-
-const DEFAULT_STATS: AgentStats = {
-  calls_total: 0, calls_answered: 0, calls_missed: 0,
-  talk_seconds: 0, avg_duration: 0,
-}
-
-const DEFAULT_GOALS: AgentGoals = {
-  daily_calls_target: 50, daily_answer_rate: 80, daily_talk_time: 14400,
-}
-
-// ── Helper fetch ──────────────────────────────────────────────
-async function apiFetch(path: string, token: string): Promise<any> {
-  const r = await fetch(API_URL + path, {
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+const apiFetch = async (path: string) => {
+  const r = await fetch(API() + path, {
+    headers: { Authorization: 'Bearer ' + TOK(), 'Content-Type': 'application/json' },
   })
-  if (!r.ok) throw new Error(`HTTP ${r.status} on ${path}`)
   return r.json()
 }
 
-// ── Hook principal ────────────────────────────────────────────
-export function useAgentDashboard() {
-  const [calls,       setCalls]       = useState<ApiCall[]>([])
-  const [queue,       setQueue]       = useState<QueueEntry[]>([])
-  const [voicemails,  setVoicemails]  = useState<Voicemail[]>([])
-  const [scripts,     setScripts]     = useState<Script[]>([])
-  const [contacts,    setContacts]    = useState<Contact[]>([])
-  const [stats,       setStats]       = useState<AgentStats>(DEFAULT_STATS)
-  const [goals,       setGoals]       = useState<AgentGoals>(DEFAULT_GOALS)
-  const [loading,     setLoading]     = useState(true)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+export interface AdminStats {
+  agentsOnline: number
+  agentsTotal: number
+  agentsBusy: number
+  agentsBreak: number
+  activeQueues: number
+  callsToday: number
+  callsAnswered: number
+  avgDuration: number
+  resolutionRate: number
+  ivrCount: number
+}
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+export interface AgentRow {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  extension?: string
+  created_at: string
+  agentStatus?: string
+  current_call?: boolean
+  call_duration?: number
+}
 
-  const getToken = () =>
-    typeof window !== "undefined" ? localStorage.getItem("vf_tok") || "" : ""
+export interface QueueRow {
+  id: string
+  name: string
+  strategy: string
+  waiting: number
+  active: number
+  created_at: string
+}
 
-  // ── Fetch tout en parallèle ───────────────────────────────
-  const fetchAll = useCallback(async () => {
-    const token = getToken()
-    if (!token) { setLoading(false); return }
+export interface CallRow {
+  id: string
+  from_number: string
+  to_number: string
+  direction: string
+  status: string
+  duration: number
+  started_at: string
+  recording_url?: string
+  notes?: string
+  contact?: { first_name: string; last_name: string; company?: string }
+}
 
-    const [callsRes, vmRes, scriptsRes, queueRes, goalsRes, contactsRes] =
-      await Promise.allSettled([
-        apiFetch("/api/v1/telephony/calls?limit=50", token),
-        apiFetch("/api/v1/telephony/voicemails", token),
-        apiFetch("/api/v1/agent/scripts", token),
-        apiFetch("/api/v1/queues/live", token),          // peut échouer si route absente
-        apiFetch("/api/v1/agent/goals", token),          // idem
-        apiFetch("/api/v1/crm/contacts?limit=100", token),
+export interface IVRRow {
+  id: string
+  name: string
+  description?: string
+  created_at: string
+}
+
+export function useAdminDashboard() {
+  const [stats, setStats] = useState<AdminStats>({
+    agentsOnline: 0, agentsTotal: 0, agentsBusy: 0, agentsBreak: 0,
+    activeQueues: 0, callsToday: 0, callsAnswered: 0, avgDuration: 0,
+    resolutionRate: 0, ivrCount: 0,
+  })
+  const [agents, setAgents] = useState<AgentRow[]>([])
+  const [queues, setQueues] = useState<QueueRow[]>([])
+  const [calls, setCalls] = useState<CallRow[]>([])
+  const [ivr, setIvr] = useState<IVRRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
+  const pollRef = useRef<NodeJS.Timeout | null>(null)
+
+  const loadAll = useCallback(async () => {
+    try {
+      const [statsR, agentsR, queuesR, callsR, ivrR, snapR] = await Promise.allSettled([
+        apiFetch('/api/v1/admin/stats'),
+        apiFetch('/api/v1/admin/agents'),
+        apiFetch('/api/v1/admin/queues'),
+        apiFetch(`/api/v1/admin/reports?period=${period}`),
+        apiFetch('/api/v1/admin/ivr'),
+        apiFetch('/api/v1/supervision/snapshot'),
       ])
 
-    // ── Calls + stats temps réel ──────────────────────────
-    if (callsRes.status === "fulfilled" && callsRes.value?.success) {
-      const raw: any[] = callsRes.value.data || []
-      const mapped: ApiCall[] = raw.map(c => ({
-        id:          c.id,
-        from_number: c.from_number,
-        to_number:   c.to_number,
-        direction:   c.direction,
-        status:      c.status,
-        duration:    c.duration,
-        started_at:  c.started_at,
-        ended_at:    c.ended_at,
-        notes:       c.notes,
-        contact:     c.contact || null,
-      }))
-      setCalls(mapped)
-
-      // Calculer stats depuis les appels du jour courant
-      const today    = new Date().toDateString()
-      const todayCalls = raw.filter(c => new Date(c.started_at).toDateString() === today)
-      const answered   = todayCalls.filter(c => c.status === "COMPLETED")
-      const missed     = todayCalls.filter(c => ["NO_ANSWER","MISSED","FAILED","CANCELLED"].includes(c.status))
-      const talkSec    = answered.reduce((s: number, c: any) => s + (c.duration || 0), 0)
-      const avgDur     = answered.length ? Math.round(talkSec / answered.length) : 0
-      setStats({ calls_total: todayCalls.length, calls_answered: answered.length, calls_missed: missed.length, talk_seconds: talkSec, avg_duration: avgDur })
-    }
-
-    // ── Voicemails ────────────────────────────────────────
-    if (vmRes.status === "fulfilled" && vmRes.value?.success) {
-      setVoicemails(vmRes.value.data || [])
-    }
-
-    // ── Scripts ───────────────────────────────────────────
-    if (scriptsRes.status === "fulfilled" && scriptsRes.value?.success) {
-      setScripts(scriptsRes.value.data || [])
-    }
-
-    // ── Queue live ────────────────────────────────────────
-    if (queueRes.status === "fulfilled" && queueRes.value?.success) {
-      setQueue(queueRes.value.data || [])
-    }
-
-    // ── Objectifs agent ───────────────────────────────────
-    if (goalsRes.status === "fulfilled" && goalsRes.value?.success) {
-      const g = goalsRes.value.data?.goals
-      if (g) setGoals({
-        daily_calls_target: g.daily_calls_target ?? 50,
-        daily_answer_rate:  g.daily_answer_rate  ?? 80,
-        daily_talk_time:    g.daily_talk_time     ?? 14400,
-      })
-    }
-
-    // ── Contacts CRM ──────────────────────────────────────
-    if (contactsRes.status === "fulfilled" && contactsRes.value?.success) {
-      setContacts(contactsRes.value.data || [])
-    }
-
-    setLastRefresh(new Date())
-    setLoading(false)
-  }, [])
-
-  // ── BroadcastChannel : écoute le dialer flottant ─────────
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const bc = new BroadcastChannel("voxflow_calls")
-    bc.onmessage = (e: MessageEvent) => {
-      if (["CALL_ENDED","CALL_STARTED","CALL_MISSED","STATUS_CHANGED"].includes(e.data?.type)) {
-        // Refresh après 800ms pour laisser le backend écrire
-        setTimeout(fetchAll, 800)
+      // Stats
+      if (statsR.status === 'fulfilled' && statsR.value?.success) {
+        const d = statsR.value.data
+        setStats(prev => ({
+          ...prev,
+          agentsTotal:    d.agentsTotal    ?? prev.agentsTotal,
+          agentsOnline:   d.agentsOnline   ?? prev.agentsOnline,
+          agentsBusy:     d.agentsBusy     ?? prev.agentsBusy,
+          agentsBreak:    d.agentsBreak    ?? prev.agentsBreak,
+          activeQueues:   d.activeQueues   ?? prev.activeQueues,
+          callsToday:     d.callsToday     ?? prev.callsToday,
+          callsAnswered:  d.callsAnswered  ?? prev.callsAnswered,
+          avgDuration:    d.avgDuration    ?? prev.avgDuration,
+          resolutionRate: d.resolutionRate ?? prev.resolutionRate,
+          ivrCount:       d.ivrCount       ?? prev.ivrCount,
+        }))
       }
+
+      // Agents
+      if (agentsR.status === 'fulfilled' && agentsR.value?.success) {
+        let agentList: AgentRow[] = agentsR.value.data || []
+        // Merge avec snapshot supervision
+        if (snapR.status === 'fulfilled' && snapR.value?.success && snapR.value?.data) {
+          const snap = snapR.value.data
+          const snapAgents = snap.agentStatuses || snap.agents || snap || []
+          agentList = agentList.map((a: AgentRow) => {
+            const s = snapAgents.find((x: any) => x.agentId === a.id || x.userId === a.id)
+            return s ? { ...a, agentStatus: s.status, current_call: !!s.callId, call_duration: s.callDuration || 0 } : a
+          })
+          // Stats live depuis snapshot
+          const online = agentList.filter(a => a.agentStatus === 'ONLINE' && !a.current_call).length
+          const busy   = agentList.filter(a => a.current_call || a.agentStatus === 'BUSY').length
+          const brk    = agentList.filter(a => a.agentStatus === 'BREAK').length
+          setStats(prev => ({ ...prev, agentsOnline: online, agentsBusy: busy, agentsBreak: brk }))
+        }
+        setAgents(agentList)
+      }
+
+      // Queues
+      if (queuesR.status === 'fulfilled' && queuesR.value?.success) {
+        setQueues(queuesR.value.data || [])
+        setStats(prev => ({ ...prev, activeQueues: (queuesR.value.data || []).length }))
+      }
+
+      // Calls / Reports
+      if (callsR.status === 'fulfilled' && callsR.value?.success) {
+        const d = callsR.value.data
+        if (Array.isArray(d)) {
+          setCalls(d)
+          const completed = d.filter((c: CallRow) => c.status === 'COMPLETED').length
+          const answered  = d.filter((c: CallRow) => ['COMPLETED', 'IN_PROGRESS'].includes(c.status)).length
+          const avgDur    = d.length ? Math.round(d.reduce((a: number, c: CallRow) => a + (c.duration || 0), 0) / d.length) : 0
+          setStats(prev => ({
+            ...prev,
+            callsToday:     d.length,
+            callsAnswered:  answered,
+            avgDuration:    avgDur,
+            resolutionRate: d.length ? Math.round((completed / d.length) * 100) : 0,
+          }))
+        } else if (d?.calls) {
+          setCalls(d.calls)
+          setStats(prev => ({
+            ...prev,
+            callsToday:     d.total     ?? d.calls.length,
+            callsAnswered:  d.answered  ?? 0,
+            avgDuration:    d.avgDuration ?? 0,
+            resolutionRate: d.resolutionRate ?? 0,
+          }))
+        }
+      } else {
+        // Fallback: charger les appels depuis telephony
+        const fallback = await apiFetch('/api/v1/telephony/calls?limit=50')
+        if (fallback?.success) {
+          const d = fallback.data || []
+          setCalls(d)
+          const completed = d.filter((c: CallRow) => c.status === 'COMPLETED').length
+          const answered  = d.filter((c: CallRow) => ['COMPLETED'].includes(c.status)).length
+          const avgDur    = d.length ? Math.round(d.reduce((a: number, c: CallRow) => a + (c.duration || 0), 0) / d.length) : 0
+          setStats(prev => ({
+            ...prev,
+            callsToday:     d.length,
+            callsAnswered:  answered,
+            avgDuration:    avgDur,
+            resolutionRate: d.length ? Math.round((completed / d.length) * 100) : 0,
+          }))
+        }
+      }
+
+      // IVR
+      if (ivrR.status === 'fulfilled' && ivrR.value?.success) {
+        setIvr(ivrR.value.data || [])
+        setStats(prev => ({ ...prev, ivrCount: (ivrR.value.data || []).length }))
+      }
+
+      setError(null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
     }
-    return () => bc.close()
-  }, [fetchAll])
+  }, [period])
 
-  // ── Polling 30s ───────────────────────────────────────────
   useEffect(() => {
-    fetchAll()
-    pollRef.current = setInterval(fetchAll, POLL_INTERVAL)
+    loadAll()
+    pollRef.current = setInterval(loadAll, 20000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [fetchAll])
+  }, [loadAll])
 
-  // ── Actions ───────────────────────────────────────────────
-  const markVoicemailListened = useCallback(async (id: string) => {
-    const token = getToken()
-    setVoicemails(prev => prev.map(v => v.id === id ? { ...v, status: "LISTENED" as const } : v))
-    try {
-      await fetch(`${API_URL}/api/v1/telephony/voicemail/${id}/listen`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    } catch {}
-  }, [])
+  const deactivateAgent = async (agentId: string) => {
+    await apiFetch(`/api/v1/admin/agent/${agentId}/deactivate`).catch(() => {})
+    loadAll()
+  }
 
-  const saveContactToApi = useCallback(async (form: any): Promise<boolean> => {
-    const token = getToken()
-    try {
-      const r = await fetch(`${API_URL}/api/v1/crm/contacts`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      })
-      if (r.ok) { setTimeout(fetchAll, 500); return true }
-      return false
-    } catch { return false }
-  }, [fetchAll])
+  const createAgent = async (data: { email: string; name: string; password: string; extension?: string }) => {
+    const r = await apiFetch('/api/v1/admin/agent/create').catch(() => ({ success: false }))
+    loadAll()
+    return r
+  }
 
-  const updateAgentStatus = useCallback(async (status: string) => {
-    const token = getToken()
-    try {
-      await fetch(`${API_URL}/api/v1/telephony/status`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      })
-    } catch {}
-  }, [])
+  const createQueue = async (name: string, strategy: string) => {
+    await apiFetch('/api/v1/admin/queue/create').catch(() => {})
+    loadAll()
+  }
 
   return {
-    calls, queue, voicemails, scripts, contacts,
-    stats, goals, loading, lastRefresh,
-    refresh:              fetchAll,
-    markVoicemailListened,
-    saveContactToApi,
-    updateAgentStatus,
+    stats, agents, queues, calls, ivr,
+    loading, error, period, setPeriod,
+    refresh: loadAll, deactivateAgent, createAgent, createQueue,
   }
 }
