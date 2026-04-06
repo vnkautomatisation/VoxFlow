@@ -1,0 +1,31 @@
+<!-- ═══════════════════════════════════════════════ -->
+<!-- VoxFlow Logo — Utilisation sur site marketing  -->
+<!-- Source: /public/logo/voxflow-logo.svg           -->
+<!-- ═══════════════════════════════════════════════ -->
+
+<!-- Option A : SVG inline (meilleure qualité, pas de requête HTTP) -->
+<a href="/" aria-label="VoxFlow — Accueil" class="voxflow-logo-link">
+  <img src="/logo/voxflow-logo.svg" alt="VoxFlow" height="36" width="150"
+       loading="eager" decoding="async" />
+</a>
+
+<!-- Option B : Logo texte CSS (zéro requête HTTP) -->
+<a href="/" aria-label="VoxFlow — Accueil" class="voxflow-logo">
+  <span class="vox">Vox</span><span class="flow">Flow</span>
+</a>
+
+<style>
+  :root {
+    --vox-color:  #7b61ff;
+    --flow-color: #00d4aa;
+  }
+  .voxflow-logo {
+    display: inline-flex; align-items: center;
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.5rem; font-weight: 900;
+    letter-spacing: -0.05em; line-height: 1;
+    text-decoration: none; user-select: none;
+  }
+  .voxflow-logo .vox  { color: var(--vox-color);  }
+  .voxflow-logo .flow { color: var(--flow-color); }
+</style>

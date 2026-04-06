@@ -1,8 +1,7 @@
-const { contextBridge, ipcRenderer } = require("electron")
+const { contextBridge, ipcRenderer } = require('electron')
 
-contextBridge.exposeInMainWorld("voxflow", {
-  minimize: ()     => ipcRenderer.send("window-minimize"),
-  close:    ()     => ipcRenderer.send("window-close"),
-  move:     (x, y) => ipcRenderer.send("window-move", { x, y }),
-  platform: process.platform,
+contextBridge.exposeInMainWorld('electronAPI', {
+  openDialer: () => ipcRenderer.send('open-dialer'),
+  getToken:   () => localStorage.getItem('vf_tok'),
+  getExt:     () => localStorage.getItem('vf_ext'),
 })

@@ -24,6 +24,7 @@ import crmRoutes        from './routes/crm/index'
 import onboardingRoutes from './routes/onboarding/index'
 import agentRoutes   from './routes/agent/index'
 import webhookRoutes from './routes/webhooks/index'
+import billingRoutes from './routes/billing/index'
 
 const app = express()
 
@@ -63,6 +64,7 @@ app.use('/api/v1/crm',        crmRoutes)
 app.use('/api/v1/onboarding', onboardingRoutes)
 app.use('/api/v1/agent',    agentRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
+app.use('/api/v1/billing', billingRoutes)
 
 // Route racine
 app.get('/', (req, res) => {

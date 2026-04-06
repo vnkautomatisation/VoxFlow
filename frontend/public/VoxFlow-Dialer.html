@@ -370,8 +370,11 @@
             .lbrand .nm {
                 font-size: 30px;
                 font-weight: 700;
-                color: var(--violet);
-                letter-spacing: -.5px
+                letter-spacing: -.5px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0
             }
 
             .lbrand .sb {
@@ -1952,6 +1955,13 @@ window.addEventListener('storage', function(e) {
   }
 })
 </script>
+<style>
+@keyframes ldot {
+    0%,100% { opacity:1; box-shadow: 0 0 10px #7b61ff }
+    50% { opacity:.3; box-shadow: 0 0 3px #7b61ff }
+}
+.logo-dot { animation: ldot 2s ease-in-out infinite !important }
+</style>
 </head>
 <body>
     <div class="popup" id="popup">
@@ -1960,11 +1970,11 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ LOGIN ════════════════════════════════════════════ -->
         <div class="view on" id="view-login">
             <div class="hdr" style="justify-content:center">
-                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
+                <div class="logo"><div class="logo-dot"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
             </div>
             <div class="login-wrap">
                 <div class="lbrand">
-                    <div class="nm">VoxFlow</div>
+                    <div class="nm"><div style="width:10px;height:10px;border-radius:50%;background:#7b61ff;box-shadow:0 0 12px #7b61ff;margin-right:10px;flex-shrink:0;animation:ldot 2s ease-in-out infinite"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
                     <div class="sb">Plateforme Call Center Pro</div>
                 </div>
                 <div class="lerr" id="lerr"></div>
@@ -1978,7 +1988,7 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ INCOMING ══════════════════════════════════════════ -->
         <div class="view" id="view-incoming">
             <div class="hdr">
-                <div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div>VoxFlow</div>
+                <div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
                 <div class="rec-ind on" style="margin-left:auto"><div class="rec-dot" style="background:var(--mint)"></div>ENTRANT</div>
             </div>
             <div class="inc-wrap">
@@ -2001,7 +2011,7 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ IN-CALL ════════════════════════════════════════════ -->
         <div class="view" id="view-calling">
             <div class="hdr">
-                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
+                <div class="logo"><div class="logo-dot"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
                 <div class="rec-ind" id="rec-ind"><div class="rec-dot"></div>REC</div>
                 <div class="hdr-r">
                     <div class="ext-chip" id="call-ext">EXT 201</div>
@@ -2112,7 +2122,7 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ MAIN ════════════════════════════════════════════════ -->
         <div class="view" id="view-main">
             <div class="hdr">
-                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
+                <div class="logo"><div class="logo-dot"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
                 <div class="hdr-mid">
                     <div class="ext-chip" id="main-ext">EXT 201</div>
                     <div class="role-badge" id="role-badge">Agent</div>
@@ -2250,7 +2260,7 @@ window.addEventListener('storage', function(e) {
 
         <!-- ═══ WRAP-UP ════════════════════════════════════════════ -->
         <div class="view" id="view-wrapup">
-            <div class="hdr"><div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div>VoxFlow</div></div>
+            <div class="hdr"><div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div></div>
             <div class="wu">
                 <svg class="wu-ico" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                 <div class="wu-ttl">Appel terminé</div>

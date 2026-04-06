@@ -1,0 +1,44 @@
+/* ══ VoxFlow — Logo CSS standardisé ══ */
+
+/* Logo inline (texte) */
+.voxflow-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  text-decoration: none;
+  line-height: 1;
+  user-select: none;
+}
+
+.voxflow-logo .vox  { color: #7b61ff; }
+.voxflow-logo .flow { color: #00d4aa; }
+
+/* Tailles */
+.voxflow-logo--sm { font-size: 16px; }
+.voxflow-logo--md { font-size: 24px; }
+.voxflow-logo--lg { font-size: 36px; }
+.voxflow-logo--xl { font-size: 48px; }
+
+/* Variante light (fond blanc) */
+.voxflow-logo--light .vox  { color: #6b4fff; }
+.voxflow-logo--light .flow { color: #009d80; }
+
+/* Variante monochrome */
+.voxflow-logo--mono .vox,
+.voxflow-logo--mono .flow { color: currentColor; }
+
+/* Logo avec icône */
+.voxflow-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.voxflow-logo-icon img,
+.voxflow-logo-icon svg {
+  width: 1.2em;
+  height: 1.2em;
+}

@@ -1,50 +1,43 @@
-﻿import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import type { Metadata } from 'next'
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'VoxFlow — Plateforme SaaS Call Center',
-  description: 'Plateforme SaaS Call Center multi-tenant. Un produit de VNK Automatisation Inc.',
-  keywords: ['call center', 'voip', 'saas', 'voxflow', 'vnk'],
+  description: 'Plateforme SaaS Call Center multi-tenant. Gérez vos appels, agents et campagnes.',
+  icons: {
+    icon: [
+      { url: '/icons/favicon.ico' },
+      { url: '/icons/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icons/favicon-16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/favicon-32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/apple-touch-icon-180.png', sizes: '180x180' },
+      { url: '/icons/apple-touch-icon-152.png', sizes: '152x152' },
+      { url: '/icons/apple-touch-icon-144.png', sizes: '144x144' },
+      { url: '/icons/apple-touch-icon-120.png', sizes: '120x120' },
+    ],
+    other: [{ rel: 'mask-icon', url: '/icons/favicon.svg', color: '#7b61ff' }],
+  },
+  manifest: '/site.webmanifest',
+  themeColor: '#7b61ff',
+  openGraph: {
+    title: 'VoxFlow — Plateforme SaaS Call Center',
+    description: 'Gérez vos appels, agents et campagnes depuis une seule interface.',
+    images: [{ url: '/icons/og-image.png', width: 1200, height: 630 }],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'VoxFlow',
+    images: ['/icons/twitter-card.png'],
+  },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className="dark">
-      <body className={inter.className}>{children}
-{/* Migration session — relit le token Zustand et le met dans un cookie */}
-<script dangerouslySetInnerHTML={{ __html: `
-  (function() {
-    try {
-      var raw = localStorage.getItem('voxflow-auth');
-      if (!raw) return;
-      var state = JSON.parse(raw).state;
-      if (!state || !state.accessToken || !state.isAuth) return;
-      // Verifier si le cookie existe deja
-      if (document.cookie.indexOf('vf_access_token=') !== -1) return;
-      // Creer le cookie
-      var expires = new Date(Date.now() + 7 * 864e5).toUTCString();
-      document.cookie = 'vf_access_token=' + encodeURIComponent(state.accessToken) + ';expires=' + expires + ';path=/;SameSite=Lax';
-      if (state.user && state.user.role) {
-        document.cookie = 'vf_role=' + state.user.role + ';expires=' + expires + ';path=/;SameSite=Lax';
-      }
-      // Recharger pour que le middleware voit le cookie
-      if (window.location.pathname === '/login') {
-        var role = state.user && state.user.role;
-        var routes = { OWNER: '/owner/dashboard', ADMIN: '/admin/dashboard', AGENT: '/agent/dashboard' };
-        var dest = routes[role] || '/admin/dashboard';
-        window.location.href = dest;
-      }
-    } catch(e) {}
-  })();
-` }} />
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

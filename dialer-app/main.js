@@ -1,167 +1,103 @@
-﻿const { app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain } = require("electron")
-const path = require("path")
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen } = require('electron')
+const path = require('path')
+const fs   = require('fs')
 
-// Fix DPI Windows
-app.commandLine.appendSwitch("high-dpi-support", "1")
-app.commandLine.appendSwitch("force-device-scale-factor", "1")
-
-// ── URL unique — servi par Next.js (dev) ou Vercel (prod) ────────
-// Un seul fichier HTML : frontend\public\VoxFlow-Dialer.html
-const IS_DEV   = !app.isPackaged
-const BASE_URL = IS_DEV
-  ? "http://localhost:3001/VoxFlow-Dialer.html"
-  : "https://app.voxflow.io/VoxFlow-Dialer.html"
-
-// Protocole voxflow://
 if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient("voxflow", process.execPath, [path.resolve(process.argv[1])])
-  }
+  if (process.argv.length >= 2)
+    app.setAsDefaultProtocolClient('voxflow', process.execPath, [path.resolve(process.argv[1])])
 } else {
-  app.setAsDefaultProtocolClient("voxflow")
+  app.setAsDefaultProtocolClient('voxflow')
 }
 
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) { app.quit(); process.exit(0) }
+const gotTheLock = app.requestSingleInstanceLock()
+let mainWindow = null
+let tray = null
 
-let win = null, tray = null
-let pendingTok = "", pendingUrl = "http://localhost:4000"
-
-function parseArgs(args) {
-  for (const arg of args) {
-    if (arg.startsWith("voxflow://")) {
-      try {
-        const u   = new URL(arg)
-        const tok = u.searchParams.get("tok") || ""
-        const api = u.searchParams.get("url") || "http://localhost:4000"
-        if (tok) { pendingTok = tok; pendingUrl = api }
-      } catch {}
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
     }
-    if (arg.startsWith("--tok=")) pendingTok = arg.split("=")[1]
-    if (arg.startsWith("--url=")) pendingUrl = arg.split("=")[1]
-  }
-}
-
-parseArgs(process.argv)
-
-function buildURL() {
-  if (!pendingTok) return BASE_URL
-  return BASE_URL + "?tok=" + encodeURIComponent(pendingTok) + "&url=" + encodeURIComponent(pendingUrl)
+  })
+  app.on('open-url', (event) => {
+    event.preventDefault()
+    if (mainWindow) { mainWindow.show(); mainWindow.focus() }
+  })
+  app.whenReady().then(createWindow)
 }
 
 function createWindow() {
-  const { screen } = require("electron")
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  const iconCandidates = [
+    path.join(__dirname, 'src', 'icon.ico'),
+    path.join(__dirname, 'src', 'icon.png'),
+    path.join(__dirname, 'icon.ico'),
+  ]
+  const iconPath = iconCandidates.find(p => { try { fs.accessSync(p); return true } catch { return false } })
 
-  win = new BrowserWindow({
-    width:  360,
-    height: 700,
-    x: width  - 360 - 16,
-    y: height - 700 - 16,
-    frame:           false,
-    titleBarStyle:   "hidden",
-    backgroundColor: "#18181f",
+  mainWindow = new BrowserWindow({
+    width:           360,
+    height:          700,
     resizable:       false,
     maximizable:     false,
     fullscreenable:  false,
-    skipTaskbar:     false,
+    autoHideMenuBar: true,
+    frame:           false,
+    transparent:     false,
     alwaysOnTop:     false,
-    icon: path.join(__dirname, "src", "icon.ico"),
+    skipTaskbar:     false,
+    icon:            iconPath || undefined,
     webPreferences: {
-      nodeIntegration:  false,
+      preload:          path.join(__dirname, 'src', 'preload.js'),
       contextIsolation: true,
-      preload: path.join(__dirname, "src", "preload.js"),
-      webSecurity:      false, // Autorise localhost en dev
+      nodeIntegration:  false,
     },
   })
 
-  win.loadURL(buildURL())
+  // Charger depuis Next.js qui sert public/VoxFlow-Dialer.html
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001'
+  mainWindow.loadURL(FRONTEND_URL + '/VoxFlow-Dialer.html')
 
-  // Retry si le frontend n est pas encore démarré
-  win.webContents.on("did-fail-load", (e, code) => {
-    if (IS_DEV) {
-      console.log("[VoxFlow] Frontend pas prêt — retry dans 2s...")
-      setTimeout(() => { if (win) win.loadURL(buildURL()) }, 2000)
-    }
-  })
-
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: "deny" }
-  })
-
-  win.on("close", (e) => {
-    if (!app.isQuiting) { e.preventDefault(); win.hide() }
-  })
-
-  win.on("closed", () => { win = null })
-}
-
-function createTray() {
-  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, "src", "tray.png")))
-  tray.setToolTip("VoxFlow Dialer")
-  tray.setContextMenu(Menu.buildFromTemplate([
-    {
-      label: "Ouvrir VoxFlow",
-      click: () => { if (win) { win.show(); win.focus() } else createWindow() }
-    },
-    { type: "separator" },
-    { label: "Quitter", click: () => { app.isQuiting = true; app.quit() } }
-  ]))
-  tray.on("click", () => {
-    if (!win) { createWindow(); return }
-    if (win.isVisible()) win.hide(); else { win.show(); win.focus() }
-  })
-}
-
-function injectToken(tok, url) {
-  if (!win || !tok) return
-  win.webContents.executeJavaScript(`
-    try {
-      localStorage.setItem("vf_tok", ${JSON.stringify(tok)});
-      localStorage.setItem("vf_url", ${JSON.stringify(url)});
-      if (window.S) { window.S.tok = ${JSON.stringify(tok)}; window.S.url = ${JSON.stringify(url)}; }
-      if (window.initTwilioDevice) {
-        if (window.__TwilioDevice) { window.__TwilioDevice.destroy(); window.__TwilioDevice = null; }
-        initTwilioDevice(${JSON.stringify(url)}, ${JSON.stringify(tok)});
-      }
-      if (typeof showView === "function" && window.S?.tok) showView("main");
-      if (typeof loadData === "function") loadData();
-    } catch(e) { console.error(e) }
-  `).catch(() => {})
-}
-
-ipcMain.on("window-minimize", () => win?.minimize())
-ipcMain.on("window-close",    () => win?.hide())
-ipcMain.on("window-move",     (e, { x, y }) => win?.setPosition(x, y))
-
-app.whenReady().then(() => {
-  createWindow()
-  createTray()
-  if (pendingTok) {
-    win.webContents.once("did-finish-load", () => {
-      setTimeout(() => injectToken(pendingTok, pendingUrl), 800)
-    })
-  }
-})
-
-app.on("second-instance", (e, argv) => {
-  parseArgs(argv)
-  if (win) {
-    if (win.isMinimized()) win.restore()
-    win.show(); win.focus()
-    if (pendingTok) injectToken(pendingTok, pendingUrl)
-  }
-})
-
-app.on("open-url", (e, url) => {
-  e.preventDefault()
   try {
-    const u = new URL(url)
-    pendingTok = u.searchParams.get("tok") || pendingTok
-    pendingUrl = u.searchParams.get("url") || pendingUrl
-    if (win) { win.show(); win.focus(); injectToken(pendingTok, pendingUrl) }
-  } catch {}
-})
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize
+    mainWindow.setPosition(Math.max(0, width - 375), Math.max(0, height - 715))
+  } catch(e) {}
 
-app.on("window-all-closed", () => {})
+  ipcMain.on('window-minimize', () => mainWindow && mainWindow.minimize())
+  ipcMain.on('window-close',    () => mainWindow && mainWindow.hide())
+  ipcMain.on('window-show',     () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } })
+  ipcMain.on('open-dialer',     () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } })
+  ipcMain.on('window-move',     (_, { x, y }) => {
+    if (!mainWindow) return
+    const [cx, cy] = mainWindow.getPosition()
+    mainWindow.setPosition(cx + x, cy + y)
+  })
+
+  const trayPath = [
+    path.join(__dirname, 'src', 'tray.png'),
+    path.join(__dirname, 'src', 'icon.png'),
+    iconPath,
+  ].filter(Boolean).find(p => { try { fs.accessSync(p); return true } catch { return false } })
+
+  if (trayPath) {
+    try {
+      tray = new Tray(nativeImage.createFromPath(trayPath))
+      tray.setToolTip('VoxFlow Dialer')
+      tray.setContextMenu(Menu.buildFromTemplate([
+        { label: 'Ouvrir VoxFlow Dialer', click: () => { mainWindow.show(); mainWindow.focus() } },
+        { type:  'separator' },
+        { label: 'Quitter', click: () => { mainWindow.destroy(); app.exit(0) } },
+      ]))
+      tray.on('click',        () => { mainWindow.show(); mainWindow.focus() })
+      tray.on('double-click', () => { mainWindow.show(); mainWindow.focus() })
+    } catch(e) { console.log('[tray]', e.message) }
+  }
+
+  mainWindow.on('close', e => { e.preventDefault(); mainWindow.hide() })
+  app.setAppUserModelId('io.voxflow.dialer')
+}
+
+app.on('window-all-closed', () => {})
