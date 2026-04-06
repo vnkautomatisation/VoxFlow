@@ -1,4 +1,4 @@
-sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
+﻿sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -2223,6 +2223,7 @@ sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
         //  STATE
         // ════════════════════════════════════════════════════════════
         const S = {
+  role: localStorage.getItem('vf_role') || 'AGENT',
             url: localStorage.getItem('vf_url') || 'http://localhost:4000',
             tok: localStorage.getItem('vf_tok') || null,
             role: localStorage.getItem('vf_role') || 'AGENT',  // OWNER | ADMIN | AGENT
@@ -2382,7 +2383,7 @@ sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
             } catch { }
         }
 
-        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues/status'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = await api('/api/v1/supervision/agents'); if (ar.success) { S.agents = ar.data || []; rAgents() } } catch { } }, 5000) }
+        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues/status'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = (S.role === 'AGENT') ? {success:true,data:[]} : await api('/api/v1/supervision/agents'); if (ar.success) { S.agents = ar.data || []; rAgents() } } catch { } }, 5000) }
         function stopPoll() { clearInterval(S.poll) }
 
         // ════════════════════════════════════════════════════════════
@@ -2856,3 +2857,4 @@ sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
     </script>
 </body>
 </html>
+

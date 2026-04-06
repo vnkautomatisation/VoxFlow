@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -2464,14 +2464,14 @@ window.addEventListener('storage', function(e) {
             try {
                 const [qr, ar] = await Promise.all([
                     api('/api/v1/queues'),
-                    isAdmin() ? api('/api/v1/supervision/snapshot') : Promise.resolve({success:false,data:null}),
+                    api('/api/v1/supervision/snapshot'),
                 ])
                 if (qr.success) { S.queue = qr.data || []; rQueue() }
                 if (ar.success && ar.data) { S.agents = (ar.data.agentStatuses||ar.data.agents||ar.data||[]).map(function(a){return{id:a.agentId||a.id,first_name:a.name?a.name.split(' ')[0]:'Agent',last_name:a.name?a.name.split(' ').slice(1).join(' '):'',status:a.status||'OFFLINE',extension:a.extension||'',current_call:!!(a.callId),current_call_number:a.callFrom||a.callTo||null,call_duration:a.callDuration||0}}); rAgents() }
             } catch { }
         }
 
-        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = isAdmin() ? await api('/api/v1/supervision/snapshot') : {success:false,data:null}; if (ar.success && ar.data) { S.agents = (ar.data.agentStatuses||ar.data.agents||ar.data||[]).map(function(a){return{id:a.agentId||a.id,first_name:a.name?a.name.split(' ')[0]:'Agent',last_name:a.name?a.name.split(' ').slice(1).join(' '):'',status:a.status||'OFFLINE',extension:a.extension||'',current_call:!!(a.callId),current_call_number:a.callFrom||a.callTo||null,call_duration:a.callDuration||0}}); rAgents() } } catch { } }, 15000) }
+        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = await api('/api/v1/supervision/snapshot'); if (ar.success && ar.data) { S.agents = (ar.data.agentStatuses||ar.data.agents||ar.data||[]).map(function(a){return{id:a.agentId||a.id,first_name:a.name?a.name.split(' ')[0]:'Agent',last_name:a.name?a.name.split(' ').slice(1).join(' '):'',status:a.status||'OFFLINE',extension:a.extension||'',current_call:!!(a.callId),current_call_number:a.callFrom||a.callTo||null,call_duration:a.callDuration||0}}); rAgents() } } catch { } }, 15000) }
         function stopPoll() { clearInterval(S.poll) }
 
         // ════════════════════════════════════════════════════════════
@@ -3022,7 +3022,7 @@ window.addEventListener('storage', function(e) {
         fetch(url + '/api/v1/telephony/calls?limit=30',  { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
         fetch(url + '/api/v1/telephony/voicemails',       { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
         fetch(url + '/api/v1/queues',              { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
-        (window.S && (window.S.role==='ADMIN'||window.S.role==='OWNER') ? fetch(url + '/api/v1/supervision/snapshot', { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }) : Promise.resolve({success:false})),
+        fetch(url + '/api/v1/supervision/snapshot',         { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
       ]).then(function(res) {
         if (res[0].success && res[0].data) { S.calls  = res[0].data; if (typeof rRecents==='function') rRecents(); if (typeof rHistory==='function') rHistory() }
         if (res[1].success && res[1].data) { S.vms    = res[1].data; if (typeof rVMs==='function') rVMs() }
@@ -3576,5 +3576,3 @@ setTimeout(async function() {
 
 </body>
 </html>
-
-

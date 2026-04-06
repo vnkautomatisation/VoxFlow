@@ -186,4 +186,73 @@ router.get("/contacts", async (req: AuthRequest, res: Response) => {
   }
 })
 
+
+// GET /api/v1/agent/goals — Objectifs journaliers + stats du jour
+router.get("/goals", async (req: AuthRequest, res: Response) => {
+  try {
+    const agentId = req.user!.userId
+    const orgId   = req.user!.organizationId || ""
+
+    // Objectifs configurés
+    const { data: goalRow } = await supabaseAdmin
+      .from("agent_goals")
+      .select("daily_calls_target, daily_answer_rate, avg_duration_max, daily_talk_time")
+      .eq("agent_id", agentId)
+      .is("effective_to", null)
+      .order("effective_from", { ascending: false })
+      .limit(1)
+      .single()
+
+    const goals = goalRow || {
+      daily_calls_target: 50,
+      daily_answer_rate:  80,
+      avg_duration_max:   300,
+      daily_talk_time:    14400,
+    }
+
+    // Stats du jour depuis agent_daily_stats
+    const today = new Date().toISOString().slice(0, 10)
+    const { data: statsRow } = await supabaseAdmin
+      .from("agent_daily_stats")
+      .select("total_calls, answered_calls, missed_calls, total_talk_time, avg_call_duration")
+      .eq("agent_id", agentId)
+      .eq("stat_date", today)
+      .single()
+
+    // Fallback : calculer depuis la table calls si pas de stats pré-calculées
+    let stats = statsRow
+    if (!stats) {
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const { data: todayCalls } = await supabaseAdmin
+        .from("calls")
+        .select("status, duration")
+        .eq("agent_id", agentId)
+        .gte("started_at", startOfDay.toISOString())
+
+      const calls      = todayCalls || []
+      const answered   = calls.filter((c: any) => c.status === "COMPLETED")
+      const missed     = calls.filter((c: any) => ["NO_ANSWER","MISSED","FAILED"].includes(c.status))
+      const talkTime   = answered.reduce((s: number, c: any) => s + (c.duration || 0), 0)
+      const avgDur     = answered.length ? Math.round(talkTime / answered.length) : 0
+
+      stats = {
+        total_calls:      calls.length,
+        answered_calls:   answered.length,
+        missed_calls:     missed.length,
+        total_talk_time:  talkTime,
+        avg_call_duration: avgDur,
+      }
+    }
+
+    sendSuccess(res, { goals, stats })
+  } catch (err: any) {
+    // Fallback complet si tables absentes
+    sendSuccess(res, {
+      goals: { daily_calls_target: 50, daily_answer_rate: 80, avg_duration_max: 300, daily_talk_time: 14400 },
+      stats: { total_calls: 0, answered_calls: 0, missed_calls: 0, total_talk_time: 0, avg_call_duration: 0 },
+    })
+  }
+})
 export default router
+

@@ -213,4 +213,37 @@ router.post("/requeue", authenticate, async (req: AuthRequest, res: Response) =>
   }
 })
 
+
+// GET /api/v1/queues/live — File d'attente en temps réel
+router.get("/live", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = req.user!.organizationId || ""
+
+    const { data } = await supabaseAdmin
+      .from("queue_entries")
+      .select(`
+        id, from_number, caller_name, wait_seconds, priority, status,
+        entered_at, queue_id
+      `)
+      .eq("organization_id", orgId)
+      .in("status", ["waiting", "ringing"])
+      .order("priority",   { ascending: true })
+      .order("entered_at", { ascending: true })
+      .limit(20)
+
+    // Calculer wait_seconds en temps réel si absent
+    const now = Date.now()
+    const entries = (data || []).map((e: any) => ({
+      ...e,
+      wait_seconds: e.wait_seconds ||
+        Math.floor((now - new Date(e.entered_at).getTime()) / 1000),
+    }))
+
+    sendSuccess(res, entries)
+  } catch (err: any) {
+    // Fallback si table queue_entries absente
+    sendSuccess(res, [])
+  }
+})
 export default router
+

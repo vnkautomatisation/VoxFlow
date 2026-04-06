@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿sa ouvre m'ai pas bien dimenssionné'<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -370,11 +370,8 @@
             .lbrand .nm {
                 font-size: 30px;
                 font-weight: 700;
-                letter-spacing: -.5px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0
+                color: var(--violet);
+                letter-spacing: -.5px
             }
 
             .lbrand .sb {
@@ -1896,72 +1893,6 @@
             outline: none
         }
     </style>
-
-
-
-<style>/* ── ELECTRON — fenetre native 360x700 sans padding ─────────────
-   Electron charge depuis localhost:3001 (max-width <= 380px)
-   Navigateur normal a une fenetre plus large → pas affecté      */
-@media screen and (max-width: 380px) {
-  html, body {
-    display: block !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    width: 100% !important;
-    height: 100% !important;
-    min-height: unset !important;
-    align-items: unset !important;
-    justify-content: unset !important;
-  }
-  .popup {
-    width: 100% !important;
-    height: 100% !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-}
-</style><script>
-// ── VoxFlow Auth sync ────────────────────────────────────────────
-// postMessage depuis le portail
-window.addEventListener('message', function(e) {
-  try {
-    if (!e.data || !e.data.type) return
-    if (e.data.type === 'VOXFLOW_LOGOUT') {
-      localStorage.removeItem('vf_tok')
-      if (window.S) window.S.tok = null
-      if (typeof stopPoll === 'function') stopPoll()
-      if (typeof showView === 'function') showView('login')
-    }
-    if (e.data.type === 'VOXFLOW_TOKEN' && e.data.tok) {
-      localStorage.setItem('vf_tok', e.data.tok)
-      if (e.data.url) localStorage.setItem('vf_url', e.data.url)
-      if (window.S) { window.S.tok = e.data.tok; if (e.data.url) window.S.url = e.data.url }
-    }
-  } catch(err) {}
-})
-// Storage events (même domaine = même localStorage)
-window.addEventListener('storage', function(e) {
-  if (e.key !== 'vf_tok') return
-  if (!e.newValue) {
-    if (window.S) window.S.tok = null
-    if (typeof stopPoll === 'function') stopPoll()
-    if (typeof showView === 'function') showView('login')
-  } else {
-    if (window.S) { window.S.tok = e.newValue; window.S.url = localStorage.getItem('vf_url') || window.S.url }
-    if (typeof loadData === 'function') loadData()
-    if (typeof startPoll === 'function') startPoll()
-    if (typeof showView === 'function') showView('main')
-  }
-})
-</script>
-<style>
-@keyframes ldot {
-    0%,100% { opacity:1; box-shadow: 0 0 10px #7b61ff }
-    50% { opacity:.3; box-shadow: 0 0 3px #7b61ff }
-}
-.logo-dot { animation: ldot 2s ease-in-out infinite !important }
-</style>
 </head>
 <body>
     <div class="popup" id="popup">
@@ -1970,11 +1901,11 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ LOGIN ════════════════════════════════════════════ -->
         <div class="view on" id="view-login">
             <div class="hdr" style="justify-content:center">
-                <div class="logo"><div class="logo-dot"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
+                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
             </div>
             <div class="login-wrap">
                 <div class="lbrand">
-                    <div class="nm"><div style="width:10px;height:10px;border-radius:50%;background:#7b61ff;box-shadow:0 0 12px #7b61ff;margin-right:10px;flex-shrink:0;animation:ldot 2s ease-in-out infinite"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
+                    <div class="nm">VoxFlow</div>
                     <div class="sb">Plateforme Call Center Pro</div>
                 </div>
                 <div class="lerr" id="lerr"></div>
@@ -1988,7 +1919,7 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ INCOMING ══════════════════════════════════════════ -->
         <div class="view" id="view-incoming">
             <div class="hdr">
-                <div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
+                <div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div>VoxFlow</div>
                 <div class="rec-ind on" style="margin-left:auto"><div class="rec-dot" style="background:var(--mint)"></div>ENTRANT</div>
             </div>
             <div class="inc-wrap">
@@ -2011,7 +1942,7 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ IN-CALL ════════════════════════════════════════════ -->
         <div class="view" id="view-calling">
             <div class="hdr">
-                <div class="logo"><div class="logo-dot"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
+                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
                 <div class="rec-ind" id="rec-ind"><div class="rec-dot"></div>REC</div>
                 <div class="hdr-r">
                     <div class="ext-chip" id="call-ext">EXT 201</div>
@@ -2122,7 +2053,7 @@ window.addEventListener('storage', function(e) {
         <!-- ═══ MAIN ════════════════════════════════════════════════ -->
         <div class="view" id="view-main">
             <div class="hdr">
-                <div class="logo"><div class="logo-dot"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div>
+                <div class="logo"><div class="logo-dot"></div>VoxFlow</div>
                 <div class="hdr-mid">
                     <div class="ext-chip" id="main-ext">EXT 201</div>
                     <div class="role-badge" id="role-badge">Agent</div>
@@ -2260,7 +2191,7 @@ window.addEventListener('storage', function(e) {
 
         <!-- ═══ WRAP-UP ════════════════════════════════════════════ -->
         <div class="view" id="view-wrapup">
-            <div class="hdr"><div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div><span style="color:#7b61ff">Vox</span><span style="color:#00d4aa">Flow</span></div></div>
+            <div class="hdr"><div class="logo"><div class="logo-dot" style="background:var(--mint);box-shadow:0 0 8px var(--mint)"></div>VoxFlow</div></div>
             <div class="wu">
                 <svg class="wu-ico" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                 <div class="wu-ttl">Appel terminé</div>
@@ -2384,28 +2315,8 @@ window.addEventListener('storage', function(e) {
             document.getElementById('btn-answer').onclick = doAnswer
             document.getElementById('btn-refuse').onclick = hangup
             updDot()
-            // Auth depuis URL params (portail → dialer)
-    try {
-      var _p = new URLSearchParams(window.location.search)
-      var _tok = _p.get('tok'), _url = _p.get('url')
-      if (_tok) { localStorage.setItem('vf_tok', _tok); S.tok = _tok }
-      if (_url) { localStorage.setItem('vf_url', _url); S.url = _url }
-    } catch(e) {}
-
-    // Si connecté → charger vraies données, sinon → login
-    var _savedTok = S.tok || localStorage.getItem('vf_tok')
-    var _savedRole = localStorage.getItem('vf_role')
-    if (_savedTok) {
-      S.tok  = _savedTok
-      S.url  = localStorage.getItem('vf_url') || S.url
-      S.role = _savedRole || S.role
-      applyRolePermissions()
-      showView('main')
-      loadData()
-      startPoll()
-    } else {
-      showView('login')
-    }
+            showView('main')
+            loadDemo()
         }
 
         // ════════════════════════════════════════════════════════════
@@ -2463,15 +2374,15 @@ window.addEventListener('storage', function(e) {
             } catch { }
             try {
                 const [qr, ar] = await Promise.all([
-                    api('/api/v1/queues'),
-                    isAdmin() ? api('/api/v1/supervision/snapshot') : Promise.resolve({success:false,data:null}),
+                    api('/api/v1/queues/status'),
+                    api('/api/v1/supervision/agents'),
                 ])
                 if (qr.success) { S.queue = qr.data || []; rQueue() }
-                if (ar.success && ar.data) { S.agents = (ar.data.agentStatuses||ar.data.agents||ar.data||[]).map(function(a){return{id:a.agentId||a.id,first_name:a.name?a.name.split(' ')[0]:'Agent',last_name:a.name?a.name.split(' ').slice(1).join(' '):'',status:a.status||'OFFLINE',extension:a.extension||'',current_call:!!(a.callId),current_call_number:a.callFrom||a.callTo||null,call_duration:a.callDuration||0}}); rAgents() }
+                if (ar.success) { S.agents = ar.data || []; rAgents() }
             } catch { }
         }
 
-        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = isAdmin() ? await api('/api/v1/supervision/snapshot') : {success:false,data:null}; if (ar.success && ar.data) { S.agents = (ar.data.agentStatuses||ar.data.agents||ar.data||[]).map(function(a){return{id:a.agentId||a.id,first_name:a.name?a.name.split(' ')[0]:'Agent',last_name:a.name?a.name.split(' ').slice(1).join(' '):'',status:a.status||'OFFLINE',extension:a.extension||'',current_call:!!(a.callId),current_call_number:a.callFrom||a.callTo||null,call_duration:a.callDuration||0}}); rAgents() } } catch { } }, 15000) }
+        function startPoll() { S.poll = setInterval(async () => { try { const qr = await api('/api/v1/queues/status'); if (qr.success) { S.queue = qr.data || []; rQueue() } const ar = await api('/api/v1/supervision/agents'); if (ar.success) { S.agents = ar.data || []; rAgents() } } catch { } }, 5000) }
         function stopPoll() { clearInterval(S.poll) }
 
         // ════════════════════════════════════════════════════════════
@@ -2651,9 +2562,9 @@ window.addEventListener('storage', function(e) {
                         const name = a.first_name + ' ' + a.last_name
                         const ext = a.extension || a.ext || '—'
                         return `<div class="axfer-row">
-                  <div><span style="font-size:11px;font-weight:600">${name}</span><span class="aext" style="margin-left:6px">${ext}</span></div>
-                  <button class="btn-take" onclick="xferToAgent('${ext}')">→ Transférer</button>
-                </div>`
+              <div><span style="font-size:11px;font-weight:600">${name}</span><span class="aext" style="margin-left:6px">${ext}</span></div>
+              <button class="btn-take" onclick="xferToAgent('${ext}')">→ Transférer</button>
+            </div>`
                     }).join('')
                 }
             } else {
@@ -2709,19 +2620,19 @@ window.addEventListener('storage', function(e) {
                 const w = q.wait_seconds || (i + 1) * 52; const hot = w > 120; const n = q.caller_name || q.from_number || 'Inconnu'
                 const pc = i === 0 ? 'r1' : i === 1 ? 'r2' : ''
                 return `<div class="qi ${hot ? 'hot' : ''}" onclick="pickQ('${q.from_number || ''}')">
-              <div class="qi-pos ${pc}">${i + 1}</div>
-              <div class="qi-info"><div class="qi-name">${n}</div><div class="qi-sub"><span>${q.from_number || ''}</span><span class="qi-wait ${hot ? 'hot' : ''}">${fmtT(w)}</span></div></div>
-              <button class="btn-take" onclick="event.stopPropagation();pickQ('${q.from_number || ''}')">Prendre</button>
-            </div>`
+          <div class="qi-pos ${pc}">${i + 1}</div>
+          <div class="qi-info"><div class="qi-name">${n}</div><div class="qi-sub"><span>${q.from_number || ''}</span><span class="qi-wait ${hot ? 'hot' : ''}">${fmtT(w)}</span></div></div>
+          <button class="btn-take" onclick="event.stopPropagation();pickQ('${q.from_number || ''}')">Prendre</button>
+        </div>`
             }).join('')
 
             const al = document.getElementById('q-active')
             if (!active.length) { al.innerHTML = '<div class="empty">Aucun appel actif</div>' }
             else al.innerHTML = active.map(q => `<div class="qi">
-            <div class="qi-pos" style="background:var(--mi3);border-color:rgba(0,212,170,.3);color:var(--mint)">●</div>
-            <div class="qi-info"><div class="qi-name">${q.caller_name || q.from_number || 'Inconnu'}</div>
-            <div class="qi-sub"><span>${q.agent_name || 'Agent'}</span><span class="qi-wait" style="color:var(--mint);background:var(--mi3)">${fmtT(q.duration || 0)}</span></div></div>
-          </div>`).join('')
+        <div class="qi-pos" style="background:var(--mi3);border-color:rgba(0,212,170,.3);color:var(--mint)">●</div>
+        <div class="qi-info"><div class="qi-name">${q.caller_name || q.from_number || 'Inconnu'}</div>
+        <div class="qi-sub"><span>${q.agent_name || 'Agent'}</span><span class="qi-wait" style="color:var(--mint);background:var(--mi3)">${fmtT(q.duration || 0)}</span></div></div>
+      </div>`).join('')
         }
 
         function pickQ(num) { if (num) { S.dir = 'INBOUND'; callNum(num) } }
@@ -2750,27 +2661,27 @@ window.addEventListener('storage', function(e) {
 
                 // Supervision — admin seulement
                 const supBtns = (st === 'busy' && isAdmin()) ? `
-              <div class="sup-btns">
-                <button class="btn-sup listen"  onclick="supListen('${a.id || i}')">👂 Écouter</button>
-                <button class="btn-sup whisper" onclick="supWhisper('${a.id || i}')">🗣 Chuchoter</button>
-                <button class="btn-sup barge"   onclick="supBarge('${a.id || i}')">⚡ Rejoindre</button>
-              </div>` : ''
+          <div class="sup-btns">
+            <button class="btn-sup listen"  onclick="supListen('${a.id || i}')">👂 Écouter</button>
+            <button class="btn-sup whisper" onclick="supWhisper('${a.id || i}')">🗣 Chuchoter</button>
+            <button class="btn-sup barge"   onclick="supBarge('${a.id || i}')">⚡ Rejoindre</button>
+          </div>` : ''
 
                 return `<div class="ai">
-              <div class="aav ${st}" style="background:linear-gradient(135deg,${bg1},${bg2})">
-                ${ini}<div class="live-dot ${st}"></div>
-              </div>
-              <div class="ainfo">
-                <div class="aname">${name}</div>
-                <div class="asub">
-                  <span class="aext">${ext}</span>
-                  <span class="ast ${st}">${stL[st] || st}</span>
-                  ${dur ? `<span class="atimer">${fmtT(dur)}</span>` : ''}
-                </div>
-                ${a.current_call_number ? `<div class="acall-num">↔ ${a.current_call_number}</div>` : ''}
-              </div>
-              ${supBtns}
-            </div>`
+          <div class="aav ${st}" style="background:linear-gradient(135deg,${bg1},${bg2})">
+            ${ini}<div class="live-dot ${st}"></div>
+          </div>
+          <div class="ainfo">
+            <div class="aname">${name}</div>
+            <div class="asub">
+              <span class="aext">${ext}</span>
+              <span class="ast ${st}">${stL[st] || st}</span>
+              ${dur ? `<span class="atimer">${fmtT(dur)}</span>` : ''}
+            </div>
+            ${a.current_call_number ? `<div class="acall-num">↔ ${a.current_call_number}</div>` : ''}
+          </div>
+          ${supBtns}
+        </div>`
             }).join('')
         }
 
@@ -2798,17 +2709,17 @@ window.addEventListener('storage', function(e) {
                 const tag = tm[c.status] || { c: 'busy', l: c.status }
                 const isIn = c.direction === 'INBOUND'
                 return `<div class="hi">
-              <div class="hico" style="color:${isIn ? 'var(--mint)' : 'var(--sky)'};background:${isIn ? 'var(--mi3)' : 'var(--sk3)'}">${isIn ? '↓' : '↑'}</div>
-              <div class="hinfo">
-                <div class="hname">${name}</div>
-                <div class="hmeta"><span>${fmtD(c.started_at)}</span>${c.duration ? `<span class="hdur">${fmtT(c.duration)}</span>` : ''}<span class="htag ${tag.c}">${tag.l}</span></div>
-                ${c.notes ? `<div style="font-size:10px;color:var(--tx3);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">"${c.notes}"</div>` : ''}
-              </div>
-              <div class="hacts">
-                <button class="bsm" onclick="callNum('${num}')">Rappeler</button>
-                ${c.recording_url ? `<button class="bsm bl" onclick="playA('${c.recording_url}')">▶ Audio</button>` : ''}
-              </div>
-            </div>`
+          <div class="hico" style="color:${isIn ? 'var(--mint)' : 'var(--sky)'};background:${isIn ? 'var(--mi3)' : 'var(--sk3)'}">${isIn ? '↓' : '↑'}</div>
+          <div class="hinfo">
+            <div class="hname">${name}</div>
+            <div class="hmeta"><span>${fmtD(c.started_at)}</span>${c.duration ? `<span class="hdur">${fmtT(c.duration)}</span>` : ''}<span class="htag ${tag.c}">${tag.l}</span></div>
+            ${c.notes ? `<div style="font-size:10px;color:var(--tx3);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">"${c.notes}"</div>` : ''}
+          </div>
+          <div class="hacts">
+            <button class="bsm" onclick="callNum('${num}')">Rappeler</button>
+            ${c.recording_url ? `<button class="bsm bl" onclick="playA('${c.recording_url}')">▶ Audio</button>` : ''}
+          </div>
+        </div>`
             }).join('')
         }
 
@@ -2822,20 +2733,20 @@ window.addEventListener('storage', function(e) {
             bdg.textContent = nc; bdg.style.display = nc ? 'flex' : 'none'
             if (!S.vms.length) { el.innerHTML = '<div class="empty">Aucun message vocal</div>'; return }
             el.innerHTML = S.vms.map(v => `<div class="vmi">
-            <div class="vmh">
-              <div class="vmn">${v.contact ? v.contact.first_name + ' ' + v.contact.last_name : v.from_number}${v.status === 'NEW' ? '<span class="vmnew">Nouveau</span>' : ''}</div>
-              <div style="display:flex;align-items:center;gap:5px">
-                <span class="vmtime">${fmtD(v.created_at)}</span>
-                ${v.recording_url ? `<button class="btn-play" onclick="playVM('${v.id}','${v.recording_url}')">▶</button>` : ''}
-              </div>
-            </div>
-            <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${v.from_number || ''}${v.duration ? ' · ' + fmtT(v.duration) : ''}</div>
-            ${v.transcription ? `<div class="vmtr">"${v.transcription.substring(0, 160)}${v.transcription.length > 160 ? '…' : ''}"</div>` : ''}
-            <div style="display:flex;gap:6px;margin-top:8px">
-              <button class="bsm" onclick="callNum('${v.from_number}')">Rappeler</button>
-              <button class="bsm vi" onclick="markRead('${v.id}')">✓ Lu</button>
-            </div>
-          </div>`).join('')
+        <div class="vmh">
+          <div class="vmn">${v.contact ? v.contact.first_name + ' ' + v.contact.last_name : v.from_number}${v.status === 'NEW' ? '<span class="vmnew">Nouveau</span>' : ''}</div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <span class="vmtime">${fmtD(v.created_at)}</span>
+            ${v.recording_url ? `<button class="btn-play" onclick="playVM('${v.id}','${v.recording_url}')">▶</button>` : ''}
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">${v.from_number || ''}${v.duration ? ' · ' + fmtT(v.duration) : ''}</div>
+        ${v.transcription ? `<div class="vmtr">"${v.transcription.substring(0, 160)}${v.transcription.length > 160 ? '…' : ''}"</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="bsm" onclick="callNum('${v.from_number}')">Rappeler</button>
+          <button class="bsm vi" onclick="markRead('${v.id}')">✓ Lu</button>
+        </div>
+      </div>`).join('')
         }
         function playVM(id, url) { new Audio(url).play().catch(() => toast('Audio indisponible')); markRead(id) }
         function markRead(id) { S.vms = S.vms.map(v => v.id === id ? { ...v, status: 'LISTENED' } : v); api('/api/v1/telephony/voicemail/' + id + '/listen', { method: 'PATCH' }).catch(() => { }); rVMs() }
@@ -2854,10 +2765,10 @@ window.addEventListener('storage', function(e) {
                     const ini = (c.first_name[0] || '') + (c.last_name[0] || '')
                     const [bg1, bg2] = ACP[i % ACP.length]
                     return `<div class="coi">
-                <div class="coav" style="background:linear-gradient(135deg,${bg1},${bg2})">${ini.toUpperCase()}</div>
-                <div class="coinf"><div class="coname">${name}</div><div class="cosub">${[c.company, c.phone, c.email].filter(Boolean).join(' · ')}</div></div>
-                ${c.phone ? `<button class="bsm" onclick="callNum('${c.phone}')">Appeler</button>` : ''}
-              </div>`
+            <div class="coav" style="background:linear-gradient(135deg,${bg1},${bg2})">${ini.toUpperCase()}</div>
+            <div class="coinf"><div class="coname">${name}</div><div class="cosub">${[c.company, c.phone, c.email].filter(Boolean).join(' · ')}</div></div>
+            ${c.phone ? `<button class="bsm" onclick="callNum('${c.phone}')">Appeler</button>` : ''}
+          </div>`
                 }).join('')
             } catch { }
         }
@@ -2876,10 +2787,10 @@ window.addEventListener('storage', function(e) {
                 const cls = isMiss ? 'miss' : isIn ? 'in' : 'out'
                 const ico = isMiss ? '↗' : isIn ? '↓' : '↑'
                 return `<div class="ri">
-              <div class="ricon ${cls}">${ico}</div>
-              <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div><div style="font-size:10px;color:var(--tx3);margin-top:1px">${fmtD(c.started_at)}${c.duration ? ' · ' + fmtT(c.duration) : ''}</div></div>
-              <button class="bsm" onclick="callNum('${num}')">Rappeler</button>
-            </div>`
+          <div class="ricon ${cls}">${ico}</div>
+          <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div><div style="font-size:10px;color:var(--tx3);margin-top:1px">${fmtD(c.started_at)}${c.duration ? ' · ' + fmtT(c.duration) : ''}</div></div>
+          <button class="bsm" onclick="callNum('${num}')">Rappeler</button>
+        </div>`
             }).join('')
         }
 
@@ -2897,684 +2808,51 @@ window.addEventListener('storage', function(e) {
         }
         const playA = url => new Audio(url).play().catch(() => toast('Audio indisponible'))
 
-        // // loadDemo supprimé supprimé — données réelles uniquement
+        // ════════════════════════════════════════════════════════════
+        //  DEMO DATA
+        // ════════════════════════════════════════════════════════════
+        function loadDemo() {
+            // Simuler un rôle ADMIN pour la démo (changer à 'AGENT' pour tester restrictions)
+            S.role = 'ADMIN'
+            applyRolePermissions()
+            updDot()
+
+            S.calls = [
+                { id: '1', direction: 'INBOUND', status: 'COMPLETED', from_number: '+15141234567', to_number: '+15149876543', started_at: new Date(Date.now() - 3 * 3600000).toISOString(), duration: 154, contact: { first_name: 'Clémence', last_name: 'Roux', company: 'Acme Corp' }, notes: 'Demande de devis 5 licences' },
+                { id: '2', direction: 'OUTBOUND', status: 'NO_ANSWER', from_number: '+15149876543', to_number: '+15140001122', started_at: new Date(Date.now() - 3600000).toISOString(), duration: 0, contact: null },
+                { id: '3', direction: 'INBOUND', status: 'COMPLETED', from_number: '+15143334455', to_number: '+15149876543', started_at: new Date(Date.now() - 7200000).toISOString(), duration: 312, contact: { first_name: 'Marc', last_name: 'Tremblay', company: 'Global Solutions' } },
+                { id: '4', direction: 'OUTBOUND', status: 'COMPLETED', from_number: '+15149876543', to_number: '+15145556677', started_at: new Date(Date.now() - 86400000).toISOString(), duration: 89, contact: { first_name: 'Sophie', last_name: 'Leblanc', company: 'TechStart Inc.' } },
+                { id: '5', direction: 'INBOUND', status: 'MISSED', from_number: '+15147778899', to_number: '+15149876543', started_at: new Date(Date.now() - 2 * 86400000).toISOString(), duration: 0, contact: null },
+                { id: '6', direction: 'OUTBOUND', status: 'COMPLETED', from_number: '+15149876543', to_number: '+15148889900', started_at: new Date(Date.now() - 3 * 86400000).toISOString(), duration: 230, contact: { first_name: 'David', last_name: 'Kim', company: 'Startup XYZ' } },
+            ]
+            S.vms = [
+                { id: 'v1', from_number: '+15141234567', status: 'NEW', created_at: new Date(Date.now() - 3600000).toISOString(), duration: 47, transcription: 'Bonjour, je voulais faire le suivi de notre réunion de la semaine dernière concernant le renouvellement de contrat. Pouvez-vous me rappeler?', contact: { first_name: 'Clémence', last_name: 'Roux' }, recording_url: '#' },
+                { id: 'v2', from_number: '+15143334455', status: 'NEW', created_at: new Date(Date.now() - 7200000).toISOString(), duration: 23, transcription: 'Bonjour c\'est Marc Tremblay, merci pour le rappel de ce matin.', contact: { first_name: 'Marc', last_name: 'Tremblay' }, recording_url: '#' },
+                { id: 'v3', from_number: '+15147778899', status: 'LISTENED', created_at: new Date(Date.now() - 86400000).toISOString(), duration: 15, transcription: 'Rappel demain matin si possible.', contact: null, recording_url: '#' },
+            ]
+            S.queue = [
+                { id: 'q1', from_number: '+15149991111', caller_name: 'Jean-Paul Martin', wait_seconds: 237, status: 'waiting' },
+                { id: 'q2', from_number: '+15149992222', caller_name: 'Isabelle Fontaine', wait_seconds: 89, status: 'waiting' },
+                { id: 'q3', from_number: '+15149993333', caller_name: 'Lucie Gagnon', wait_seconds: 35, status: 'waiting' },
+                { id: 'q4', from_number: '+15149994444', caller_name: 'Robert Chen', wait_seconds: 302, status: 'waiting' },
+                { id: 'q5', from_number: '+15149995555', caller_name: 'Inconnu', wait_seconds: 18, status: 'waiting' },
+                { id: 'a1', from_number: '+15149990000', caller_name: 'Anna Kovac', duration: 145, status: 'active', agent_name: 'Marie D.' },
+                { id: 'a2', from_number: '+15149990001', caller_name: 'Pierre Dubois', duration: 89, status: 'active', agent_name: 'Thomas R.' },
+                { id: 'a3', from_number: '+15149990002', caller_name: 'Liu Wei', duration: 234, status: 'active', agent_name: 'Léa M.' },
+            ]
+            S.agents = [
+                { id: 'ag1', first_name: 'Marie', last_name: 'Dubois', status: 'BUSY', extension: '201', current_call: true, current_call_number: '+15141230000', call_duration: 145 },
+                { id: 'ag2', first_name: 'Thomas', last_name: 'Rousseau', status: 'BUSY', extension: '202', current_call: true, current_call_number: '+15141231111', call_duration: 89 },
+                { id: 'ag3', first_name: 'Léa', last_name: 'Martin', status: 'BUSY', extension: '203', current_call: true, current_call_number: '+15141232222', call_duration: 234 },
+                { id: 'ag4', first_name: 'Kevin', last_name: 'Zhang', status: 'BREAK', extension: '204', current_call: false },
+                { id: 'ag5', first_name: 'Sara', last_name: 'Benali', status: 'ONLINE', extension: '205', current_call: false },
+                { id: 'ag6', first_name: 'Pierre', last_name: 'Morin', status: 'ONLINE', extension: '206', current_call: false },
+                { id: 'ag7', first_name: 'Aïcha', last_name: 'Diop', status: 'OFFLINE', extension: '207', current_call: false },
+            ]
+            rRecents(); rHistory(); rVMs(); rQueue(); rAgents()
+        }
 
         init()
-    
-
-
-
-</script>
-
-
-<!-- SDK Twilio Voice WebRTC -->
-<script src="/twilio.min.js"></script>
-
-<script>
-// ================================================================
-//  VoxFlow — Twilio WebRTC + Temps réel (version propre)
-//  Un seul script, zéro conflit
-// ================================================================
-;(function vfPatch() {
-
-  function waitReady(cb) {
-    if (window.S && typeof window.callNum === 'function') cb()
-    else setTimeout(function() { waitReady(cb) }, 300)
-  }
-
-  waitReady(function() {
-    var S = window.S
-    window.__VFDevice = null
-    window.__VFCall   = null
-
-    // ── Init Twilio Device ──────────────────────────────────────
-    function initTwilio() {
-      if (window.__VFDevice) return
-      var tok = S.tok || localStorage.getItem('vf_tok')
-      var url = S.url || localStorage.getItem('vf_url') || 'http://localhost:4000'
-      if (!tok || typeof Twilio === 'undefined') {
-        setTimeout(initTwilio, 1000)
-        return
-      }
-
-      fetch(url + '/api/v1/telephony/voice/token', {
-        headers: { Authorization: 'Bearer ' + tok }
-      })
-      .then(function(r) { return r.json() })
-      .then(function(data) {
-        if (!data.success || !data.data || !data.data.token) {
-          console.warn('[VF] Token WebRTC non disponible')
-          return
-        }
-
-        var dev = new Twilio.Device(data.data.token, {
-          logLevel: 1,
-          codecPreferences: ['opus', 'pcmu'],
-          enableRingingState: true,
-        })
-
-        dev.on('registered', function() {
-          window.__VFDevice = dev
-          console.log('[VF] Twilio Device enregistre ✓')
-        })
-
-        dev.on('error', function(e) {
-          console.warn('[VF] Twilio error:', e.message)
-          window.__VFDevice = null
-          setTimeout(initTwilio, 5000)
-        })
-
-        dev.on('incoming', function(call) {
-          window.__VFCall = call
-          var from = call.parameters.From || 'Inconnu'
-          S._inNum = from
-          S._inCo  = null
-
-          // Lookup contact
-          var t = S.tok || localStorage.getItem('vf_tok')
-          var u = S.url || localStorage.getItem('vf_url') || 'http://localhost:4000'
-          if (t) {
-            fetch(u + '/api/v1/telephony/lookup/' + encodeURIComponent(from), {
-              headers: { Authorization: 'Bearer ' + t }
-            })
-            .then(function(r) { return r.json() })
-            .then(function(d) {
-              if (d.success && d.data && d.data.contact) {
-                S._inCo = d.data.contact
-                var n = document.getElementById('inc-name')
-                var c = document.getElementById('inc-co')
-                if (n) n.textContent = d.data.contact.first_name + ' ' + d.data.contact.last_name
-                if (c) c.textContent = d.data.contact.company || ''
-              }
-            })
-            .catch(function() {})
-          }
-
-          var ne = document.getElementById('inc-num')
-          var nm = document.getElementById('inc-name')
-          if (ne) ne.textContent = from
-          if (nm && nm.textContent === 'Inconnu') nm.textContent = from
-          if (typeof showView === 'function') showView('incoming')
-
-          call.on('cancel', function() {
-            window.__VFCall = null
-            if (typeof showView === 'function') showView('main')
-            refreshData()
-          })
-        })
-
-        dev.register()
-      })
-      .catch(function(e) {
-        console.warn('[VF] initTwilio failed:', e.message)
-      })
-    }
-
-    // ── Refresh données ─────────────────────────────────────────
-    function refreshData() {
-      var tok = S.tok || localStorage.getItem('vf_tok')
-      var url = S.url || localStorage.getItem('vf_url') || 'http://localhost:4000'
-      if (!tok) return
-
-      var h = { Authorization: 'Bearer ' + tok }
-
-      Promise.all([
-        fetch(url + '/api/v1/telephony/calls?limit=30',  { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
-        fetch(url + '/api/v1/telephony/voicemails',       { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
-        fetch(url + '/api/v1/queues',              { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }),
-        (window.S && (window.S.role==='ADMIN'||window.S.role==='OWNER') ? fetch(url + '/api/v1/supervision/snapshot', { headers: h }).then(function(r) { return r.json() }).catch(function() { return {success:false} }) : Promise.resolve({success:false})),
-      ]).then(function(res) {
-        if (res[0].success && res[0].data) { S.calls  = res[0].data; if (typeof rRecents==='function') rRecents(); if (typeof rHistory==='function') rHistory() }
-        if (res[1].success && res[1].data) { S.vms    = res[1].data; if (typeof rVMs==='function') rVMs() }
-        if (res[2].success && res[2].data) { S.queue  = res[2].data; if (typeof rQueue==='function') rQueue() }
-        if (res[3].success && res[3].data) { S.agents = res[3].data; if (typeof rAgents==='function') rAgents() }
-      })
-    }
-    window.__vfRefresh = refreshData
-
-    // ── Poll 5s ─────────────────────────────────────────────────
-    if (window.__vfPoll) clearInterval(window.__vfPoll)
-    window.__vfPoll = setInterval(function() {
-      if (S.tok || localStorage.getItem('vf_tok')) refreshData()
-    }, 15000)
-
-    // ── Patch hangup ────────────────────────────────────────────
-    var _origHangup = window.hangup
-    window.hangup = async function() {
-      // 1. Couper Twilio Device WebRTC
-      if (window.__VFCall) {
-        try { window.__VFCall.disconnect() } catch(e) {}
-        window.__VFCall = null
-      }
-      // 2. Couper via API REST (termine l'appel côté Twilio)
-      var tok = S.tok || localStorage.getItem('vf_tok')
-      var url = S.url || localStorage.getItem('vf_url') || 'http://localhost:4000'
-      if (S.callId && tok) {
-        fetch(url + '/api/v1/telephony/call/' + S.callId + '/end', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-          body: JSON.stringify({ duration: S.tsec || 0, twilioSid: S.twSid || '' })
-        }).catch(function() {})
-      }
-      // 3. Appeler hangup original
-      if (_origHangup) await _origHangup()
-      // 4. Refresh après 1.5s
-      setTimeout(refreshData, 1500)
-      setTimeout(refreshData, 4000)
-    }
-
-    // ── Patch doAnswer ──────────────────────────────────────────
-    var _origAnswer = window.doAnswer
-    window.doAnswer = function() {
-      if (window.__VFCall) {
-        window.__VFCall.accept()
-        window.__VFCall.on('disconnect', function() {
-          window.__VFCall = null
-          if (typeof hangup === 'function') hangup()
-        })
-      }
-      if (_origAnswer) _origAnswer()
-    }
-
-    // ── Patch doMute ────────────────────────────────────────────
-    var _origMute = window.doMute
-    window.doMute = function() {
-      if (window.__VFCall) window.__VFCall.mute(!S.muted)
-      if (_origMute) _origMute()
-    }
-
-    // ── Patch callNum ───────────────────────────────────────────
-    var _origCallNum = window.callNum
-    window.callNum = async function(n) {
-      var to  = n || (document.getElementById('dinp') ? document.getElementById('dinp').value.trim() : '')
-      if (!to) return
-      var tok = S.tok || localStorage.getItem('vf_tok')
-      var url = S.url || localStorage.getItem('vf_url') || 'http://localhost:4000'
-
-      if (window.__VFDevice && tok) {
-        // ── Via Twilio Device WebRTC ──────────────────────────
-        try {
-          // Enregistrer en DB
-          var dbRes  = await fetch(url + '/api/v1/telephony/call/outbound', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-            body: JSON.stringify({ to: to })
-          })
-          var dbData = await dbRes.json()
-          if (dbData.success && dbData.data) {
-            S.callId  = dbData.data.call ? dbData.data.call.id   : null
-            S.twSid   = dbData.data.call ? dbData.data.call.twilio_sid : null
-            S.contact = dbData.data.contact || null
-          }
-
-          // Lancer l'appel WebRTC
-          var call = await window.__VFDevice.connect({ params: { To: to } })
-          window.__VFCall = call
-
-          // Recuperer le CallSid des que possible
-          call.on('ringing', function() { console.log('[VF] Sonnerie...') })
-          call.on('accept',  function(c) {
-            if (c && c.parameters && c.parameters.CallSid) {
-              S.twSid = c.parameters.CallSid
-              // Mettre a jour en DB
-              if (S.callId) {
-                fetch(url + '/api/v1/telephony/call/' + S.callId + '/notes', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-                  body: JSON.stringify({ twilioSid: S.twSid })
-                }).catch(function() {})
-              }
-            }
-          })
-          call.on('disconnect', function() {
-            window.__VFCall = null
-            if (typeof hangup === 'function') hangup()
-          })
-          call.on('error', function(e) {
-            console.error('[VF] Appel error:', e.message)
-            window.__VFCall = null
-            if (typeof showView === 'function') showView('main')
-          })
-
-          // Afficher ecran appel
-          S.dir = 'OUTBOUND'
-          if (typeof startCall === 'function') startCall(to)
-
-        } catch(e) {
-          console.error('[VF] Device.connect() failed:', e.message)
-          alert('Erreur Twilio: ' + e.message)
-        }
-
-      } else {
-        // ── Fallback API REST ─────────────────────────────────
-        console.warn('[VF] Device non pret — fallback REST')
-        if (_origCallNum) await _origCallNum(n)
-      }
-    }
-
-    // ── Patch doLogin — re-init Twilio apres connexion ──────────
-    var _origLogin = window.doLogin
-    window.doLogin = async function() {
-      if (_origLogin) await _origLogin()
-      setTimeout(function() {
-        window.__VFDevice = null
-        initTwilio()
-        refreshData()
-      }, 1000)
-    }
-
-    // ── Demarrer si deja connecte ────────────────────────────────
-    var tok = S.tok || localStorage.getItem('vf_tok')
-    if (tok) {
-      S.tok = tok
-      S.url = localStorage.getItem('vf_url') || S.url
-      initTwilio()
-      refreshData()
-    }
-
-    // Storage sync (connexion depuis portail)
-    window.addEventListener('storage', function(e) {
-      if (e.key === 'vf_tok') {
-        if (e.newValue) {
-          S.tok = e.newValue
-          S.url = localStorage.getItem('vf_url') || S.url
-          window.__VFDevice = null
-          initTwilio()
-          refreshData()
-          if (typeof showView === 'function') showView('main')
-          if (typeof startPoll === 'function') startPoll()
-        } else {
-          S.tok = null
-          if (window.__VFDevice) { try { window.__VFDevice.destroy() } catch(e2) {} window.__VFDevice = null }
-          if (typeof stopPoll === 'function') stopPoll()
-          if (typeof showView === 'function') showView('login')
-        }
-      }
-    })
-
-    console.log('[VF] Patch charge ✓')
-  })
-
-})()
-</script>
-
-<style>
-/* ── AUDIO SETTINGS ──────────────────────────────────────────── */
-.audio-btn {
-    background: var(--ink3);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    color: var(--tx2);
-    padding: 4px 10px;
-    font-size: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: var(--font);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    transition: all .15s
-}
-.audio-btn:hover { background: var(--ink4); color: var(--txt) }
-.audio-modal {
-    display: none;
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,.75);
-    z-index: 900;
-    align-items: center;
-    justify-content: center
-}
-.audio-modal.on { display: flex }
-.audio-box {
-    background: var(--ink2);
-    border: 1px solid var(--line2);
-    border-radius: 16px;
-    padding: 20px;
-    width: 300px;
-    box-shadow: 0 24px 60px rgba(0,0,0,.8)
-}
-.audio-box h3 {
-    font-size: 13px;
-    font-weight: 800;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--txt)
-}
-.audio-field { margin-bottom: 13px }
-.audio-field label {
-    display: block;
-    font-size: 9px;
-    color: var(--tx3);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: .09em;
-    margin-bottom: 5px
-}
-.audio-field select {
-    width: 100%;
-    background: var(--ink3);
-    border: 1px solid var(--line);
-    border-radius: var(--rs);
-    color: var(--txt);
-    padding: 8px 10px;
-    font-size: 12px;
-    font-family: var(--font);
-    outline: none;
-    cursor: pointer
-}
-.audio-field select option { background: var(--ink3) }
-.audio-actions { display: flex; gap: 8px; margin-top: 4px }
-.audio-save {
-    flex: 1;
-    background: var(--violet);
-    border: none;
-    color: #fff;
-    padding: 9px;
-    border-radius: var(--rs);
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: var(--font)
-}
-.audio-cancel {
-    background: var(--ink3);
-    border: 1px solid var(--line);
-    color: var(--tx2);
-    padding: 9px 14px;
-    border-radius: var(--rs);
-    font-size: 12px;
-    cursor: pointer;
-    font-family: var(--font)
-}
-
-/* ── WAVEFORM ────────────────────────────────────────────────── */
-.waveform-wrap {
-    display: none;
-    padding: 8px 12px 4px;
-    gap: 6px;
-    flex-direction: column
-}
-.waveform-wrap.on { display: flex }
-.wf-row {
-    display: flex;
-    align-items: center;
-    gap: 8px
-}
-.wf-lbl {
-    font-size: 9px;
-    color: var(--tx3);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    width: 32px;
-    flex-shrink: 0
-}
-.wf-canvas {
-    flex: 1;
-    height: 28px;
-    border-radius: 6px;
-    background: var(--ink3)
-}
-</style>
-
-<!-- AUDIO MODAL -->
-<div class="audio-modal" id="audio-modal">
-    <div class="audio-box">
-        <h3>
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>
-            Périphériques audio
-        </h3>
-        <div class="audio-field">
-            <label>Microphone (entrée)</label>
-            <select id="sel-mic">
-                <option value="">Périphérique par défaut</option>
-            </select>
-        </div>
-        <div class="audio-field">
-            <label>Casque / Haut-parleur (sortie)</label>
-            <select id="sel-out">
-                <option value="">Périphérique par défaut</option>
-            </select>
-        </div>
-        <div class="audio-actions">
-            <button class="audio-cancel" onclick="closeAudio()">Annuler</button>
-            <button class="audio-save" onclick="saveAudio()">✓ Appliquer</button>
-        </div>
-    </div>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<script>
-// ══════════════════════════════════════════════════════════════════════════════
-//  VoxFlow — Sons UI + Twilio Voice (version corrigée)
-// ══════════════════════════════════════════════════════════════════════════════
-
-// ── AudioContext — reprendre dès la 1ère interaction ─────────────────────────
-var _vfCtx = null
-function _ac() {
-  if (!_vfCtx) _vfCtx = new (window.AudioContext || window.webkitAudioContext)()
-  if (_vfCtx.state === 'suspended') _vfCtx.resume()
-  return _vfCtx
-}
-// Débloquer l'audio à la première interaction réelle
-;['click','touchstart','keydown'].forEach(function(ev) {
-  document.addEventListener(ev, function _unlock() {
-    _ac()
-    document.removeEventListener(ev, _unlock)
-  }, { once: true })
-})
-
-// ── Sons UI discrets ──────────────────────────────────────────────────────────
-function _pip(freqs, dur, vol) {
-  try {
-    var a = _ac(), now = a.currentTime
-    var g = a.createGain()
-    g.gain.setValueAtTime(0, now)
-    g.gain.linearRampToValueAtTime(vol, now + 0.01)
-    g.gain.setValueAtTime(vol, now + dur - 0.02)
-    g.gain.linearRampToValueAtTime(0, now + dur)
-    g.connect(a.destination)
-    freqs.forEach(function(f) {
-      var o = a.createOscillator()
-      o.type = 'sine'; o.frequency.value = f
-      o.connect(g); o.start(now); o.stop(now + dur)
-    })
-  } catch(e) { console.warn('[Audio]', e.message) }
-}
-
-var _DT = {
-  '1':[697,1209],'2':[697,1336],'3':[697,1477],
-  '4':[770,1209],'5':[770,1336],'6':[770,1477],
-  '7':[852,1209],'8':[852,1336],'9':[852,1477],
-  '*':[941,1209],'0':[941,1336],'#':[941,1477],'+':[941,1336]
-}
-window.vfDTMF    = function(k) { var f=_DT[String(k)]; if(f) _pip(f, 0.09, 0.12) }
-window.vfConnect = function()  { _pip([880,1100], 0.15, 0.12) }
-window.vfHangup  = function()  {
-  try {
-    var a=_ac(), now=a.currentTime, g=a.createGain()
-    g.gain.setValueAtTime(0.12, now)
-    g.gain.exponentialRampToValueAtTime(0.0001, now+0.3)
-    g.connect(a.destination)
-    var o=a.createOscillator(); o.type='sine'
-    o.frequency.setValueAtTime(480, now)
-    o.frequency.exponentialRampToValueAtTime(280, now+0.3)
-    o.connect(g); o.start(now); o.stop(now+0.3)
-  } catch(e) {}
-}
-
-// ── Twilio Voice ──────────────────────────────────────────────────────────────
-window.__VFDevice = null
-window.__VFCall   = null
-
-window.initTwilioDevice = async function() {
-  try {
-    if (typeof Twilio === 'undefined') {
-      console.warn('[Twilio] SDK absent — mode simulation')
-      return
-    }
-    if (window.__VFDevice && window.__VFDevice.state === 'registered') {
-      console.log('[Twilio] Device déjà enregistré')
-      return
-    }
-    // Essayer les deux routes
-    var res = null
-    try { res = await api('/api/v1/telephony/voice/token') } catch {}
-    if (!res || !res.success) {
-      try { res = await api('/api/v1/telephony/token') } catch {}
-    }
-    if (!res || !res.success || !res.data || !res.data.token) {
-      console.warn('[Twilio] Pas de token valide')
-      return
-    }
-    window.__VFDevice = new Twilio.Device(res.data.token, {
-      logLevel: 1,
-      codecPreferences: ['opus', 'pcmu']
-    })
-    window.__VFDevice.on('registered', function() {
-      console.log('[Twilio] ✓ Device enregistré — prêt')
-    })
-    window.__VFDevice.on('incoming', function(call) {
-      window.__VFCall = call
-      S._incomingNum = call.parameters.From || 'Entrant'
-      var el = document.getElementById('inc-num') || document.getElementById('incoming-num')
-      if (el) el.textContent = S._incomingNum
-      showView('incoming')
-      call.on('disconnect', window.endCallCleanup || function(){})
-      call.on('cancel', function() { showView('main') })
-    })
-    window.__VFDevice.on('error', function(err) {
-      console.error('[Twilio]', err.message)
-    })
-    window.__VFDevice.on('tokenWillExpire', async function() {
-      var r = null
-      try { r = await api('/api/v1/telephony/voice/token') } catch {}
-      if (!r || !r.success) try { r = await api('/api/v1/telephony/token') } catch {}
-      if (r && r.success && r.data) window.__VFDevice.updateToken(r.data.token)
-    })
-    await window.__VFDevice.register()
-  } catch(err) {
-    console.warn('[Twilio] Init échouée:', err.message)
-  }
-}
-
-// ── Appel sortant ─────────────────────────────────────────────────────────────
-window.makeCall = async function(toNumber) {
-  if (!toNumber) return
-  if (!window.__VFDevice || window.__VFDevice.state !== 'registered') {
-    // Fallback simulation REST
-    console.log('[Twilio] Device non prêt — fallback REST')
-    try {
-      var res = await api('/api/v1/telephony/call/outbound', {method:'POST', body:{to:toNumber}})
-      if (res && res.success) { S.callId = res.data?.call?.id || null; S.contact = res.data?.contact || null }
-    } catch {}
-    startCall(toNumber)
-    return
-  }
-  try {
-    window.__VFCall = await window.__VFDevice.connect({ params: { To: toNumber } })
-    window.__VFCall.on('accept', function() { vfConnect(); startCall(toNumber) })
-    window.__VFCall.on('disconnect', window.endCallCleanup || function(){})
-    window.__VFCall.on('error', function(e) { console.error('[Call]', e.message) })
-    startCall(toNumber)
-  } catch(err) {
-    alert('Erreur appel : ' + err.message)
-  }
-}
-
-// ── Fonctions d'appel ─────────────────────────────────────────────────────────
-window.doAnswer = function() {
-  if (window.__VFCall) { window.__VFCall.accept(); window.__VFCall.on('disconnect', window.endCallCleanup || function(){}) }
-  vfConnect()
-  startCall(S._incomingNum || 'Entrant')
-}
-window.doReject = function() {
-  if (window.__VFCall) { window.__VFCall.reject(); window.__VFCall = null }
-  showView('main')
-}
-window.hangup = async function() {
-  vfHangup()
-  if (window.__VFCall) { window.__VFCall.disconnect(); window.__VFCall = null }
-  if (window.endCallCleanup) window.endCallCleanup()
-}
-window.endCallCleanup = function() {
-  clearInterval(S.timerInt)
-  var dur = S.timerSec
-  var el = document.getElementById('wrapup-dur')
-  if (el) el.textContent = 'Durée : ' + (typeof fmtTimer === 'function' ? fmtTimer(dur) : dur + 's')
-  showView('wrapup')
-  setTimeout(async function() {
-    S.timerSec=0; S.isMuted=false; S.isOnHold=false
-    S.callId=null; S.contact=null; window.__VFCall=null
-    var di = document.getElementById('dinp') || document.getElementById('dial-input')
-    if (di) di.value = ''
-    if (typeof onDialInput === 'function') onDialInput()
-    showView('main')
-    if (typeof loadData === 'function') await loadData()
-  }, 2500)
-}
-
-// ── Touches clavier : hors appel = numérotation, pendant appel = DTMF ─────────
-window.dtmf = function(key) {
-  vfDTMF(String(key))  // son toujours
-  if (window.__VFCall) {
-    window.__VFCall.sendDigits(String(key))
-  } else {
-    var inp = document.getElementById('dinp') || document.getElementById('dial-input')
-    if (inp) {
-      inp.value += key
-      if (typeof onDialInput === 'function') onDialInput()
-    }
-  }
-}
-
-// ── callNum — utilise le bon ID input ─────────────────────────────────────────
-window.callNum = async function(num) {
-  var inp = document.getElementById('dinp') || document.getElementById('dial-input')
-  var to = (num || (inp ? inp.value : '') || '').trim()
-  if (!to) return
-  await window.makeCall(to)
-}
-
-// ── Auto-init au chargement ───────────────────────────────────────────────────
-setTimeout(async function() {
-  // Patcher loadData pour init Twilio après chaque chargement
-  if (typeof loadData === 'function' && !loadData._vfPatched) {
-    var _orig = loadData
-    window.loadData = async function() {
-      await _orig()
-      if (!window.__VFDevice || window.__VFDevice.state !== 'registered') {
-        await window.initTwilioDevice()
-      }
-    }
-    window.loadData._vfPatched = true
-  }
-  // Init immédiat si déjà connecté
-  if (window.S && window.S.token) {
-    await window.initTwilioDevice()
-  }
-  console.log('[VoxFlow] ✓ Sons + Twilio Voice prêts')
-}, 500)
-</script>
-
+    </script>
 </body>
 </html>
-
-
