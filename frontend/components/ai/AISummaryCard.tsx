@@ -59,7 +59,7 @@ export default function AISummaryCard({ call, onProcessed }: Props) {
         )}
       </div>
 
-      {call.ai_summary && (
+      {call.ai_summary && !call.ai_summary.startsWith(`{`) && (
         <div className="mt-2">
           <p className="text-gray-300 text-sm">{call.ai_summary}</p>
           {call.transcription && (
@@ -72,7 +72,7 @@ export default function AISummaryCard({ call, onProcessed }: Props) {
           )}
           {expanded && call.transcription && (
             <div className="mt-2 bg-gray-800 rounded-lg p-3 text-gray-400 text-xs leading-relaxed">
-              {call.transcription}
+              {!call.transcription.startsWith(`{`) ? call.transcription : "Transcription indisponible (clé OpenAI requise)"}
             </div>
           )}
         </div>
@@ -80,3 +80,4 @@ export default function AISummaryCard({ call, onProcessed }: Props) {
     </div>
   )
 }
+

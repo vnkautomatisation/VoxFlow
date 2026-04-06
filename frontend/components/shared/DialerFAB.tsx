@@ -50,19 +50,9 @@ export default function DialerFAB() {
       return
     }
 
-    // Tenter Electron via protocole voxflow://
+    // Lancer Electron via protocole custom — pas d'onglet Chrome ouvert
     window.location.href = `voxflow://open?tok=${encodeURIComponent(tok)}&url=${encodeURIComponent(url)}`
-
-    // Fallback popup HTML après 1.5s
-    setTimeout(() => {
-      if (winRef.current && !winRef.current.closed) return
-      const left = window.screen.availWidth  - W - 24
-      const top  = window.screen.availHeight - H - 48
-      const feat = `width=${W},height=${H},left=${left},top=${top},resizable=no,scrollbars=no,menubar=no,toolbar=no,location=no`
-      const dialerUrl = `/VoxFlow-Dialer.html?tok=${encodeURIComponent(tok)}&url=${encodeURIComponent(url)}`
-      const w = window.open(dialerUrl, "VoxFlowDialer", feat)
-      if (w) { winRef.current = w; setIsOpen(true); w.focus() }
-    }, 1500)
+    setIsOpen(true)
   }, [isAuth, accessToken])
 
   // Détecter fermeture popup
@@ -156,3 +146,5 @@ export default function DialerFAB() {
     </>
   )
 }
+
+

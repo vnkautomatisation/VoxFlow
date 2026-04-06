@@ -77,14 +77,24 @@ export class AdminService {
     return user
   }
 
-  async updateAgent(agentId: string, organizationId: string, dto: {
-    name?: string
-    role?: string
-    status?: string
-  }) {
+  async updateAgent(agentId: string, organizationId: string, dto: any) {
+    // Extraire et hasher le mot de passe séparément
+    const { password, queues, ...rest } = dto
+    const update: any = { ...rest, updated_at: new Date().toISOString() }
+
+    // Hasher le mot de passe si fourni
+    if (password && password.trim()) {
+      const { hashPassword } = await import("../../utils/hash")
+      update.password_hash = await hashPassword(password)
+    }
+
+    // Supprimer les champs non-colonnes
+    delete update.password
+    delete update.queues
+
     const { data, error } = await supabaseAdmin
       .from("users")
-      .update({ ...dto, updated_at: new Date().toISOString() })
+      .update(update)
       .eq("id", agentId)
       .eq("organization_id", organizationId)
       .select().single()
@@ -268,3 +278,4 @@ export class AdminService {
 }
 
 export const adminService = new AdminService()
+

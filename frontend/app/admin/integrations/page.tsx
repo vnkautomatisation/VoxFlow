@@ -9,13 +9,49 @@ import CRMIntegrations from "@/components/integrations/CRMIntegrations"
 
 type Tab = "crm" | "webhooks" | "apikeys" | "docs"
 
+const INTEGRATION_ICONS: Record<string, React.ReactNode> = {
+  HUBSPOT: (
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18.164 7.33V5.02a1.56 1.56 0 00.895-1.405V3.58a1.56 1.56 0 00-1.557-1.557h-.036A1.56 1.56 0 0015.91 3.58v.036a1.56 1.56 0 00.895 1.404V7.33a4.43 4.43 0 00-2.104 1.224L7.13 3.27a1.73 1.73 0 00.044-.373 1.738 1.738 0 10-1.738 1.738c.208 0 .406-.038.59-.104l7.434 5.187a4.43 4.43 0 00-.582 2.185 4.43 4.43 0 00.673 2.346l-2.26 2.26a1.43 1.43 0 00-.41-.063 1.44 1.44 0 101.44 1.44 1.43 1.43 0 00-.063-.41l2.23-2.23a4.45 4.45 0 002.72.924 4.46 4.46 0 000-8.914zm0 6.57a2.115 2.115 0 110-4.23 2.115 2.115 0 010 4.23z" fill="#FF7A59"/>
+    </svg>
+  ),
+  SALESFORCE: (
+    <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10.05 4.8a3.9 3.9 0 012.9-1.3 3.94 3.94 0 013.55 2.26 2.9 2.9 0 011.1-.22 2.95 2.95 0 012.95 2.95 2.95 2.95 0 01-.2 1.07 2.63 2.63 0 01.55 1.62 2.65 2.65 0 01-2.65 2.65 2.6 2.6 0 01-.43-.04 2.35 2.35 0 01-2.1 1.32 2.3 2.3 0 01-.97-.21 3.14 3.14 0 01-2.97 2.12 3.16 3.16 0 01-3-2.2 2.66 2.66 0 01-.52.05 2.7 2.7 0 01-2.7-2.7 2.7 2.7 0 01.75-1.87 2.2 2.2 0 01-.22-1A2.25 2.25 0 018.3 8.97a2.22 2.22 0 01.5.06 3.9 3.9 0 011.25-4.23z" fill="#00A1E0"/>
+    </svg>
+  ),
+  ZAPIER: (
+    <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+      <path d="M11.983 14.923l-4.26 4.26a1.4 1.4 0 01-1.98-1.98l4.26-4.26H4.22a1.4 1.4 0 010-2.8h5.783l-4.26-4.26a1.4 1.4 0 011.98-1.98l4.26 4.26V2.4a1.4 1.4 0 012.8 0v5.763l4.26-4.26a1.4 1.4 0 011.98 1.98l-4.26 4.26H22a1.4 1.4 0 010 2.8h-5.237l4.26 4.26a1.4 1.4 0 01-1.98 1.98l-4.26-4.26v5.42a1.4 1.4 0 01-2.8 0v-5.42z" fill="#FF4A00"/>
+    </svg>
+  ),
+  ZENDESK: (
+    <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+      <path d="M11.5 2C6.26 2 2 6.26 2 11.5S6.26 21 11.5 21 21 16.74 21 11.5 16.74 2 11.5 2zm-1.2 14.5L6 10.5h8.6l-4.3 6zm2.4-8.5l4.3-6h-8.6l4.3 6z" fill="#03363D"/>
+    </svg>
+  ),
+  GOOGLE_CALENDAR: (
+    <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H5V9h12v12zM5 7V5h14v2H5z" fill="#4285F4"/>
+      <path d="M7 11h4v4H7z" fill="#34A853"/>
+      <path d="M13 11h4v2h-4z" fill="#FBBC04"/>
+      <path d="M13 15h4v2h-4z" fill="#EA4335"/>
+    </svg>
+  ),
+  SLACK: (
+    <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5.042 15.165a2.528 2.528 0 01-2.52 2.523A2.528 2.528 0 010 15.165a2.527 2.527 0 012.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 012.521-2.52 2.527 2.527 0 012.521 2.52v6.313A2.528 2.528 0 018.834 24a2.528 2.528 0 01-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 01-2.521-2.52A2.528 2.528 0 018.834 0a2.528 2.528 0 012.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 012.521 2.521 2.528 2.528 0 01-2.521 2.521H2.522A2.528 2.528 0 010 8.834a2.528 2.528 0 012.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 012.522-2.521A2.528 2.528 0 0124 8.834a2.528 2.528 0 01-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 01-2.523 2.521 2.527 2.527 0 01-2.52-2.521V2.522A2.527 2.527 0 0115.165 0a2.528 2.528 0 012.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 012.523 2.522A2.528 2.528 0 0115.165 24a2.527 2.527 0 01-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 01-2.52-2.523 2.526 2.526 0 012.52-2.52h6.313A2.527 2.527 0 0124 15.165a2.528 2.528 0 01-2.522 2.523h-6.313z" fill="#E01E5A"/>
+    </svg>
+  ),
+}
+
 const INTEGRATIONS_CATALOG = [
-  { type: "HUBSPOT",        name: "HubSpot",         icon: "🟠", desc: "Synchroniser contacts et deals",      color: "border-orange-700" },
-  { type: "SALESFORCE",     name: "Salesforce",       icon: "🔵", desc: "CRM enterprise Salesforce",          color: "border-blue-700" },
-  { type: "ZAPIER",         name: "Zapier",            icon: "⚡", desc: "Automatiser avec 5000+ apps",        color: "border-amber-700" },
-  { type: "ZENDESK",        name: "Zendesk",           icon: "🎫", desc: "Tickets support Zendesk",            color: "border-green-700" },
-  { type: "GOOGLE_CALENDAR",name: "Google Calendar",  icon: "📅", desc: "Synchroniser les rendez-vous",       color: "border-blue-600" },
-  { type: "SLACK",          name: "Slack",             icon: "💬", desc: "Notifications dans Slack",           color: "border-purple-700" },
+  { type: "HUBSPOT", get svgIcon() { return INTEGRATION_ICONS["HUBSPOT"] },         name: "HubSpot",         desc: "Synchroniser contacts et deals",   color: "border-orange-700/40" },
+  { type: "SALESFORCE", get svgIcon() { return INTEGRATION_ICONS["SALESFORCE"] },      name: "Salesforce",       desc: "CRM enterprise Salesforce",        color: "border-blue-700/40" },
+  { type: "ZAPIER", get svgIcon() { return INTEGRATION_ICONS["ZAPIER"] },          name: "Zapier",           desc: "Automatiser avec 5000+ apps",      color: "border-amber-700/40" },
+  { type: "ZENDESK", get svgIcon() { return INTEGRATION_ICONS["ZENDESK"] },         name: "Zendesk",          desc: "Tickets support Zendesk",          color: "border-teal-700/40" },
+  { type: "GOOGLE_CALENDAR", get svgIcon() { return INTEGRATION_ICONS["GOOGLE_CALENDAR"] }, name: "Google Calendar",  desc: "Synchroniser les rendez-vous",     color: "border-blue-600/40" },
+  { type: "SLACK", get svgIcon() { return INTEGRATION_ICONS["SLACK"] },           name: "Slack",            desc: "Notifications dans Slack",         color: "border-pink-700/40" },
 ]
 
 export default function IntegrationsPage() {
@@ -195,3 +231,6 @@ function APIDocs() {
     </div>
   )
 }
+
+
+

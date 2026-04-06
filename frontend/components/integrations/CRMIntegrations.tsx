@@ -64,7 +64,7 @@ export default function CRMIntegrations({ token, catalog, integrations, connecte
             <div key={item.type} className={"bg-gray-900 border rounded-xl p-5 " + (isConnected ? item.color : "border-gray-800")}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{item.icon}</span>
+                  <span className="flex items-center justify-center w-8 h-8">{item.svgIcon ?? item.icon}</span>
                   <div>
                     <p className="text-white font-semibold">{item.name}</p>
                     <p className="text-gray-500 text-xs">{item.desc}</p>
@@ -116,3 +116,4 @@ export default function CRMIntegrations({ token, catalog, integrations, connecte
     </div>
   )
 }
+
