@@ -1,8 +1,9 @@
-﻿import { Router, Request, Response } from "express"
+import { Router, Request, Response } from "express"
 import { authenticate, AuthRequest } from "../../middleware/auth"
 import { twilioService } from "../../services/twilio/twilio.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
+import voiceRoutes from './voice'
 
 const router = Router()
 const BACKEND = () => process.env.BACKEND_URL || "http://localhost:4000"
@@ -437,6 +438,8 @@ router.get("/twiml/voicemail", (req: Request, res: Response) => {
   res.set("Content-Type", "text/xml")
   res.send(twilioService.generateVoicemailTwiML(orgId))
 })
+
+router.use('/', voiceRoutes)
 
 export default router
 

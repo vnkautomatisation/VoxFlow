@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 --  VoxFlow -- Migration 015 -- Agent Dashboard + Dialer
 --  SEULEMENT ce qui n'existe PAS dans 001-014
 --  Fix: auth.uid()::text pour compatibilite users.id TEXT
@@ -16,7 +16,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_talk_sec INTEGER DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_users_agent_status ON users(agent_status);
 
 -- ── 2. Colonnes post-appel sur calls ─────────────────────────
--- contact_id déjà ajouté dans migration 005 avec FK contacts — skip
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS contact_id    TEXT;
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS wrap_up_tags  TEXT[];
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS outcome       TEXT;
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS hold_duration INTEGER DEFAULT 0;
@@ -50,7 +50,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_sessions_org    ON agent_sessions(organizat
 CREATE INDEX IF NOT EXISTS idx_agent_sessions_status ON agent_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_agent_sessions_agent  ON agent_sessions(agent_id);
 ALTER TABLE agent_sessions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_agent_sessions ON agent_sessions;
 CREATE POLICY org_agent_sessions ON agent_sessions
   USING (organization_id IN (
     SELECT organization_id FROM users WHERE id = auth.uid()::text
@@ -68,7 +67,6 @@ CREATE TABLE IF NOT EXISTS call_notes (
 CREATE INDEX IF NOT EXISTS idx_call_notes_call  ON call_notes(call_id);
 CREATE INDEX IF NOT EXISTS idx_call_notes_agent ON call_notes(agent_id);
 ALTER TABLE call_notes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_call_notes ON call_notes;
 CREATE POLICY org_call_notes ON call_notes
   USING (agent_id IN (
     SELECT id FROM users WHERE organization_id IN (
@@ -95,7 +93,6 @@ CREATE INDEX IF NOT EXISTS idx_queue_entries_org    ON queue_entries(organizatio
 CREATE INDEX IF NOT EXISTS idx_queue_entries_status ON queue_entries(status);
 CREATE INDEX IF NOT EXISTS idx_queue_entries_queue  ON queue_entries(queue_id);
 ALTER TABLE queue_entries ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_queue_entries ON queue_entries;
 CREATE POLICY org_queue_entries ON queue_entries
   USING (organization_id IN (
     SELECT organization_id FROM users WHERE id = auth.uid()::text
@@ -114,7 +111,6 @@ CREATE TABLE IF NOT EXISTS supervision_events (
 CREATE INDEX IF NOT EXISTS idx_sup_events_supervisor ON supervision_events(supervisor_id);
 CREATE INDEX IF NOT EXISTS idx_sup_events_call       ON supervision_events(call_id);
 ALTER TABLE supervision_events ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_supervision ON supervision_events;
 CREATE POLICY org_supervision ON supervision_events
   USING (supervisor_id IN (
     SELECT id FROM users WHERE organization_id IN (
@@ -141,7 +137,6 @@ CREATE TABLE IF NOT EXISTS robot_campaigns (
 CREATE INDEX IF NOT EXISTS idx_robot_campaigns_org    ON robot_campaigns(organization_id);
 CREATE INDEX IF NOT EXISTS idx_robot_campaigns_status ON robot_campaigns(status);
 ALTER TABLE robot_campaigns ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_robot_campaigns ON robot_campaigns;
 CREATE POLICY org_robot_campaigns ON robot_campaigns
   USING (organization_id IN (
     SELECT organization_id FROM users WHERE id = auth.uid()::text
@@ -160,7 +155,6 @@ CREATE TABLE IF NOT EXISTS agent_scripts (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_scripts_org ON agent_scripts(organization_id);
 ALTER TABLE agent_scripts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_agent_scripts ON agent_scripts;
 CREATE POLICY org_agent_scripts ON agent_scripts
   USING (organization_id IN (
     SELECT organization_id FROM users WHERE id = auth.uid()::text
@@ -176,7 +170,6 @@ CREATE TABLE IF NOT EXISTS wrap_up_tags (
 );
 CREATE INDEX IF NOT EXISTS idx_wrap_up_tags_org ON wrap_up_tags(organization_id);
 ALTER TABLE wrap_up_tags ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS org_wrap_up_tags ON wrap_up_tags;
 CREATE POLICY org_wrap_up_tags ON wrap_up_tags
   USING (organization_id IN (
     SELECT organization_id FROM users WHERE id = auth.uid()::text
@@ -225,4 +218,3 @@ LEFT JOIN users u ON u.id = qe.agent_id
 WHERE qe.status IN ('waiting','ringing','active');
 
 SELECT '=== Migration 015 OK ===' AS message;
-

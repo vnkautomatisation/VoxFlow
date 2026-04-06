@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS sms_messages (
   from_number     TEXT NOT NULL,
   to_number       TEXT NOT NULL,
   body            TEXT NOT NULL,
-  direction       TEXT NOT NULL DEFAULT 'OUTBOUND',
-  status          TEXT NOT NULL DEFAULT 'SENT',
+  direction       TEXT NOT NULL DEFAULT "OUTBOUND",
+  status          TEXT NOT NULL DEFAULT "SENT",
   organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   agent_id        TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ DEFAULT NOW()
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS ai_summaries (
   call_id        TEXT UNIQUE NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
   transcription  TEXT,
   summary        TEXT NOT NULL,
-  sentiment      TEXT DEFAULT 'NEUTRE',
-  topics JSONB DEFAULT '[]'::jsonb,
+  sentiment      TEXT DEFAULT "NEUTRE",
+  topics         JSONB DEFAULT "[]",
   resolved       BOOLEAN DEFAULT false,
   follow_up      TEXT,
   created_at     TIMESTAMPTZ DEFAULT NOW()
@@ -37,5 +37,4 @@ CREATE TABLE IF NOT EXISTS ai_summaries (
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS recording_sid TEXT;
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS ai_processed BOOLEAN DEFAULT false;
 
-SELECT 'Migration 003 executee avec succes !' AS message;
-
+SELECT "Migration 003 executee avec succes !" AS message;

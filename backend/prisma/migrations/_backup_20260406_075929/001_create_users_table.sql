@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role            ON users(role);
 CREATE TABLE IF NOT EXISTS phone_numbers (
   id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   number          TEXT UNIQUE NOT NULL,
-  twilio_sid      TEXT UNIQUE,
+  twilio_sid      TEXT UNIQUE NOT NULL,
   country         TEXT DEFAULT 'CA',
   organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS queues (
 -- Table calls (historique des appels)
 CREATE TABLE IF NOT EXISTS calls (
   id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  twilio_sid      TEXT UNIQUE,
+  twilio_sid      TEXT UNIQUE NOT NULL,
   from_number     TEXT NOT NULL,
   to_number       TEXT NOT NULL,
   duration        INTEGER DEFAULT 0,
@@ -99,4 +99,3 @@ ALTER TABLE subscriptions   ENABLE ROW LEVEL SECURITY;
 -- Les utilisateurs ne voient que leurs données
 
 SELECT 'Migration 001 executee avec succes !' AS message;
-

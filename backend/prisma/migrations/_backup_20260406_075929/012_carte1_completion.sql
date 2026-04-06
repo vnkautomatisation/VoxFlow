@@ -6,7 +6,7 @@ ALTER TABLE calls ADD COLUMN IF NOT EXISTS duration       INTEGER DEFAULT 0;
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS ended_at       TIMESTAMPTZ;
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS notes          TEXT;
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS quality_score  INTEGER;
--- twilio_sid déjà défini UNIQUE dans migration 001 — skip
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS twilio_sid     TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_calls_twilio ON calls(twilio_sid);
 CREATE INDEX IF NOT EXISTS idx_calls_org    ON calls(organization_id);
@@ -32,4 +32,3 @@ CREATE INDEX IF NOT EXISTS idx_vm_org    ON voicemails(organization_id);
 CREATE INDEX IF NOT EXISTS idx_vm_status ON voicemails(status);
 
 SELECT 'Migration 012 OK' AS message;
-

@@ -59,6 +59,7 @@
         "@types/morgan": "^1.9.10",
         "@types/multer": "^2.1.0",
         "@types/node": "^25.5.2",
+        "@types/twilio": "^3.19.2",
         "@types/uuid": "^10.0.0",
         "@types/ws": "^8.18.1",
         "@typescript-eslint/eslint-plugin": "^8.58.0",

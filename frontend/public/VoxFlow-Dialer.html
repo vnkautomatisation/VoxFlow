@@ -2908,7 +2908,7 @@ window.addEventListener('storage', function(e) {
 
 
 <!-- SDK Twilio Voice WebRTC -->
-<script src="https://sdk.twilio.com/js/voice/releases/2.10.0/twilio.min.js"></script>
+<script src="/twilio.min.js"></script>
 
 <script>
 // ================================================================
@@ -2937,7 +2937,7 @@ window.addEventListener('storage', function(e) {
         return
       }
 
-      fetch(url + '/api/v1/telephony/token', {
+      fetch(url + '/api/v1/telephony/voice/token', {
         headers: { Authorization: 'Bearer ' + tok }
       })
       .then(function(r) { return r.json() })
@@ -3197,5 +3197,382 @@ window.addEventListener('storage', function(e) {
 
 })()
 </script>
+
+<style>
+/* ── AUDIO SETTINGS ──────────────────────────────────────────── */
+.audio-btn {
+    background: var(--ink3);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--tx2);
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all .15s
+}
+.audio-btn:hover { background: var(--ink4); color: var(--txt) }
+.audio-modal {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 900;
+    align-items: center;
+    justify-content: center
+}
+.audio-modal.on { display: flex }
+.audio-box {
+    background: var(--ink2);
+    border: 1px solid var(--line2);
+    border-radius: 16px;
+    padding: 20px;
+    width: 300px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.8)
+}
+.audio-box h3 {
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--txt)
+}
+.audio-field { margin-bottom: 13px }
+.audio-field label {
+    display: block;
+    font-size: 9px;
+    color: var(--tx3);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    margin-bottom: 5px
+}
+.audio-field select {
+    width: 100%;
+    background: var(--ink3);
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    color: var(--txt);
+    padding: 8px 10px;
+    font-size: 12px;
+    font-family: var(--font);
+    outline: none;
+    cursor: pointer
+}
+.audio-field select option { background: var(--ink3) }
+.audio-actions { display: flex; gap: 8px; margin-top: 4px }
+.audio-save {
+    flex: 1;
+    background: var(--violet);
+    border: none;
+    color: #fff;
+    padding: 9px;
+    border-radius: var(--rs);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font)
+}
+.audio-cancel {
+    background: var(--ink3);
+    border: 1px solid var(--line);
+    color: var(--tx2);
+    padding: 9px 14px;
+    border-radius: var(--rs);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font)
+}
+
+/* ── WAVEFORM ────────────────────────────────────────────────── */
+.waveform-wrap {
+    display: none;
+    padding: 8px 12px 4px;
+    gap: 6px;
+    flex-direction: column
+}
+.waveform-wrap.on { display: flex }
+.wf-row {
+    display: flex;
+    align-items: center;
+    gap: 8px
+}
+.wf-lbl {
+    font-size: 9px;
+    color: var(--tx3);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    width: 32px;
+    flex-shrink: 0
+}
+.wf-canvas {
+    flex: 1;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--ink3)
+}
+</style>
+
+<!-- AUDIO MODAL -->
+<div class="audio-modal" id="audio-modal">
+    <div class="audio-box">
+        <h3>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>
+            Périphériques audio
+        </h3>
+        <div class="audio-field">
+            <label>Microphone (entrée)</label>
+            <select id="sel-mic">
+                <option value="">Périphérique par défaut</option>
+            </select>
+        </div>
+        <div class="audio-field">
+            <label>Casque / Haut-parleur (sortie)</label>
+            <select id="sel-out">
+                <option value="">Périphérique par défaut</option>
+            </select>
+        </div>
+        <div class="audio-actions">
+            <button class="audio-cancel" onclick="closeAudio()">Annuler</button>
+            <button class="audio-save" onclick="saveAudio()">✓ Appliquer</button>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+//  VoxFlow — Sons UI + Twilio Voice (version corrigée)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── AudioContext — reprendre dès la 1ère interaction ─────────────────────────
+var _vfCtx = null
+function _ac() {
+  if (!_vfCtx) _vfCtx = new (window.AudioContext || window.webkitAudioContext)()
+  if (_vfCtx.state === 'suspended') _vfCtx.resume()
+  return _vfCtx
+}
+// Débloquer l'audio à la première interaction réelle
+;['click','touchstart','keydown'].forEach(function(ev) {
+  document.addEventListener(ev, function _unlock() {
+    _ac()
+    document.removeEventListener(ev, _unlock)
+  }, { once: true })
+})
+
+// ── Sons UI discrets ──────────────────────────────────────────────────────────
+function _pip(freqs, dur, vol) {
+  try {
+    var a = _ac(), now = a.currentTime
+    var g = a.createGain()
+    g.gain.setValueAtTime(0, now)
+    g.gain.linearRampToValueAtTime(vol, now + 0.01)
+    g.gain.setValueAtTime(vol, now + dur - 0.02)
+    g.gain.linearRampToValueAtTime(0, now + dur)
+    g.connect(a.destination)
+    freqs.forEach(function(f) {
+      var o = a.createOscillator()
+      o.type = 'sine'; o.frequency.value = f
+      o.connect(g); o.start(now); o.stop(now + dur)
+    })
+  } catch(e) { console.warn('[Audio]', e.message) }
+}
+
+var _DT = {
+  '1':[697,1209],'2':[697,1336],'3':[697,1477],
+  '4':[770,1209],'5':[770,1336],'6':[770,1477],
+  '7':[852,1209],'8':[852,1336],'9':[852,1477],
+  '*':[941,1209],'0':[941,1336],'#':[941,1477],'+':[941,1336]
+}
+window.vfDTMF    = function(k) { var f=_DT[String(k)]; if(f) _pip(f, 0.09, 0.12) }
+window.vfConnect = function()  { _pip([880,1100], 0.15, 0.12) }
+window.vfHangup  = function()  {
+  try {
+    var a=_ac(), now=a.currentTime, g=a.createGain()
+    g.gain.setValueAtTime(0.12, now)
+    g.gain.exponentialRampToValueAtTime(0.0001, now+0.3)
+    g.connect(a.destination)
+    var o=a.createOscillator(); o.type='sine'
+    o.frequency.setValueAtTime(480, now)
+    o.frequency.exponentialRampToValueAtTime(280, now+0.3)
+    o.connect(g); o.start(now); o.stop(now+0.3)
+  } catch(e) {}
+}
+
+// ── Twilio Voice ──────────────────────────────────────────────────────────────
+window.__VFDevice = null
+window.__VFCall   = null
+
+window.initTwilioDevice = async function() {
+  try {
+    if (typeof Twilio === 'undefined') {
+      console.warn('[Twilio] SDK absent — mode simulation')
+      return
+    }
+    if (window.__VFDevice && window.__VFDevice.state === 'registered') {
+      console.log('[Twilio] Device déjà enregistré')
+      return
+    }
+    // Essayer les deux routes
+    var res = null
+    try { res = await api('/api/v1/telephony/voice/token') } catch {}
+    if (!res || !res.success) {
+      try { res = await api('/api/v1/telephony/token') } catch {}
+    }
+    if (!res || !res.success || !res.data || !res.data.token) {
+      console.warn('[Twilio] Pas de token valide')
+      return
+    }
+    window.__VFDevice = new Twilio.Device(res.data.token, {
+      logLevel: 1,
+      codecPreferences: ['opus', 'pcmu']
+    })
+    window.__VFDevice.on('registered', function() {
+      console.log('[Twilio] ✓ Device enregistré — prêt')
+    })
+    window.__VFDevice.on('incoming', function(call) {
+      window.__VFCall = call
+      S._incomingNum = call.parameters.From || 'Entrant'
+      var el = document.getElementById('inc-num') || document.getElementById('incoming-num')
+      if (el) el.textContent = S._incomingNum
+      showView('incoming')
+      call.on('disconnect', window.endCallCleanup || function(){})
+      call.on('cancel', function() { showView('main') })
+    })
+    window.__VFDevice.on('error', function(err) {
+      console.error('[Twilio]', err.message)
+    })
+    window.__VFDevice.on('tokenWillExpire', async function() {
+      var r = null
+      try { r = await api('/api/v1/telephony/voice/token') } catch {}
+      if (!r || !r.success) try { r = await api('/api/v1/telephony/token') } catch {}
+      if (r && r.success && r.data) window.__VFDevice.updateToken(r.data.token)
+    })
+    await window.__VFDevice.register()
+  } catch(err) {
+    console.warn('[Twilio] Init échouée:', err.message)
+  }
+}
+
+// ── Appel sortant ─────────────────────────────────────────────────────────────
+window.makeCall = async function(toNumber) {
+  if (!toNumber) return
+  if (!window.__VFDevice || window.__VFDevice.state !== 'registered') {
+    // Fallback simulation REST
+    console.log('[Twilio] Device non prêt — fallback REST')
+    try {
+      var res = await api('/api/v1/telephony/call/outbound', {method:'POST', body:{to:toNumber}})
+      if (res && res.success) { S.callId = res.data?.call?.id || null; S.contact = res.data?.contact || null }
+    } catch {}
+    startCall(toNumber)
+    return
+  }
+  try {
+    window.__VFCall = await window.__VFDevice.connect({ params: { To: toNumber } })
+    window.__VFCall.on('accept', function() { vfConnect(); startCall(toNumber) })
+    window.__VFCall.on('disconnect', window.endCallCleanup || function(){})
+    window.__VFCall.on('error', function(e) { console.error('[Call]', e.message) })
+    startCall(toNumber)
+  } catch(err) {
+    alert('Erreur appel : ' + err.message)
+  }
+}
+
+// ── Fonctions d'appel ─────────────────────────────────────────────────────────
+window.doAnswer = function() {
+  if (window.__VFCall) { window.__VFCall.accept(); window.__VFCall.on('disconnect', window.endCallCleanup || function(){}) }
+  vfConnect()
+  startCall(S._incomingNum || 'Entrant')
+}
+window.doReject = function() {
+  if (window.__VFCall) { window.__VFCall.reject(); window.__VFCall = null }
+  showView('main')
+}
+window.hangup = async function() {
+  vfHangup()
+  if (window.__VFCall) { window.__VFCall.disconnect(); window.__VFCall = null }
+  if (window.endCallCleanup) window.endCallCleanup()
+}
+window.endCallCleanup = function() {
+  clearInterval(S.timerInt)
+  var dur = S.timerSec
+  var el = document.getElementById('wrapup-dur')
+  if (el) el.textContent = 'Durée : ' + (typeof fmtTimer === 'function' ? fmtTimer(dur) : dur + 's')
+  showView('wrapup')
+  setTimeout(async function() {
+    S.timerSec=0; S.isMuted=false; S.isOnHold=false
+    S.callId=null; S.contact=null; window.__VFCall=null
+    var di = document.getElementById('dinp') || document.getElementById('dial-input')
+    if (di) di.value = ''
+    if (typeof onDialInput === 'function') onDialInput()
+    showView('main')
+    if (typeof loadData === 'function') await loadData()
+  }, 2500)
+}
+
+// ── Touches clavier : hors appel = numérotation, pendant appel = DTMF ─────────
+window.dtmf = function(key) {
+  vfDTMF(String(key))  // son toujours
+  if (window.__VFCall) {
+    window.__VFCall.sendDigits(String(key))
+  } else {
+    var inp = document.getElementById('dinp') || document.getElementById('dial-input')
+    if (inp) {
+      inp.value += key
+      if (typeof onDialInput === 'function') onDialInput()
+    }
+  }
+}
+
+// ── callNum — utilise le bon ID input ─────────────────────────────────────────
+window.callNum = async function(num) {
+  var inp = document.getElementById('dinp') || document.getElementById('dial-input')
+  var to = (num || (inp ? inp.value : '') || '').trim()
+  if (!to) return
+  await window.makeCall(to)
+}
+
+// ── Auto-init au chargement ───────────────────────────────────────────────────
+setTimeout(async function() {
+  // Patcher loadData pour init Twilio après chaque chargement
+  if (typeof loadData === 'function' && !loadData._vfPatched) {
+    var _orig = loadData
+    window.loadData = async function() {
+      await _orig()
+      if (!window.__VFDevice || window.__VFDevice.state !== 'registered') {
+        await window.initTwilioDevice()
+      }
+    }
+    window.loadData._vfPatched = true
+  }
+  // Init immédiat si déjà connecté
+  if (window.S && window.S.token) {
+    await window.initTwilioDevice()
+  }
+  console.log('[VoxFlow] ✓ Sons + Twilio Voice prêts')
+}, 500)
+</script>
+
 </body>
 </html>

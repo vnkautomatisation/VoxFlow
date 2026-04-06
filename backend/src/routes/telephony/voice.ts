@@ -1,0 +1,81 @@
+import { Router, Request, Response } from 'express'
+import { authenticate, AuthRequest } from '../../middleware/auth'
+import { twilioService } from '../../services/twilio/twilio.service'
+import { supabaseAdmin } from '../../config/supabase'
+import { sendSuccess, sendError } from '../../utils/response'
+
+const router = Router()
+const BACKEND = () => process.env.BACKEND_URL || 'http://localhost:4000'
+const getOrgId = (req: AuthRequest) =>
+  req.user?.organizationId || String(req.query.orgId || '')
+
+// ════════════════════════════════════════════════════════════
+//  GET /voice/token  — JWT pour Twilio.Device (dialer)
+// ════════════════════════════════════════════════════════════
+router.get('/voice/token', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const identity = req.user!.userId
+    const token    = await twilioService.generateToken(identity, getOrgId(req))
+    sendSuccess(res, { token, identity, configured: true })
+  } catch (err: any) {
+    // Fallback demo si Twilio pas configuré
+    sendSuccess(res, { token: 'demo_' + Date.now(), identity: req.user!.userId, configured: false })
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+//  POST /voice  — TwiML appels sortants (appelé par Twilio)
+//  Configurer dans TwiML App → Voice Request URL
+// ════════════════════════════════════════════════════════════
+router.post('/voice', async (req: Request, res: Response) => {
+  try {
+    const { To, From } = req.body
+    const twiml = new (require('twilio').twiml.VoiceResponse)()
+
+    if (To) {
+      const dial = twiml.dial({
+        callerId: process.env.TWILIO_PHONE_NUMBER || From,
+        record:   'record-from-answer',
+        recordingStatusCallback: BACKEND() + '/api/v1/telephony/voice/recording',
+      })
+
+      if (To.startsWith('client:')) {
+        dial.client(To.replace('client:', ''))
+      } else {
+        dial.number(To)
+      }
+    } else {
+      twiml.say({ language: 'fr-FR' }, 'Bienvenue chez VoxFlow.')
+    }
+
+    res.set('Content-Type', 'text/xml')
+    res.send(twiml.toString())
+  } catch (err: any) {
+    console.error('[TwiML /voice error]', err.message)
+    res.set('Content-Type', 'text/xml')
+    res.send('<?xml version="1.0"?><Response><Say>Erreur.</Say></Response>')
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+//  POST /voice/recording  — Callback enregistrement
+// ════════════════════════════════════════════════════════════
+router.post('/voice/recording', async (req: Request, res: Response) => {
+  try {
+    const { CallSid, RecordingUrl, RecordingDuration } = req.body
+    console.log('[Twilio] Enregistrement prêt:', { CallSid, RecordingUrl, RecordingDuration })
+
+    if (CallSid && RecordingUrl) {
+      await supabaseAdmin.from('calls')
+        .update({ recording_url: RecordingUrl })
+        .eq('twilio_sid', CallSid)
+    }
+
+    res.sendStatus(200)
+  } catch (err: any) {
+    console.error('[Recording callback error]', err.message)
+    res.sendStatus(200)
+  }
+})
+
+export default router

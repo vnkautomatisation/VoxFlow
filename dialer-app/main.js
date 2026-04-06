@@ -54,6 +54,7 @@ function createWindow() {
       preload:          path.join(__dirname, 'src', 'preload.js'),
       contextIsolation: true,
       nodeIntegration:  false,
+      allowRunningInsecureContent: false,
     },
   })
 
@@ -97,6 +98,17 @@ function createWindow() {
   }
 
   mainWindow.on('close', e => { e.preventDefault(); mainWindow.hide() })
+
+  // Permissions micro + audio pour le waveform et Twilio WebRTC
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['media', 'audioCapture', 'microphone', 'notifications']
+    callback(allowed.includes(permission))
+  })
+
+  mainWindow.webContents.session.setPermissionCheckHandler((webContents, permission) => {
+    const allowed = ['media', 'audioCapture', 'microphone', 'notifications']
+    return allowed.includes(permission)
+  })
   app.setAppUserModelId('io.voxflow.dialer')
 }
 

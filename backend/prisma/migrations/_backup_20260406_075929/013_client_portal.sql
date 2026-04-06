@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS extensions (
   organization_id  TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   extension_number TEXT NOT NULL,
   label            TEXT NOT NULL DEFAULT '',
-  did_number       TEXT REFERENCES phone_numbers(id) ON DELETE SET NULL,
+  did_number       TEXT REFERENCES phone_numbers(number) ON DELETE SET NULL,
   user_id          TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW(),

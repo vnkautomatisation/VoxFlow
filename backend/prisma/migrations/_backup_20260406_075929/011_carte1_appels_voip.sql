@@ -32,4 +32,3 @@ CREATE INDEX IF NOT EXISTS idx_voicemails_status ON voicemails(status);
 CREATE INDEX IF NOT EXISTS idx_calls_twilio_sid ON calls(twilio_sid);
 
 SELECT 'Migration 011 Appels VoIP Reels executee !' AS message;
-
