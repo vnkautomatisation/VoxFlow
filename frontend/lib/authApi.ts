@@ -93,3 +93,4 @@ export const onboardingApi = {
   step5: (token: string) =>
     apiRequest<any>("/api/v1/onboarding/step/5", { method: "POST", token }),
 }
+

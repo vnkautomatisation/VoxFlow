@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useCallback, useState } from "react"
 import { Phone } from "lucide-react"
@@ -25,7 +25,7 @@ export default function DialerButton() {
       `location=no`, `status=no`,
     ].join(",")
 
-    const w = window.open("/VoxFlow-Dialer.html", "VoxFlowDialer", feat)
+    const w = window.open('/dialer', '_blank', 'width=380,height=720')
     if (w) { setWin(w); setOpen2(true); w.focus() }
   }, [win])
 

@@ -1,9 +1,9 @@
-﻿// VoxFlow Dialer Service Worker
+// VoxFlow Dialer Service Worker
 const CACHE = 'voxflow-dialer-v1'
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['/VoxFlow-Dialer.html', '/dialer-manifest.json']))
+    caches.open(CACHE).then(c => c.addAll(['//dialer', '/dialer-manifest.json']))
   )
   self.skipWaiting()
 })

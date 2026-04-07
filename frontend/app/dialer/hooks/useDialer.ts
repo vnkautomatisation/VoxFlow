@@ -1,0 +1,768 @@
+'use client'
+import { useRef, useState, useCallback, useEffect } from 'react'
+import { useAuthStore } from '@/store/authStore'
+
+// ── Types ───────────────────────────────────────────────────────
+export type ViewId = 'login' | 'incoming' | 'calling' | 'main' | 'wrapup'
+export type TabId = 'dialer' | 'queue' | 'agents' | 'history' | 'voicemails' | 'search'
+export type PanelId = 'xfer' | 'notes' | 'kpad' | null
+export type XferType = 'blind' | 'attended' | 'conf'
+export type HistFilter = 'all' | 'INBOUND' | 'OUTBOUND' | 'MISSED'
+
+export interface Contact {
+    id?: string; first_name: string; last_name: string
+    company?: string; phone?: string; email?: string
+    pipeline_stage?: string; total_calls?: number
+    last_call?: string; tags?: string[]
+}
+
+export interface CallRecord {
+    id: string; direction: 'INBOUND' | 'OUTBOUND'; status: string
+    from_number: string; to_number: string; duration: number
+    started_at: string; ended_at?: string; notes?: string
+    contact?: Contact; twilio_sid?: string; recording_url?: string
+}
+
+export interface AgentInfo {
+    id: string; name?: string; first_name?: string; last_name?: string
+    extension?: string; ext?: string; status: string
+    current_call?: boolean; current_call_number?: string; call_duration?: number
+}
+
+export interface QueueEntry {
+    id: string; from_number: string; caller_name?: string
+    status?: string; wait_seconds?: number; duration?: number
+    agent_name?: string; agent_id?: string
+}
+
+export interface VoicemailRecord {
+    id: string; from_number: string; recording_url?: string
+    transcription?: string; duration?: number; status: string
+    created_at: string; contact?: Contact
+}
+
+// ── Couleurs avatars ────────────────────────────────────────────
+export const ACP: [string, string][] = [
+    ['#2d1a80', '#3d1fa3'], ['#1a356b', '#1a4d8f'], ['#1a4d3a', '#1a6b54'],
+    ['#4d1a5a', '#6b1a80'], ['#4d2a1a', '#6b3a1a'], ['#1a3a4d', '#1a5270'], ['#3a4d1a', '#506b1a']
+]
+
+// ── Utils ───────────────────────────────────────────────────────
+export const fmtT = (s: number) =>
+    String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0')
+
+export const fmtD = (dt?: string) => {
+    if (!dt) return ''
+    const d = new Date(dt), df = (Date.now() - d.getTime()) / 1000
+    if (df < 60) return "À l'instant"
+    if (df < 3600) return Math.floor(df / 60) + 'min'
+    if (df < 86400) return Math.floor(df / 3600) + 'h'
+    return d.toLocaleDateString('fr-CA', { day: '2-digit', month: 'short' })
+}
+
+export const ini = (s: string) =>
+    s.split(' ').map(w => w[0] || '').join('').substring(0, 2).toUpperCase()
+
+export const avatarGrad = (name: string) => {
+    const i = (name.charCodeAt(0) || 0) % ACP.length
+    return `linear-gradient(135deg,${ACP[i][0]},${ACP[i][1]})`
+}
+
+// ── Système audio ───────────────────────────────────────────────
+const DTMF_FREQS: Record<string, [number, number]> = {
+    '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+    '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+    '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+    '*': [941, 1209], '0': [941, 1336], '#': [941, 1477], '+': [941, 1336]
+}
+
+let _audioCtx: AudioContext | null = null
+
+function getAC(): AudioContext {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    if (_audioCtx.state === 'suspended') _audioCtx.resume()
+    return _audioCtx
+}
+
+function pip(freqs: number[], dur: number, vol: number) {
+    try {
+        const a = getAC(), now = a.currentTime
+        const g = a.createGain()
+        g.gain.setValueAtTime(0, now)
+        g.gain.linearRampToValueAtTime(vol, now + 0.01)
+        g.gain.setValueAtTime(vol, now + dur - 0.02)
+        g.gain.linearRampToValueAtTime(0, now + dur)
+        g.connect(a.destination)
+        freqs.forEach(f => {
+            const o = a.createOscillator()
+            o.type = 'sine'; o.frequency.value = f
+            o.connect(g); o.start(now); o.stop(now + dur)
+        })
+    } catch { }
+}
+
+export function playDTMF(k: string) { const f = DTMF_FREQS[k]; if (f) pip(f, 0.09, 0.12) }
+export function playConnect() { pip([880, 1100], 0.15, 0.12) }
+export function playHangup() {
+    try {
+        const a = getAC(), now = a.currentTime
+        const g = a.createGain()
+        g.gain.setValueAtTime(0.12, now)
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3)
+        g.connect(a.destination)
+        const o = a.createOscillator(); o.type = 'sine'
+        o.frequency.setValueAtTime(480, now)
+        o.frequency.exponentialRampToValueAtTime(280, now + 0.3)
+        o.connect(g); o.start(now); o.stop(now + 0.3)
+    } catch { }
+}
+
+// Exposer globalement pour compatibilité
+if (typeof window !== 'undefined') {
+    (window as any).vfDTMF = playDTMF
+        ; (window as any).vfConnect = playConnect
+        ; (window as any).vfHangup = playHangup
+}
+
+// ── Waveform ────────────────────────────────────────────────────
+let _stopLocalWF: (() => void) | null = null
+let _stopRemoteWF: (() => void) | null = null
+
+function drawWave(canvas: HTMLCanvasElement, analyser: AnalyserNode, color: string) {
+    const W = canvas.width = canvas.offsetWidth * window.devicePixelRatio
+    const H = canvas.height = canvas.offsetHeight * window.devicePixelRatio
+    const ctx = canvas.getContext('2d')!
+    const buf = new Uint8Array(analyser.frequencyBinCount)
+    let rafId: number
+
+    function frame() {
+        rafId = requestAnimationFrame(frame)
+        analyser.getByteTimeDomainData(buf)
+        ctx.clearRect(0, 0, W, H)
+        ctx.fillStyle = 'rgba(27,27,40,0.6)'
+        ctx.fillRect(0, 0, W, H)
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5 * devicePixelRatio
+        ctx.lineJoin = 'round'; ctx.shadowColor = color; ctx.shadowBlur = 6
+        ctx.beginPath()
+        const sw = W / buf.length; let x = 0
+        for (let i = 0; i < buf.length; i++) {
+            const y = (buf[i] / 128.0 * H) / 2
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+            x += sw
+        }
+        ctx.lineTo(W, H / 2); ctx.stroke(); ctx.shadowBlur = 0
+    }
+    frame()
+    return () => cancelAnimationFrame(rafId)
+}
+
+export function startWaveforms(call?: any) {
+    const wrap = document.getElementById('wf-wrap')
+    const cLocal = document.getElementById('wf-local') as HTMLCanvasElement
+    const cRemote = document.getElementById('wf-remote') as HTMLCanvasElement
+    if (!wrap || !cLocal || !cRemote) return
+    wrap.classList.add('on')
+    try {
+        const ac = getAC()
+
+        // ── Micro local ───────────────────────────────────────────
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+            const src = ac.createMediaStreamSource(stream)
+            const an = ac.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.8
+            src.connect(an)
+            _stopLocalWF = drawWave(cLocal, an, '#00d4aa')
+                ; (window as any).__wfLocalStream = stream
+        }).catch(() => { })
+
+        // ── Audio remote — plusieurs chemins selon version SDK ────
+        const tryRemote = (pc: RTCPeerConnection) => {
+            const receivers = pc.getReceivers?.() || []
+            const audio = receivers.find((r: any) => r.track?.kind === 'audio')
+            if (!audio) return false
+            const rs = new MediaStream([audio.track])
+            const srcR = ac.createMediaStreamSource(rs)
+            const anR = ac.createAnalyser(); anR.fftSize = 512; anR.smoothingTimeConstant = 0.8
+            srcR.connect(anR)
+            _stopRemoteWF = drawWave(cRemote, anR, '#7b61ff')
+            return true
+        }
+
+        const getPc = (call: any): RTCPeerConnection | null => {
+            // SDK 2.x
+            if (call?._mediaHandler?.version?.pc) return call._mediaHandler.version.pc
+            if (call?._mediaHandler?._peerConnection) return call._mediaHandler._peerConnection
+            // SDK 1.x / autres
+            if (call?.conn?._pc) return call.conn._pc
+            if (call?._pc) return call._pc
+            // Chercher récursivement dans les propriétés
+            for (const key of Object.keys(call || {})) {
+                const v = call[key]
+                if (v && typeof v === 'object' && typeof v.getReceivers === 'function') return v
+            }
+            return null
+        }
+
+        const pc = getPc(call)
+        if (pc) {
+            if (!tryRemote(pc)) {
+                // Réessayer après 1s (connexion pas encore établie)
+                setTimeout(() => { const pc2 = getPc(call); if (pc2) tryRemote(pc2) }, 1000)
+            }
+        } else {
+            // Dernier recours : attendre 1.5s et retenter
+            setTimeout(() => {
+                const c2 = (window as any).__VFCall
+                const pc2 = getPc(c2)
+                if (pc2) tryRemote(pc2)
+            }, 1500)
+        }
+    } catch { }
+}
+
+export function stopWaveforms() {
+    document.getElementById('wf-wrap')?.classList.remove('on')
+    _stopLocalWF?.(); _stopLocalWF = null
+    _stopRemoteWF?.(); _stopRemoteWF = null
+    const stream = (window as any).__wfLocalStream
+    if (stream) { stream.getTracks().forEach((t: MediaStreamTrack) => t.stop()); (window as any).__wfLocalStream = null }
+}
+
+// ── Hook principal ──────────────────────────────────────────────
+export function useDialer() {
+    const { accessToken, isAuth, user } = useAuthStore()
+
+    // ── Session ────────────────────────────────────────────────
+    const S = useRef<any>({
+        url: 'http://localhost:4000', tok: null, role: 'AGENT',
+        ext: '201', status: 'ONLINE',
+        callId: null, twSid: null, contact: null, dir: 'OUTBOUND',
+        muted: false, hold: false, rec: false,
+        tsec: 0, tint: null, panel: null, xt: 'blind',
+        hf: 'all', poll: null, _inCo: null, _inNum: null,
+    })
+
+    // ── UI State ───────────────────────────────────────────────
+    const [view, setView] = useState<ViewId>('login')
+    const [tab, setTab] = useState<TabId>('dialer')
+    const [panel, setPanel] = useState<PanelId>(null)
+    const [agStatus, setAgStatus] = useState<'ONLINE' | 'BREAK' | 'OFFLINE'>('ONLINE')
+    const [dialNum, setDialNum] = useState('')
+    const [callTimer, setCallTimer] = useState(0)
+    const [muted, setMuted] = useState(false)
+    const [onHold, setOnHold] = useState(false)
+    const [recording, setRecording] = useState(false)
+    const [xferType, setXferType] = useState<XferType>('blind')
+    const [xferNum, setXferNum] = useState('')
+    const [notesVal, setNotesVal] = useState('')
+    const [outcome, setOutcome] = useState('Résolu ✓')
+    const [stars, setStars] = useState(0)
+    const [toast, setToast] = useState('')
+    const [histFilter, setHistFilter] = useState<HistFilter>('all')
+
+    // ── Data State ─────────────────────────────────────────────
+    const [calls, setCalls] = useState<CallRecord[]>([])
+    const [agents, setAgents] = useState<AgentInfo[]>([])
+    const [queue, setQueue] = useState<QueueEntry[]>([])
+    const [voicemails, setVoicemails] = useState<VoicemailRecord[]>([])
+    const [contact, setContact] = useState<Contact | null>(null)
+    const [incoming, setIncoming] = useState<{ from: string; co?: Contact } | null>(null)
+    const [wrapupDur, setWrapupDur] = useState(0)
+    const [qAgentsXfer, setQAgentsXfer] = useState<AgentInfo[]>([])
+    const [searchRes, setSearchRes] = useState<Contact[]>([])
+    const [loginErr, setLoginErr] = useState('')
+
+    // ── Refs ───────────────────────────────────────────────────
+    const timerRef = useRef<any>(null)
+    const pollRef = useRef<any>(null)
+    const lpdoneRef = useRef(false)
+    const lptRef = useRef<any>(null)
+
+    // ── isAdmin helper ─────────────────────────────────────────
+    const isAdmin = useCallback(() =>
+        S.current.role === 'ADMIN' || S.current.role === 'OWNER', [])
+
+    // ── Toast ──────────────────────────────────────────────────
+    const showToast = useCallback((msg: string, dur = 2500) => {
+        setToast(msg)
+        setTimeout(() => setToast(''), dur)
+    }, [])
+
+    // ── API helper ─────────────────────────────────────────────
+    const api = useCallback(async (path: string, opts: any = {}) => {
+        const r = await fetch(S.current.url + path, {
+            ...opts,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(S.current.tok ? { Authorization: 'Bearer ' + S.current.tok } : {}),
+                ...(opts.headers || {}),
+            },
+            body: opts.body ? JSON.stringify(opts.body) : undefined,
+        })
+        return r.json()
+    }, [])
+
+    // ── Auth — source de vérité = vf_tok dans localStorage ──────────
+    // Ne pas se fier à useAuthStore (Zustand) en Electron — localStorage isolé
+    useEffect(() => {
+        const tok = localStorage.getItem('vf_tok')
+        const role = localStorage.getItem('vf_role') || 'AGENT'
+        const url = localStorage.getItem('vf_url') || 'http://localhost:4000'
+
+        if (tok) {
+            // Token présent dans localStorage → connecté
+            S.current.tok = tok
+            S.current.role = role
+            S.current.url = url
+            setView('main')
+            loadData()
+            startPoll()
+        } else if (isAuth && accessToken && user) {
+            // Portail connecté (même contexte) → sync
+            S.current.tok = accessToken
+            S.current.url = url
+            S.current.role = user.role
+            localStorage.setItem('vf_tok', accessToken)
+            localStorage.setItem('vf_url', url)
+            localStorage.setItem('vf_role', user.role)
+            setView('main')
+            loadData()
+            startPoll()
+        } else {
+            S.current.tok = null
+            stopPoll()
+            setView('login')
+        }
+    }, [isAuth, accessToken, user])
+
+
+    // ── Données ────────────────────────────────────────────────
+    const loadData = useCallback(async () => {
+        try {
+            const [cr, vr] = await Promise.all([
+                api('/api/v1/telephony/calls?limit=30'),
+                api('/api/v1/telephony/voicemails'),
+            ])
+            if (cr.success) setCalls(cr.data || [])
+            if (vr.success) setVoicemails(vr.data || [])
+        } catch { }
+        try {
+            const [qr, ar] = await Promise.all([
+                api('/api/v1/queues'),
+                isAdmin() ? api('/api/v1/supervision/snapshot') : Promise.resolve({ success: false }),
+            ])
+            if (qr.success) setQueue(qr.data || [])
+            if (ar.success && ar.data) {
+                const ags = (ar.data.agentStatuses || ar.data.agents || ar.data || []).map((a: any) => ({
+                    id: a.agentId || a.id,
+                    name: a.name,
+                    first_name: a.name?.split(' ')[0],
+                    last_name: a.name?.split(' ').slice(1).join(' '),
+                    extension: a.extension || a.ext,
+                    status: a.status || 'OFFLINE',
+                    current_call: !!(a.callId),
+                    current_call_number: a.callFrom || a.callTo || null,
+                    call_duration: a.callDuration || 0,
+                }))
+                setAgents(ags)
+            }
+        } catch { }
+    }, [api, isAdmin])
+
+    const startPoll = useCallback(() => {
+        stopPoll()
+        pollRef.current = setInterval(loadData, 15000)
+    }, [loadData])
+
+    const stopPoll = useCallback(() => {
+        if (pollRef.current) clearInterval(pollRef.current)
+    }, [])
+
+    // ── Login manuel ───────────────────────────────────────────
+    const doLogin = useCallback(async (url: string, email: string, pass: string) => {
+        S.current.url = url.replace(/\/$/, '')
+        localStorage.setItem('vf_url', S.current.url)
+        setLoginErr('')
+        const r = await api('/api/v1/auth/login', { method: 'POST', body: { email, password: pass } })
+        if (r.success && r.data?.accessToken) {
+            const tok = r.data.accessToken
+            const role = r.data.user?.role || 'AGENT'
+            S.current.tok = tok
+            S.current.role = role
+            S.current.ext = r.data.user?.extension || '201'
+            // Écrire dans localStorage — source de vérité pour Electron
+            localStorage.setItem('vf_tok', tok)
+            localStorage.setItem('vf_role', role)
+            // Écrire les cookies session pour le middleware Next.js
+            try {
+                await fetch('http://localhost:3001/api/auth/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: tok, role }),
+                })
+            } catch { }
+            setView('main')
+            await loadData()
+            startPoll()
+        } else {
+            setLoginErr(r.message || 'Identifiants incorrects')
+        }
+    }, [api, loadData, startPoll])
+
+    const doLogout = useCallback(() => {
+        localStorage.removeItem('vf_tok')
+        localStorage.removeItem('vf_role')
+        S.current.tok = null
+        stopPoll()
+        setView('login')
+        setLoginErr('')
+    }, [stopPoll])
+
+    // ── Statut ─────────────────────────────────────────────────
+    const doStatus = useCallback((s: 'ONLINE' | 'BREAK' | 'OFFLINE') => {
+        setAgStatus(s)
+        S.current.status = s
+        api('/api/v1/telephony/status', { method: 'PATCH', body: { status: s } }).catch(() => { })
+    }, [api])
+
+    // ── Clavier ────────────────────────────────────────────────
+    const startLong = useCallback((e?: TouchEvent) => {
+        if (e) e.preventDefault()
+        lpdoneRef.current = false
+        lptRef.current = setTimeout(() => {
+            lpdoneRef.current = true
+            setDialNum(p => p.endsWith('0') ? p.slice(0, -1) + '+' : p + '+')
+        }, 500)
+    }, [])
+
+    const endLong = useCallback(() => {
+        if (lptRef.current) { clearTimeout(lptRef.current); lptRef.current = null }
+    }, [])
+
+    // ── Appel sortant ──────────────────────────────────────────
+    const callNum = useCallback(async (n?: string) => {
+        const to = n || dialNum
+        if (!to) return
+        S.current.contact = null; setContact(null)
+        try {
+            const r = await api('/api/v1/telephony/call/outbound', { method: 'POST', body: { to } })
+            if (r.success) {
+                S.current.callId = r.data.call?.id || null
+                S.current.twSid = r.data.call?.twilio_sid || null
+                S.current.contact = r.data.contact || null
+                setContact(r.data.contact || null)
+                S.current.dir = 'OUTBOUND'
+                startCallUI(to)
+            } else {
+                showToast(r.message || 'Erreur appel')
+            }
+        } catch { showToast('Erreur réseau') }
+
+        // Twilio WebRTC si disponible
+        const dev = (window as any).__VFDevice
+        if (dev && dev.state === 'registered') {
+            try {
+                const call = await dev.connect({ params: { To: to } })
+                    ; (window as any).__VFCall = call
+                call.on('accept', () => startCallUI(to))
+                call.on('disconnect', endCallCleanup)
+                call.on('error', (e: any) => showToast(e.message))
+            } catch (e: any) { showToast('WebRTC: ' + e.message) }
+        }
+
+        if ((window as any).electronAPI?.callStarted) (window as any).electronAPI.callStarted()
+    }, [dialNum, api, showToast])
+
+    const startCallUI = useCallback((num: string) => {
+        playConnect()
+        S.current.tsec = 0
+        setCallTimer(0)
+        setMuted(false); setOnHold(false); setRecording(false); setPanel(null)
+        setNotesVal(''); setView('calling')
+        clearInterval(timerRef.current)
+        timerRef.current = setInterval(() => {
+            S.current.tsec++
+            setCallTimer(S.current.tsec)
+        }, 1000)
+        setTimeout(() => startWaveforms((window as any).__VFCall), 500)
+    }, [])
+
+    // ── Appel entrant ──────────────────────────────────────────
+    const handleIncoming = useCallback(async (call: any) => {
+        const from = call.parameters?.From || 'Entrant'
+        S.current._inNum = from
+            ; (window as any).__VFCall = call
+        let co: Contact | undefined
+        try {
+            const r = await api('/api/v1/telephony/lookup/' + encodeURIComponent(from))
+            if (r.success && r.data?.contact) co = r.data.contact
+        } catch { }
+        S.current._inCo = co || null
+        setIncoming({ from, co })
+        setView('incoming')
+        call.on('cancel', () => { ; (window as any).__VFCall = null; setView('main') })
+    }, [api])
+
+    const doAnswer = useCallback(() => {
+        const call = (window as any).__VFCall
+        if (call) {
+            call.accept()
+            call.on('disconnect', endCallCleanup)
+        }
+        S.current.contact = incoming?.co || null
+        setContact(incoming?.co || null)
+        S.current.dir = 'INBOUND'
+        startCallUI(incoming?.from || 'Entrant')
+        setIncoming(null)
+        if ((window as any).electronAPI?.callStarted) (window as any).electronAPI.callStarted()
+    }, [incoming, startCallUI])
+
+    const doRefuse = useCallback(() => {
+        const call = (window as any).__VFCall
+        if (call) { call.reject();; (window as any).__VFCall = null }
+        setIncoming(null); setView('main')
+    }, [])
+
+    // ── Raccrocher ─────────────────────────────────────────────
+    const hangup = useCallback(async () => {
+        playHangup()
+        stopWaveforms()
+        clearInterval(timerRef.current)
+        const dur = S.current.tsec
+        const call = (window as any).__VFCall
+        if (call) { try { call.disconnect() } catch { }; (window as any).__VFCall = null }
+        if (S.current.callId) {
+            await api('/api/v1/telephony/call/' + S.current.callId + '/end', {
+                method: 'PATCH', body: { duration: dur, notes: notesVal, twilioSid: S.current.twSid || '' }
+            }).catch(() => { })
+        }
+        if ((window as any).electronAPI?.callEnded) (window as any).electronAPI.callEnded()
+        setWrapupDur(dur)
+        setStars(0)
+        setView('wrapup')
+        setTimeout(async () => {
+            S.current.callId = null; S.current.contact = null; S.current.twSid = null
+            setDialNum(''); setContact(null); setNotesVal('')
+            setView('main'); await loadData()
+        }, 3200)
+    }, [api, notesVal, loadData])
+
+    const endCallCleanup = useCallback(() => {
+        clearInterval(timerRef.current)
+        setCallTimer(0); setView('main')
+        if ((window as any).electronAPI?.callEnded) (window as any).electronAPI.callEnded()
+    }, [])
+
+    // ── Mute / Hold / Rec ──────────────────────────────────────
+    const doMute = useCallback(() => {
+        const next = !muted
+        setMuted(next); S.current.muted = next
+        const call = (window as any).__VFCall
+        if (call?.mute) call.mute(next)
+        if (S.current.callId)
+            api('/api/v1/telephony/call/' + S.current.callId + '/mute', { method: 'PATCH', body: { mute: next } }).catch(() => { })
+        showToast(next ? '🔇 Micro coupé' : '🎙️ Micro actif')
+    }, [muted, api, showToast])
+
+    const doHold = useCallback(() => {
+        const next = !onHold
+        setOnHold(next); S.current.hold = next
+        if (S.current.callId)
+            api('/api/v1/telephony/call/' + S.current.callId + '/hold', { method: 'PATCH', body: { hold: next } }).catch(() => { })
+        showToast(next ? '⏸ Appel en attente' : '▶ Appel repris')
+    }, [onHold, api, showToast])
+
+    const doRec = useCallback(() => {
+        if (!isAdmin()) { showToast('🔒 Réservé aux administrateurs'); return }
+        const next = !recording
+        setRecording(next); S.current.rec = next
+        showToast(next ? '⏺ Enregistrement démarré' : '⏹ Enregistrement arrêté')
+    }, [recording, isAdmin, showToast])
+
+    // ── Transfert ──────────────────────────────────────────────
+    const execTransfer = useCallback(async () => {
+        if (!xferNum || !S.current.callId) return
+        await api('/api/v1/telephony/call/' + S.current.callId + '/transfer', {
+            method: 'POST', body: { to: xferNum, type: xferType }
+        }).catch(() => { })
+        showToast('→ Transfert en cours…')
+        if (xferType === 'blind') setTimeout(hangup, 900)
+    }, [xferNum, xferType, api, showToast, hangup])
+
+    const xferToAgent = useCallback((ext: string) => {
+        setXferNum(ext)
+        setTimeout(execTransfer, 100)
+    }, [execTransfer])
+
+    // ── Notes ──────────────────────────────────────────────────
+    const saveNotes = useCallback(() => {
+        if (notesVal && S.current.callId)
+            api('/api/v1/telephony/call/' + S.current.callId + '/notes', {
+                method: 'PATCH', body: { notes: notesVal }
+            }).catch(() => { })
+        showToast('✓ Notes sauvegardées')
+    }, [notesVal, api, showToast])
+
+    // ── DTMF ───────────────────────────────────────────────────
+    const dtmf = useCallback((k: string) => {
+        playDTMF(k)
+        const call = (window as any).__VFCall
+        if (call?.sendDigits) call.sendDigits(k)
+    }, [])
+
+    // ── Supervision ────────────────────────────────────────────
+    const supListen = useCallback((id: string) => { showToast('👂 Écoute activée'); api('/api/v1/supervision/listen/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
+    const supWhisper = useCallback((id: string) => { showToast('🗣 Chuchotement actif'); api('/api/v1/supervision/whisper/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
+    const supBarge = useCallback((id: string) => { showToast("⚡ Vous rejoignez l'appel"); api('/api/v1/supervision/barge/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
+
+    // ── Voicemails ─────────────────────────────────────────────
+    const markRead = useCallback((id: string) => {
+        setVoicemails(v => v.map(x => x.id === id ? { ...x, status: 'LISTENED' } : x))
+        api('/api/v1/telephony/voicemail/' + id + '/listen', { method: 'PATCH' }).catch(() => { })
+    }, [api])
+
+    const playVM = useCallback((id: string, url: string) => {
+        markRead(id); playAudio(url)
+    }, [markRead])
+
+    // ── Search ─────────────────────────────────────────────────
+    const doSearch = useCallback(async (q: string) => {
+        if (!q || q.length < 2) { setSearchRes([]); return }
+        try {
+            const r = await api('/api/v1/crm/contacts?search=' + encodeURIComponent(q) + '&limit=8')
+            if (r.success) setSearchRes(r.data || [])
+        } catch { }
+    }, [api])
+
+    // ── Queue ──────────────────────────────────────────────────
+    const pickQ = useCallback((num: string) => {
+        if (num) { S.current.dir = 'INBOUND'; callNum(num) }
+    }, [callNum])
+
+    // ── Audio playback ─────────────────────────────────────────
+    const playAudio = useCallback((url: string) => {
+        if (!url) { showToast('Aucun enregistrement'); return }
+        const base = S.current.url
+        const tok = S.current.tok
+        const proxyUrl = url.includes('twilio.com') && tok
+            ? base + '/api/v1/telephony/recording-proxy?url=' + encodeURIComponent(url)
+            : url
+
+        // Créer modal audio
+        const old = document.getElementById('vf-audio-modal')
+        if (old) old.remove()
+        const m = document.createElement('div')
+        m.id = 'vf-audio-modal'
+        m.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;border-radius:20px'
+        m.innerHTML = `<div style="background:#18181f;border:1px solid #3a3a55;border-radius:16px;padding:20px;width:300px">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#55557a;margin-bottom:12px">▶ Enregistrement</div>
+      <div id="vf-audio-status" style="font-size:12px;color:#9898b8;text-align:center;padding:8px 0">Chargement...</div>
+      <audio id="vf-audio-el" controls style="width:100%;border-radius:8px;display:none"></audio>
+      <button onclick="document.getElementById('vf-audio-modal').remove()"
+        style="margin-top:12px;width:100%;background:#1f1f2a;border:1px solid #2e2e44;border-radius:8px;color:#9898b8;padding:8px;font-size:12px;cursor:pointer;font-family:var(--font)">Fermer</button>
+    </div>`
+        document.getElementById('popup')?.appendChild(m)
+
+        const h: Record<string, string> = tok ? { Authorization: 'Bearer ' + tok } : {}
+        fetch(proxyUrl, { headers: h })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob() })
+            .then(blob => {
+                const audio = document.getElementById('vf-audio-el') as HTMLAudioElement
+                const status = document.getElementById('vf-audio-status')
+                if (!audio || !status) return
+                audio.src = URL.createObjectURL(blob)
+                audio.style.display = 'block'
+                status.style.display = 'none'
+                audio.play().catch(() => { })
+            })
+            .catch(e => {
+                const status = document.getElementById('vf-audio-status')
+                if (status) { status.textContent = 'Erreur: ' + e.message; (status as any).style.color = '#ff4d6d' }
+            })
+    }, [showToast])
+
+    // ── CRM ────────────────────────────────────────────────────
+    const openCRM = useCallback(() => {
+        window.open(S.current.url.replace(':4000', ':3001') + '/admin/crm', '_blank')
+    }, [])
+
+    // ── Xfer agents list ───────────────────────────────────────
+    useEffect(() => {
+        if ((xferType === 'attended' || xferType === 'conf') && isAdmin()) {
+            setQAgentsXfer(agents.filter(a => a.status === 'ONLINE' && !a.current_call))
+        } else {
+            setQAgentsXfer([])
+        }
+    }, [xferType, agents, isAdmin])
+
+    // ── Sync logout/login temps réel avec le portail ────────────────
+    useEffect(() => {
+        // Snapshot du token au montage
+        let lastTok = localStorage.getItem('vf_tok')
+
+        const check = () => {
+            const tok = localStorage.getItem('vf_tok')
+
+            // Token supprimé → logout immédiat
+            if (lastTok && !tok) {
+                lastTok = null
+                S.current.tok = null
+                if (pollRef.current) clearInterval(pollRef.current)
+                setView('login')
+                return
+            }
+
+            // Nouveau token ou token changé → reconnexion
+            if (tok && tok !== lastTok) {
+                lastTok = tok
+                S.current.tok = tok
+                S.current.role = localStorage.getItem('vf_role') || 'AGENT'
+                S.current.url = localStorage.getItem('vf_url') || S.current.url
+                setView('main')
+            }
+        }
+
+        // Vérification toutes les 1 seconde — léger et réactif
+        const iv = setInterval(check, 1000)
+        return () => clearInterval(iv)
+    }, []) // [] = monté une fois, pas de dépendances
+
+
+    // ── Débloquer AudioContext au premier clic ───────────────────
+    useEffect(() => {
+        const unlock = () => { try { getAC() } catch { } }
+        document.addEventListener('click', unlock, { once: true })
+        document.addEventListener('touchstart', unlock, { once: true })
+        document.addEventListener('keydown', unlock, { once: true })
+    }, [])
+
+    // ── onDialNumber depuis Electron / CRM ─────────────────────
+    useEffect(() => {
+        const ea = (window as any).electronAPI
+        if (!ea?.onDialNumber) return
+        ea.removeDialListener?.()
+        ea.onDialNumber((data: any) => {
+            if (!data?.phone) return
+            setDialNum(data.phone)
+            setTimeout(() => callNum(data.phone), 300)
+        })
+    }, [callNum])
+
+    return {
+        // State
+        view, tab, panel, agStatus, dialNum, callTimer,
+        muted, onHold, recording, xferType, xferNum, notesVal, outcome,
+        stars, toast, histFilter, calls, agents, queue, voicemails,
+        contact, incoming, wrapupDur, qAgentsXfer, searchRes, loginErr,
+        // Setters
+        setView, setTab, setPanel, setDialNum, setXferType, setXferNum,
+        setNotesVal, setOutcome, setStars, setHistFilter,
+        // Actions
+        doLogin, doLogout, doStatus, callNum, doAnswer, doRefuse, hangup, handleIncoming,
+        doMute, doHold, doRec, execTransfer, xferToAgent, saveNotes,
+        dtmf, supListen, supWhisper, supBarge, markRead, playVM,
+        doSearch, pickQ, playAudio, openCRM, showToast,
+        startLong, endLong, lpdoneRef,
+        // Helpers
+        isAdmin, S,
+    }
+}
