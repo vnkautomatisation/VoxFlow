@@ -1,4 +1,4 @@
-﻿import { supabaseAdmin } from "../../config/supabase"
+import { supabaseAdmin } from "../../config/supabase"
 import { hashPassword } from "../../utils/hash"
 
 export class AdminService {
@@ -203,6 +203,63 @@ export class AdminService {
     return data
   }
 
+  async deleteIVR(ivrId: string, organizationId: string) {
+    const { error } = await supabaseAdmin
+      .from("ivr_configs")
+      .delete()
+      .eq("id", ivrId)
+      .eq("organization_id", organizationId)
+    if (error) throw new Error(error.message)
+    return { deleted: true }
+  }
+
+  // ── AUDIO FILES ───────────────────────────────────────────────
+  async getAudioFiles(organizationId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("audio_files")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+    if (error) throw new Error(error.message)
+    return data || []
+  }
+
+  async createAudioFile(organizationId: string, dto: { name: string; url: string; type?: string; duration?: number }) {
+    const { data, error } = await supabaseAdmin
+      .from("audio_files")
+      .insert({
+        name:            dto.name,
+        url:             dto.url,
+        type:            dto.type || "hold_music",
+        duration:        dto.duration || 0,
+        organization_id: organizationId,
+      })
+      .select().single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  async updateAudioFile(id: string, organizationId: string, dto: any) {
+    const { data, error } = await supabaseAdmin
+      .from("audio_files")
+      .update({ ...dto, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("organization_id", organizationId)
+      .select().single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  async deleteAudioFile(id: string, organizationId: string) {
+    const { error } = await supabaseAdmin
+      .from("audio_files")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", organizationId)
+    if (error) throw new Error(error.message)
+    return { deleted: true }
+  }
+
   async updateIVR(ivrId: string, organizationId: string, dto: any) {
     const { data, error } = await supabaseAdmin
       .from("ivr_configs")
@@ -225,6 +282,24 @@ export class AdminService {
 
     if (error) throw new Error(error.message)
     return data || []
+  }
+
+  async updateScript(id: string, organizationId: string, dto: any) {
+    const { data, error } = await supabaseAdmin
+      .from("call_scripts")
+      .update({ ...dto, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("organization_id", organizationId)
+      .select().single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  async deleteScript(id: string, organizationId: string) {
+    const { error } = await supabaseAdmin
+      .from("call_scripts").delete()
+      .eq("id", id).eq("organization_id", organizationId)
+    if (error) throw new Error(error.message)
+    return { deleted: true }
   }
 
   async createScript(organizationId: string, dto: {
@@ -264,6 +339,35 @@ export class AdminService {
     const outbound    = allCalls.filter((c: any) => c.direction === "OUTBOUND")
     const totalDur    = completed.reduce((s: number, c: any) => s + (c.duration || 0), 0)
 
+    // Stats par agent
+    const agentMap: Record<string, { id: string; calls: number; completed: number; duration: number }> = {}
+    allCalls.forEach((c: any) => {
+      if (!c.agent_id) return
+      if (!agentMap[c.agent_id]) agentMap[c.agent_id] = { id: c.agent_id, calls: 0, completed: 0, duration: 0 }
+      agentMap[c.agent_id].calls++
+      if (c.status === "COMPLETED") agentMap[c.agent_id].completed++
+      agentMap[c.agent_id].duration += c.duration || 0
+    })
+
+    // Enrichir avec les noms des agents
+    const agentIds = Object.keys(agentMap)
+    let agentNames: Record<string, string> = {}
+    if (agentIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users").select("id, name, email").in("id", agentIds)
+      ;(users || []).forEach((u: any) => { agentNames[u.id] = u.name || u.email })
+    }
+
+    const byAgent = Object.values(agentMap).map(a => ({
+      agent_id:   a.id,
+      name:       agentNames[a.id] || a.id.substring(0, 8),
+      calls:      a.calls,
+      completed:  a.completed,
+      duration:   a.duration,
+      avgDuration: a.calls > 0 ? Math.round(a.duration / a.calls) : 0,
+      resolution: a.calls > 0 ? Math.round((a.completed / a.calls) * 100) : 0,
+    })).sort((a, b) => b.calls - a.calls)
+
     return {
       period,
       totalCalls:       allCalls.length,
@@ -272,7 +376,8 @@ export class AdminService {
       outboundCalls:    outbound.length,
       avgDuration:      completed.length > 0 ? Math.round(totalDur / completed.length) : 0,
       resolutionRate:   allCalls.length > 0 ? Math.round((completed.length / allCalls.length) * 100) : 0,
-      recentCalls:      allCalls.slice(0, 10),
+      recentCalls:      allCalls.slice(0, 50),
+      byAgent,
     }
   }
 }

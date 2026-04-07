@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -4007,6 +4007,166 @@ setTimeout(async function() {
 
   console.log('[VoxFlow] Waveform prêt ✓')
 })()
+
+  // ── SUPERVISION — Rejoindre un appel depuis la page Live ─────────
+  (function() {
+    try {
+      var supChannel = new BroadcastChannel('voxflow_sync')
+      supChannel.addEventListener('message', function(e) {
+        var msg = e.data
+        if (!msg || msg.type !== 'SUPERVISION_JOIN') return
+
+        var mode      = msg.mode      // listen | whisper | barge
+        var callId    = msg.callId
+        var conf      = msg.conf
+        var simulated = msg.simulated
+
+        var modeLabels = { listen: '👂 Écoute', whisper: '🗣 Chuchoter', barge: '⚡ Intervenir' }
+        var modeColors = { listen: '#38b6ff', whisper: '#ffb547', barge: '#ff4d6d' }
+
+        // Afficher une notification dans le dialer
+        showSupervisionAlert(mode, callId, simulated)
+
+        // Si pas simulé → le dialer Twilio WebRTC doit rejoindre la conférence
+        if (!simulated && window.S && window.S.device) {
+          // Le dialer est déjà connecté via WebRTC
+          // Twilio Conference rappelle automatiquement via client:supervisor-{userId}
+          console.log('[Supervision] Mode', mode, '— en attente de l\'appel Twilio Conference...')
+        }
+      })
+    } catch(e) { console.warn('[Supervision] BroadcastChannel indisponible:', e) }
+
+    function showSupervisionAlert(mode, callId, simulated) {
+      var modeLabels = { listen: '👂 Écoute', whisper: '🗣 Chuchoter', barge: '⚡ Intervenir' }
+      var modeColors = { listen: '#38b6ff', whisper: '#ffb547', barge: '#ff4d6d' }
+      var label = modeLabels[mode] || mode
+      var color = modeColors[mode] || '#7b61ff'
+
+      // Créer/mettre à jour la bannière de supervision
+      var existing = document.getElementById('vf-sup-banner')
+      if (existing) existing.remove()
+
+      var banner = document.createElement('div')
+      banner.id = 'vf-sup-banner'
+      banner.style.cssText = [
+        'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
+        'background:' + color, 'color:#fff', 'padding:8px 16px',
+        'font-size:11px', 'font-weight:bold', 'display:flex',
+        'align-items:center', 'justify-content:space-between',
+        'font-family:DM Sans,sans-serif', 'box-shadow:0 2px 12px rgba(0,0,0,.4)'
+      ].join(';')
+
+      var statusText = simulated
+        ? label + ' ACTIF (simulé — configurez Twilio pour l\'audio réel)'
+        : label + ' ACTIF — appel Twilio Conference en cours...'
+
+      banner.innerHTML = '<span>' + statusText + '</span>' +
+        '<button onclick="document.getElementById(\'vf-sup-banner\').remove()" ' +
+        'style="background:rgba(255,255,255,.25);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10px">✕</button>'
+
+      document.body.appendChild(banner)
+
+      // Auto-fermer après 10s si simulé
+      if (simulated) setTimeout(function() { if (banner.parentNode) banner.remove() }, 10000)
+    }
+  })()
+  
+  // ── Handler dial depuis CRM / page admin ─────────────────────
+  ;(function() {
+    if (!window.electronAPI) return
+    window.electronAPI.removeDialListener()
+    window.electronAPI.onDialNumber(function(data) {
+      if (!data || !data.phone) return
+      var phone = data.phone
+      // Mettre le numero dans le champ de saisie
+      var inp = document.getElementById('dinp')
+      if (inp) {
+        inp.value = phone
+        if (typeof onDial === 'function') onDial()
+      }
+      // Lancer l'appel directement
+      if (typeof callNum === 'function') {
+        setTimeout(function() { callNum(phone) }, 300)
+      }
+      console.log('[VoxFlow] Dial depuis CRM:', phone)
+    })
+    console.log('[VoxFlow] Handler onDialNumber pret')
+  })()
+
+  // ── Bridge auth portail <-> dialer ─────────────────────────
+  ;(function() {
+    // Si vf_tok absent, lire depuis voxflow-auth (portail Zustand)
+    if (!localStorage.getItem('vf_tok')) {
+      try {
+        var portalAuth = JSON.parse(localStorage.getItem('voxflow-auth') || '{}')
+        var state = portalAuth.state || portalAuth
+        if (state.accessToken && state.isAuth) {
+          localStorage.setItem('vf_tok',  state.accessToken)
+          localStorage.setItem('vf_url',  'http://localhost:4000')
+          localStorage.setItem('vf_role', state.user?.role || 'AGENT')
+          console.log('[VoxFlow] Auth synchronisee depuis le portail:', state.user?.email)
+        }
+      } catch(e) { console.warn('[VoxFlow] Bridge auth:', e.message) }
+    }
+
+    // Ecouter les changements de voxflow-auth (portail se connecte)
+    window.addEventListener('storage', function(e) {
+      if (e.key !== 'voxflow-auth') return
+      try {
+        var state = JSON.parse(e.newValue || '{}').state || {}
+        if (state.accessToken && state.isAuth) {
+          localStorage.setItem('vf_tok',  state.accessToken)
+          localStorage.setItem('vf_url',  'http://localhost:4000')
+          localStorage.setItem('vf_role', state.user?.role || 'AGENT')
+          // Recharger le dialer si pas encore connecte
+          if (!window.S || !window.S.tok) {
+            console.log('[VoxFlow] Reconnexion depuis portail...')
+            setTimeout(function() { location.reload() }, 500)
+          }
+        } else if (!state.isAuth) {
+          // Deconnexion du portail -> deconnecter le dialer
+          localStorage.removeItem('vf_tok')
+          localStorage.removeItem('vf_role')
+        }
+      } catch(e) {}
+    })
+
+    console.log('[VoxFlow] Bridge auth portail <-> dialer actif')
+  })()
+
+  // ── Sync auth via cookie (partage avec portail localhost:3001) ──
+  ;(function() {
+    function getCookie(name) {
+      var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+      return match ? decodeURIComponent(match[2]) : null
+    }
+    var token = getCookie('vf_access_token')
+    var role  = getCookie('vf_role') || 'AGENT'
+    if (token) {
+      localStorage.setItem('vf_tok',  token)
+      localStorage.setItem('vf_url',  'http://localhost:4000')
+      localStorage.setItem('vf_role', role)
+      console.log('[VoxFlow] Token lu depuis cookie portail, role:', role)
+    }
+    // Surveiller les changements de cookie toutes les 2s
+    var lastToken = token
+    setInterval(function() {
+      var t = getCookie('vf_access_token')
+      if (t !== lastToken) {
+        lastToken = t
+        if (t) {
+          localStorage.setItem('vf_tok',  t)
+          localStorage.setItem('vf_role', getCookie('vf_role') || 'AGENT')
+          if (!window.S || !window.S.tok) setTimeout(function() { location.reload() }, 300)
+          else window.S.tok = t
+        } else {
+          localStorage.removeItem('vf_tok')
+          localStorage.removeItem('vf_role')
+          setTimeout(function() { location.reload() }, 300)
+        }
+      }
+    }, 2000)
+  })()
 </script>
 </body>
 </html>

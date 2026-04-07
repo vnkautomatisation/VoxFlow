@@ -1,4 +1,4 @@
-﻿import { Router, Response } from "express"
+import { Router, Response } from "express"
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth"
 import { adminService } from "../../services/admin/admin.service"
 import { sendSuccess, sendError } from "../../utils/response"
@@ -113,11 +113,68 @@ router.patch("/ivr/:id", async (req: AuthRequest, res: Response) => {
   } catch (err: any) { sendError(res, err.message) }
 })
 
+router.delete("/ivr/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const ivrId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    sendSuccess(res, await adminService.deleteIVR(ivrId, orgId))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+// ── AUDIO / MUSIQUE D ATTENTE ─────────────────────────────────
+router.get("/audio", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    sendSuccess(res, await adminService.getAudioFiles(orgId))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.post("/audio", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const { name, url, type, duration } = req.body
+    if (!name || !url) return sendError(res, "Nom et URL requis", 400)
+    sendSuccess(res, await adminService.createAudioFile(orgId, { name, url, type, duration }), 201)
+  } catch (err: any) { sendError(res, err.message, 400) }
+})
+
+router.patch("/audio/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    sendSuccess(res, await adminService.updateAudioFile(id, orgId, req.body))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.delete("/audio/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    sendSuccess(res, await adminService.deleteAudioFile(id, orgId))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
 // ── SCRIPTS ───────────────────────────────────────────────────
 router.get("/scripts", async (req: AuthRequest, res: Response) => {
   try {
     const orgId = getOrgId(req)
     sendSuccess(res, await adminService.getScripts(orgId))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.patch("/scripts/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    sendSuccess(res, await adminService.updateScript(id, orgId, req.body))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.delete("/scripts/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    sendSuccess(res, await adminService.deleteScript(id, orgId))
   } catch (err: any) { sendError(res, err.message) }
 })
 
