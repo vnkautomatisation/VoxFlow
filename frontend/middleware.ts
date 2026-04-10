@@ -19,7 +19,7 @@ const DASHBOARD: Record<string, string> = {
   AGENT:      '/agent/dashboard',
 }
 
-const PUBLIC = /^\/(login|register|forgot-password|reset-password|verify-email|onboarding)/
+const PUBLIC = /^\/(login|register|forgot-password|reset-password|verify-email|onboarding|callback)/
 
 function decodeJwt(token: string): Record<string, any> | null {
   try {

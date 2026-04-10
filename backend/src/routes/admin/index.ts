@@ -5,10 +5,21 @@ import { sendSuccess, sendError } from "../../utils/response"
 
 const router = Router()
 router.use(authenticate)
-router.use(authorize("ADMIN", "OWNER", "SUPERVISOR"))
+// Accès au portail admin: ADMIN + SUPERVISOR de leur org. OWNER et
+// OWNER_STAFF peuvent aussi accéder mais voient uniquement LEUR PROPRE
+// organisation (l'org VNK interne). Pour gérer un client, l'OWNER doit
+// passer par /api/v1/owner/organizations (routes séparées avec auth own).
+router.use(authorize("ADMIN", "SUPERVISOR", "OWNER", "OWNER_STAFF" as any))
 
+/**
+ * Récupère l'organizationId strictement depuis le JWT décodé.
+ * Plus de fallback sur req.query.orgId — ça créait une faille potentielle
+ * où un attaquant pouvait tenter de passer ?orgId=OTHER_ORG pour accéder
+ * aux données d'une autre organisation. La source de vérité est le JWT
+ * signé, qui contient l'organization_id liée au user authentifié.
+ */
 const getOrgId = (req: AuthRequest): string => {
-  return String(req.user?.organizationId || req.query.orgId || "")
+  return String(req.user?.organizationId || "")
 }
 
 // Stats

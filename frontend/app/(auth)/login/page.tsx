@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore, getDashboardRoute } from '@/store/authStore'
 import { authApi } from '@/lib/authApi'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -11,8 +12,10 @@ export default function LoginPage() {
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [remember, setRemember] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [ssoLoading, setSsoLoading] = useState<'google' | 'azure' | null>(null)
     const [error, setError] = useState('')
 
     // Charger les credentials sauvegardés
@@ -59,6 +62,40 @@ export default function LoginPage() {
             setError('Erreur de connexion au serveur')
         } finally {
             setLoading(false)
+        }
+    }
+
+    // ── SSO OAuth handler (Google / Microsoft) ────────────────
+    const handleSSO = async (provider: 'google' | 'azure') => {
+        setError('')
+        setSsoLoading(provider)
+        try {
+            const supabase = createClient()
+            const redirectTo = `${window.location.origin}/callback`
+            const { error: oauthError } = await supabase.auth.signInWithOAuth({
+                provider,
+                options: {
+                    redirectTo,
+                    queryParams: provider === 'google'
+                        ? { access_type: 'offline', prompt: 'consent' }
+                        : undefined,
+                },
+            })
+            if (oauthError) {
+                const providerLabel = provider === 'google' ? 'Google' : 'Microsoft'
+                // Messages d'erreur fréquents: provider not enabled
+                if (oauthError.message?.toLowerCase().includes('not enabled') ||
+                    oauthError.message?.toLowerCase().includes('provider')) {
+                    setError(`${providerLabel} SSO n'est pas configuré. Activez-le dans Supabase → Authentication → Providers.`)
+                } else {
+                    setError(`Erreur SSO ${providerLabel}: ${oauthError.message}`)
+                }
+                setSsoLoading(null)
+            }
+            // Si pas d'erreur → redirect automatique vers le provider
+        } catch (err: any) {
+            setError(err?.message || 'Erreur de connexion SSO')
+            setSsoLoading(null)
         }
     }
 
@@ -110,14 +147,34 @@ export default function LoginPage() {
                             <label className="block text-[10px] text-[#55557a] font-bold uppercase tracking-wider mb-1.5">
                                 Mot de passe
                             </label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                required
-                                className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-[#eeeef8] text-sm outline-none focus:border-[#7b61ff] transition-colors placeholder:text-[#35355a]"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                    className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 pr-10 text-[#eeeef8] text-sm outline-none focus:border-[#7b61ff] transition-colors placeholder:text-[#35355a]"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#55557a] hover:text-[#9898b8] transition-colors"
+                                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                                >
+                                    {showPassword ? (
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                            <line x1="1" y1="1" x2="23" y2="23" />
+                                        </svg>
+                                    ) : (
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                            <circle cx="12" cy="12" r="3" />
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Se souvenir + Mot de passe oublié */}
@@ -148,7 +205,7 @@ export default function LoginPage() {
                         {/* Bouton connexion */}
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || ssoLoading !== null}
                             className="w-full bg-[#7b61ff] hover:bg-[#6145ff] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-sm transition-all mt-2"
                         >
                             {loading ? (
@@ -164,10 +221,69 @@ export default function LoginPage() {
 
                     </form>
 
-                    {/* Séparateur + info rôles */}
-                    <div className="mt-6 pt-5 border-t border-[#2e2e44]">
-                        <p className="text-[10px] text-[#35355a] text-center">
-                            L'accès est limité selon votre rôle (Owner · Admin · Agent)
+                    {/* Séparateur SSO */}
+                    <div className="my-6 flex items-center gap-3">
+                        <div className="flex-1 h-px bg-[#2e2e44]" />
+                        <span className="text-[10px] text-[#55557a] font-bold uppercase tracking-widest">ou</span>
+                        <div className="flex-1 h-px bg-[#2e2e44]" />
+                    </div>
+
+                    {/* Boutons SSO */}
+                    <div className="space-y-2">
+                        <button
+                            type="button"
+                            onClick={() => handleSSO('google')}
+                            disabled={loading || ssoLoading !== null}
+                            className="w-full flex items-center justify-center gap-3 bg-[#1f1f2a] border border-[#2e2e44] text-[#eeeef8] font-medium py-2.5 rounded-lg text-sm hover:bg-[#2e2e44] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {ssoLoading === 'google' ? (
+                                <svg className="animate-spin w-4 h-4 text-[#7b61ff]" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            ) : (
+                                <svg width="16" height="16" viewBox="0 0 48 48">
+                                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
+                                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+                                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
+                                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
+                                </svg>
+                            )}
+                            <span>{ssoLoading === 'google' ? 'Redirection...' : 'Continuer avec Google'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSSO('azure')}
+                            disabled={loading || ssoLoading !== null}
+                            className="w-full flex items-center justify-center gap-3 bg-[#1f1f2a] border border-[#2e2e44] text-[#eeeef8] font-medium py-2.5 rounded-lg text-sm hover:bg-[#2e2e44] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {ssoLoading === 'azure' ? (
+                                <svg className="animate-spin w-4 h-4 text-[#7b61ff]" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                            ) : (
+                                <svg width="16" height="16" viewBox="0 0 23 23">
+                                    <path fill="#F35325" d="M1 1h10v10H1z" />
+                                    <path fill="#81BC06" d="M12 1h10v10H12z" />
+                                    <path fill="#05A6F0" d="M1 12h10v10H1z" />
+                                    <path fill="#FFBA08" d="M12 12h10v10H12z" />
+                                </svg>
+                            )}
+                            <span>{ssoLoading === 'azure' ? 'Redirection...' : 'Continuer avec Microsoft'}</span>
+                        </button>
+                    </div>
+
+                    {/* CTA Register trial */}
+                    <div className="mt-6 pt-5 border-t border-[#2e2e44] text-center">
+                        <p className="text-xs text-[#9898b8]">
+                            Nouveau sur VoxFlow ?{' '}
+                            <a href="/register" className="text-[#7b61ff] hover:text-[#6145ff] font-bold transition-colors">
+                                Essai gratuit 14 jours
+                            </a>
+                        </p>
+                        <p className="text-[10px] text-[#35355a] mt-2">
+                            Sans carte de crédit · Annulation à tout moment
                         </p>
                     </div>
                 </div>
