@@ -177,12 +177,12 @@ export default function ScriptsPage() {
                 </div>
             )}
 
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-xl font-bold text-[#eeeef8]">Scripts d'appel</h1>
                     <div className="text-xs text-[#55557a] mt-0.5">{scripts.length} script{scripts.length > 1 ? 's' : ''}</div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <button onClick={() => setShowTemplates(true)}
                         className="flex items-center gap-2 text-[10px] font-bold text-[#9898b8] border border-[#2e2e44] bg-[#18181f] px-3 py-2 rounded-lg hover:text-[#eeeef8] hover:border-[#3a3a55] transition-colors">
                         <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>

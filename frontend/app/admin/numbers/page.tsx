@@ -85,13 +85,13 @@ export default function NumbersPage() {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-xl font-bold text-[#eeeef8]">Numéros DID</h1>
                     <div className="text-xs text-[#55557a] mt-0.5">{numbers.length} numéro{numbers.length > 1 ? 's' : ''} Twilio</div>
                 </div>
                 <button onClick={() => window.open(`${window.location.origin}/client/numbers`, '_blank')}
-                    className="flex items-center gap-2 bg-[#7b61ff] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#6145ff] transition-colors">
+                    className="self-start sm:self-auto flex items-center gap-2 bg-[#7b61ff] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#6145ff] transition-colors">
                     <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                     Commander un numéro
                 </button>
@@ -110,7 +110,7 @@ export default function NumbersPage() {
                 <div className="space-y-3">
                     {numbers.map(n => (
                         <div key={n.sid} className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden hover:border-[#3a3a55] transition-all">
-                            <div className="flex items-center gap-4 px-5 py-4">
+                            <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4">
                                 {/* Icône téléphone */}
                                 <div className="w-10 h-10 rounded-xl bg-[#7b61ff]/15 border border-[#7b61ff]/30 flex items-center justify-center flex-shrink-0">
                                     <svg width="18" height="18" fill="none" stroke="#7b61ff" strokeWidth="2" viewBox="0 0 24 24">
@@ -120,16 +120,16 @@ export default function NumbersPage() {
 
                                 {/* Infos numéro */}
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-bold text-[#eeeef8] font-mono text-lg">{n.phoneNumber}</span>
-                                        <span className="text-xs text-[#55557a]">{n.friendlyName}</span>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-[#eeeef8] font-mono text-base sm:text-lg">{n.phoneNumber}</span>
                                         <span className="text-[9px] font-bold bg-emerald-400/15 text-emerald-400 border border-emerald-400/30 px-2 py-0.5 rounded-full">ACTIF</span>
                                     </div>
+                                    <span className="text-[10px] text-[#55557a] truncate block">{n.friendlyName}</span>
                                 </div>
 
                                 {/* Bouton assigner */}
                                 <button onClick={() => { setSelected(n); setAssign({ ivr: '', queue: '', agentId: '' }) }}
-                                    className="text-[10px] font-bold text-violet-400 border border-violet-400/30 bg-violet-400/10 px-3 py-1.5 rounded-lg hover:bg-violet-400/20 transition-colors">
+                                    className="text-[10px] font-bold text-violet-400 border border-violet-400/30 bg-violet-400/10 px-3 py-1.5 rounded-lg hover:bg-violet-400/20 transition-colors flex-shrink-0">
                                     Assigner
                                 </button>
                             </div>
