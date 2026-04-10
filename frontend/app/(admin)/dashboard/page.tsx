@@ -10,7 +10,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!isAuth) router.push('/login')
-    if (user?.role === 'OWNER') router.push('/owner/dashboard')
+    if (user?.role === 'OWNER' || user?.role === 'OWNER_STAFF') router.push('/owner/dashboard')
   }, [isAuth, user, router])
 
   if (!user) return null

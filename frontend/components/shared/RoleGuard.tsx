@@ -9,10 +9,11 @@ interface Props {
 }
 
 const DASHBOARD: Record<string, string> = {
-    OWNER: '/owner/dashboard',
-    ADMIN: '/admin/dashboard',
-    SUPERVISOR: '/agent/dashboard',
-    AGENT: '/agent/dashboard',
+    OWNER:       '/owner/dashboard',
+    OWNER_STAFF: '/owner/dashboard',
+    ADMIN:       '/admin/dashboard',
+    SUPERVISOR:  '/agent/dashboard',
+    AGENT:       '/agent/dashboard',
 }
 
 export default function RoleGuard({ allowedRoles, children }: Props) {
