@@ -350,11 +350,12 @@ export default function ReportsPage() {
                 {filteredCalls.length === 0 ? (
                     <div className="py-10 text-center text-[#55557a] text-sm">Aucun appel sur cette période</div>
                 ) : (
-                    <table className="w-full">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[700px]">
                         <thead>
                             <tr className="bg-[#1f1f2a] border-b border-[#2e2e44]">
                                 {['Direction', 'Statut', 'Durée', 'Agent', 'Date', 'Heure'].map(h => (
-                                    <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a]">{h}</th>
+                                    <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a] whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -385,13 +386,14 @@ export default function ReportsPage() {
                                                 {agentName}
                                             </button>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-[#55557a]">{fmtD(c.started_at)}</td>
-                                        <td className="px-4 py-3 text-xs text-[#55557a]">{fmtH(c.started_at)}</td>
+                                        <td className="px-4 py-3 text-xs text-[#55557a] whitespace-nowrap">{fmtD(c.started_at)}</td>
+                                        <td className="px-4 py-3 text-xs text-[#55557a] whitespace-nowrap">{fmtH(c.started_at)}</td>
                                     </tr>
                                 )
                             })}
                         </tbody>
                     </table>
+                  </div>
                 )}
             </div>
 

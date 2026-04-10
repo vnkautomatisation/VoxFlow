@@ -483,11 +483,12 @@ export default function LivePage() {
                             Appels actifs ({calls.length})
                         </div>
                     </div>
-                    <table className="w-full">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
                         <thead>
                             <tr className="bg-[#1f1f2a] border-b border-[#2e2e44]">
                                 {['Direction', 'Numero', 'Contact', 'Agent', 'Duree', 'Statut', 'Actions'].map(h => (
-                                    <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a]">{h}</th>
+                                    <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a] whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -527,6 +528,7 @@ export default function LivePage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
 

@@ -122,7 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 return (
                                     <button key={group.label}
                                         onClick={() => router.push(group.href!)}
-                                        className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg whitespace-nowrap transition-all
+                                        className={`text-[10px] font-bold uppercase tracking-wider px-2 xl:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all
                       ${isActive
                                                 ? 'bg-[#7b61ff]/15 text-[#eeeef8] border border-[#7b61ff]/30'
                                                 : 'text-[#55557a] hover:text-[#9898b8] hover:bg-[#1f1f2a]'}`}>
@@ -195,15 +195,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="flex-1 lg:hidden" />
 
                     {/* User + déconnexion — DESKTOP uniquement */}
-                    <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
-                        <div className="text-right">
-                            <div className="text-xs font-semibold text-[#eeeef8] leading-tight">{userName}</div>
+                    <div className="hidden lg:flex items-center gap-2 xl:gap-3 flex-shrink-0 ml-2">
+                        <div className="text-right hidden xl:block">
+                            <div className="text-xs font-semibold text-[#eeeef8] leading-tight truncate max-w-[140px]">{userName}</div>
                             <div className="text-[9px] font-bold uppercase tracking-wider text-[#7b61ff]">{user?.role}</div>
+                        </div>
+                        {/* Avatar compact lg → xl */}
+                        <div className="xl:hidden w-7 h-7 rounded-full bg-[#7b61ff]/20 border border-[#7b61ff]/40 flex items-center justify-center text-[10px] font-bold text-[#a78bfa]" title={`${userName} · ${user?.role}`}>
+                            {userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </div>
                         <button
                             onClick={() => { useAuthStore.getState().logout?.(); router.push('/login') }}
-                            className="text-[10px] font-bold text-[#55557a] border border-[#2e2e44] px-3 py-1.5 rounded-lg hover:text-[#eeeef8] hover:border-[#3a3a55] transition-colors">
-                            Déconnexion
+                            className="text-[10px] font-bold text-[#55557a] border border-[#2e2e44] px-2.5 xl:px-3 py-1.5 rounded-lg hover:text-[#eeeef8] hover:border-[#3a3a55] transition-colors whitespace-nowrap"
+                            title="Déconnexion">
+                            <span className="hidden xl:inline">Déconnexion</span>
+                            <svg className="xl:hidden" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
                         </button>
                     </div>
 
