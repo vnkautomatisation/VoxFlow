@@ -45,7 +45,7 @@ export default function AdminDashboard() {
           ].map((m) => (
             <div key={m.label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
               <p className="text-gray-500 text-xs mb-2">{m.label}</p>
-              <p className={	ext-2xl font-bold }>{m.value}</p>
+              <p className={`${m.color} text-2xl font-bold`}>{m.value}</p>
             </div>
           ))}
         </div>

@@ -34,6 +34,25 @@ export const authApi = {
   register: (body: any) =>
     apiRequest<any>(base + "/register", { method: "POST", body }),
 
+  // ── SSO Exchange ────────────────────────────────────────────
+  // Called after a successful Supabase OAuth redirect. Passes the
+  // Supabase access_token to our backend which validates it,
+  // creates or logs in the user, and returns our own JWT.
+  ssoExchange: async (supabaseAccessToken: string, provider: 'google' | 'azure') => {
+    const res = await apiRequest<any>(base + "/sso-exchange", {
+      method: "POST",
+      body:   { supabaseAccessToken, provider },
+    })
+    if (res?.data?.accessToken) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('vf_tok', res.data.accessToken)
+        localStorage.setItem('vf_url', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000')
+      }
+      saveDialerKeys(res.data.user)
+    }
+    return res
+  },
+
   me: async (token: string) => {
     const res = await apiRequest<any>(base + "/me", { token })
     // Rafraichir les infos dialer a chaque appel /me

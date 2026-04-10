@@ -1,20 +1,19 @@
 ﻿import { Router, Response } from "express"
-import { authenticate, authorize, AuthRequest } from "../../middleware/auth"
+import { authenticate, authorize, AuthRequest, resolveOrgId } from "../../middleware/auth"
 import { supervisionService } from "../../services/supervision/supervision.service"
 import { sendSuccess, sendError } from "../../utils/response"
 
 const router = Router()
 router.use(authenticate)
-router.use(authorize("ADMIN", "OWNER", "SUPERVISOR"))
+router.use(authorize("ADMIN", "OWNER", "OWNER_STAFF" as any, "SUPERVISOR"))
 
-const getOrgId = (req: AuthRequest) => req.user?.organizationId || ""
+const getOrgId = (req: AuthRequest) => String(req.user?.organizationId || "")
 
-// GET /api/v1/supervision/snapshot -- Snapshot temps reel
+// GET /api/v1/supervision/snapshot -- Snapshot temps réel
+// OWNER / OWNER_STAFF peuvent cibler une autre org via ?orgId=X.
 router.get("/snapshot", async (req: AuthRequest, res: Response) => {
   try {
-    const orgId = req.user?.role === "OWNER"
-      ? String(req.query.orgId || getOrgId(req))
-      : getOrgId(req)
+    const orgId = resolveOrgId(req)
     sendSuccess(res, await supervisionService.getRealtimeSnapshot(orgId))
   } catch (err: any) { sendError(res, err.message) }
 })
