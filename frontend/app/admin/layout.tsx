@@ -51,6 +51,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const { isAuth, user } = useAuthStore()
     const [mounted, setMounted] = useState(false)
     const [openGroup, setOpenGroup] = useState<string | null>(null)
+    const [mobileOpen, setMobileOpen] = useState(false)
+    const [mobileExpandedGroup, setMobileExpandedGroup] = useState<string | null>(null)
     const navRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => { setMounted(true) }, [])
@@ -61,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (user?.role !== 'ADMIN' && user?.role !== 'OWNER') router.push('/login')
     }, [mounted, isAuth, user, router])
 
-    // Fermer si clic dehors
+    // Fermer dropdowns si clic dehors
     useEffect(() => {
         const fn = (e: MouseEvent) => {
             if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenGroup(null)
@@ -71,13 +73,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }, [])
 
     // Fermer sur navigation
-    useEffect(() => { setOpenGroup(null) }, [pathname])
+    useEffect(() => {
+        setOpenGroup(null)
+        setMobileOpen(false)
+        setMobileExpandedGroup(null)
+    }, [pathname])
+
+    // Auto-expand le groupe actif quand on ouvre le menu mobile
+    useEffect(() => {
+        if (mobileOpen && !mobileExpandedGroup) {
+            const active = NAV_GROUPS.find(g =>
+                g.items?.some(i => pathname.startsWith(i.href))
+            )
+            if (active) setMobileExpandedGroup(active.label)
+        }
+    }, [mobileOpen])
 
     if (!mounted || !isAuth) return null
 
     const activeGroup = NAV_GROUPS.find(g =>
         g.single ? pathname.startsWith(g.href!) : g.items?.some(i => pathname.startsWith(i.href))
     )
+
+    const userName = user?.name || user?.email?.split('@')[0] || 'Admin'
 
     return (
         <div className="min-h-screen bg-[#111118] text-[#eeeef8]">
@@ -93,8 +111,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </span>
                     </div>
 
-                    {/* Groupes */}
-                    <div className="flex items-center gap-0.5 flex-1">
+                    {/* Groupes — DESKTOP uniquement (hidden sur mobile) */}
+                    <div className="hidden lg:flex items-center gap-0.5 flex-1">
                         {NAV_GROUPS.map(group => {
                             const isActive = activeGroup?.label === group.label
                             const isOpen = openGroup === group.label
@@ -125,7 +143,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                                 ? 'bg-[#7b61ff]/15 text-[#eeeef8] border border-[#7b61ff]/30'
                                                 : 'text-[#55557a] hover:text-[#9898b8] hover:bg-[#1f1f2a]'}`}>
                                         {group.label}
-                                        {/* Sous-page active */}
                                         {isActive && activePage && (
                                             <span className="text-[9px] bg-[#7b61ff]/25 text-violet-300 px-1.5 py-0.5 rounded font-bold normal-case tracking-normal">
                                                 {activePage.label}
@@ -174,12 +191,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         })}
                     </div>
 
-                    {/* User + déconnexion */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    {/* Spacer mobile pour pousser les boutons à droite */}
+                    <div className="flex-1 lg:hidden" />
+
+                    {/* User + déconnexion — DESKTOP uniquement */}
+                    <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
                         <div className="text-right">
-                            <div className="text-xs font-semibold text-[#eeeef8] leading-tight">
-                                {user?.name || user?.email?.split('@')[0] || 'Admin'}
-                            </div>
+                            <div className="text-xs font-semibold text-[#eeeef8] leading-tight">{userName}</div>
                             <div className="text-[9px] font-bold uppercase tracking-wider text-[#7b61ff]">{user?.role}</div>
                         </div>
                         <button
@@ -188,7 +206,123 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             Déconnexion
                         </button>
                     </div>
+
+                    {/* Hamburger button — MOBILE uniquement */}
+                    <button
+                        onClick={() => setMobileOpen(!mobileOpen)}
+                        className="lg:hidden text-[#9898b8] hover:text-[#eeeef8] p-1.5 rounded-lg hover:bg-[#1f1f2a] transition-colors"
+                        aria-label="Menu"
+                    >
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            {mobileOpen ? (
+                                <>
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </>
+                            ) : (
+                                <>
+                                    <line x1="3" y1="6" x2="21" y2="6" />
+                                    <line x1="3" y1="12" x2="21" y2="12" />
+                                    <line x1="3" y1="18" x2="21" y2="18" />
+                                </>
+                            )}
+                        </svg>
+                    </button>
                 </div>
+
+                {/* Mobile menu drawer — accordéon compact, visible uniquement sur mobile */}
+                {mobileOpen && (
+                    <div className="lg:hidden border-t border-[#2e2e44] bg-[#18181f] max-h-[calc(100vh-49px)] overflow-y-auto">
+                        {/* User info */}
+                        <div className="px-4 py-3 border-b border-[#2e2e44] flex items-center justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-semibold text-[#eeeef8] truncate">{userName}</div>
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-[#7b61ff] mt-0.5">{user?.role}</div>
+                            </div>
+                            <button
+                                onClick={() => { useAuthStore.getState().logout?.(); router.push('/login') }}
+                                className="text-[10px] font-bold text-rose-400 border border-rose-400/30 bg-rose-400/10 px-3 py-1.5 rounded-lg hover:bg-rose-400/20 transition-colors flex-shrink-0">
+                                Déconnexion
+                            </button>
+                        </div>
+
+                        {/* Groupes accordéon */}
+                        <div className="py-1">
+                            {NAV_GROUPS.map(group => {
+                                // Lien simple (Vue globale)
+                                if (group.single) {
+                                    const isActive = activeGroup?.label === group.label
+                                    return (
+                                        <button key={group.label}
+                                            onClick={() => router.push(group.href!)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-[#2e2e44]/50
+                                                ${isActive ? 'bg-[#7b61ff]/10 text-[#eeeef8]' : 'text-[#9898b8] hover:bg-[#1f1f2a]'}`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-[#7b61ff]' : 'bg-[#3a3a55]'}`}
+                                                style={isActive ? { boxShadow: '0 0 6px #7b61ff' } : {}} />
+                                            <span className="text-xs font-bold uppercase tracking-wider flex-1">{group.label}</span>
+                                        </button>
+                                    )
+                                }
+
+                                // Groupe accordéon — titre cliquable, items nestés
+                                const expanded  = mobileExpandedGroup === group.label
+                                const groupActive = activeGroup?.label === group.label
+                                const activeItem  = group.items?.find(i => pathname.startsWith(i.href))
+
+                                return (
+                                    <div key={group.label} className="border-b border-[#2e2e44]/50">
+                                        <button
+                                            onClick={() => setMobileExpandedGroup(expanded ? null : group.label)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors
+                                                ${groupActive ? 'bg-[#7b61ff]/10' : 'hover:bg-[#1f1f2a]'}`}
+                                        >
+                                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${groupActive ? 'bg-[#7b61ff]' : 'bg-[#3a3a55]'}`}
+                                                style={groupActive ? { boxShadow: '0 0 6px #7b61ff' } : {}} />
+                                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                                                <span className={`text-xs font-bold uppercase tracking-wider ${groupActive ? 'text-[#eeeef8]' : 'text-[#9898b8]'}`}>
+                                                    {group.label}
+                                                </span>
+                                                {groupActive && activeItem && !expanded && (
+                                                    <span className="text-[9px] font-bold text-[#7b61ff] bg-[#7b61ff]/10 px-1.5 py-0.5 rounded normal-case tracking-normal truncate">
+                                                        {activeItem.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                                                className={`text-[#55557a] transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}
+                                            >
+                                                <polyline points="6 9 12 15 18 9" />
+                                            </svg>
+                                        </button>
+
+                                        {/* Items expandés — compact, sans descriptions */}
+                                        {expanded && (
+                                            <div className="bg-[#111118]/50 border-t border-[#2e2e44]/50">
+                                                {group.items?.map(item => {
+                                                    const active = pathname.startsWith(item.href)
+                                                    return (
+                                                        <button key={item.href}
+                                                            onClick={() => router.push(item.href)}
+                                                            className={`w-full flex items-center gap-3 pl-10 pr-4 py-2.5 text-left transition-colors border-b border-[#2e2e44]/30 last:border-0
+                                                                ${active ? 'bg-[#7b61ff]/10 text-[#eeeef8]' : 'text-[#9898b8] hover:bg-[#1f1f2a]'}`}>
+                                                            <div className={`w-1 h-1 rounded-full flex-shrink-0 ${active ? 'bg-[#7b61ff]' : 'bg-[#3a3a55]'}`} />
+                                                            <span className="text-xs font-medium flex-1 truncate">{item.label}</span>
+                                                            {active && (
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7b61ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                                    <polyline points="20 6 9 17 4 12" />
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
             </nav>
 
             <DialerFAB />

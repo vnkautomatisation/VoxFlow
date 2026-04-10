@@ -150,7 +150,7 @@ export default function NumbersPage() {
             {selected && (
                 <div className="fixed inset-0 z-50 flex">
                     <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setSelected(null)} />
-                    <div className="w-[440px] bg-[#111118] border-l border-[#2e2e44] flex flex-col h-full">
+                    <div className="w-full sm:w-[440px] max-w-full bg-[#111118] border-l border-[#2e2e44] flex flex-col h-full">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2e2e44] bg-[#18181f]">
                             <div>
                                 <div className="font-bold text-[#eeeef8] font-mono">{selected.phoneNumber}</div>

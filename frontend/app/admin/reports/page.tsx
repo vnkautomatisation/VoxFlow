@@ -181,7 +181,7 @@ export default function ReportsPage() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                 {[
                     { label: 'Total appels', val: totalFiltered, color: 'text-[#eeeef8]', sub: PERIODS.find(p => p.value === period)?.label },
                     { label: 'Complétés', val: completedFiltered, color: 'text-emerald-400', sub: `${resRate}% taux` },
@@ -228,7 +228,7 @@ export default function ReportsPage() {
             </div>
 
             {/* Graphiques 3 colonnes */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
                 {/* Entrants vs Sortants */}
                 <div className="col-span-2 bg-[#18181f] border border-[#2e2e44] rounded-xl p-5">
