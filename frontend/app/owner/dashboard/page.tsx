@@ -22,7 +22,8 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     if (!isAuth || !user) { router.push("/login"); return }
-    if (user.role !== "OWNER") { router.push("/login"); return }
+    // OWNER + OWNER_STAFF partagent le portail owner
+    if (user.role !== "OWNER" && user.role !== "OWNER_STAFF") { router.push("/login"); return }
     loadData()
   }, [isAuth, user])
 

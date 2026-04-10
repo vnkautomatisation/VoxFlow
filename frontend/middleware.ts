@@ -2,21 +2,25 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // ISOLATION STRICTE — chaque role = un seul portail
+// OWNER_STAFF = staff VNK, même portail que OWNER (le filtrage des champs
+// sensibles est géré dans les pages OWNER elles-mêmes)
 const ACL: Record<string, RegExp> = {
-  OWNER:      /^\/(owner)/,
-  ADMIN:      /^\/(admin)/,
-  SUPERVISOR: /^\/(agent)/,
-  AGENT:      /^\/(agent)/,
+  OWNER:       /^\/(owner)/,
+  OWNER_STAFF: /^\/(owner)/,
+  ADMIN:       /^\/(admin)/,
+  SUPERVISOR:  /^\/(agent)/,
+  AGENT:       /^\/(agent)/,
 }
 
 // Routes accessibles par tous les roles connectes
 const SHARED = /^\/(profile|dialer|client)/
 
 const DASHBOARD: Record<string, string> = {
-  OWNER:      '/owner/dashboard',
-  ADMIN:      '/admin/dashboard',
-  SUPERVISOR: '/agent/dashboard',
-  AGENT:      '/agent/dashboard',
+  OWNER:       '/owner/dashboard',
+  OWNER_STAFF: '/owner/dashboard',
+  ADMIN:       '/admin/dashboard',
+  SUPERVISOR:  '/agent/dashboard',
+  AGENT:       '/agent/dashboard',
 }
 
 const PUBLIC = /^\/(login|register|forgot-password|reset-password|verify-email|onboarding|callback)/

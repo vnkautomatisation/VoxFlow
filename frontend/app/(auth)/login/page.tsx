@@ -35,7 +35,8 @@ export default function LoginPage() {
     useEffect(() => {
         if (isAuth && user) {
             const redirect = searchParams.get('redirect')
-            router.replace(redirect || getDashboardRoute(user.role))
+            const target = redirect || getDashboardRoute(user.role)
+            window.location.href = target
         }
     }, [isAuth, user])
 
@@ -54,7 +55,13 @@ export default function LoginPage() {
                 }
                 setAuth(res.data.user, res.data.accessToken)
                 const redirect = searchParams.get('redirect')
-                router.replace(redirect || getDashboardRoute(res.data.user.role))
+                const target = redirect || getDashboardRoute(res.data.user.role)
+                // Attendre que la cookie HTTP-only soit écrite avant la nav
+                // (sinon race condition : middleware voit pas encore le token
+                // et bounce vers /login). Un micro-délai suffit.
+                await new Promise(r => setTimeout(r, 150))
+                // Hard navigation pour garantir un fresh middleware check
+                window.location.href = target
             } else {
                 setError(res.message || 'Identifiants incorrects')
             }
@@ -71,7 +78,15 @@ export default function LoginPage() {
         setSsoLoading(provider)
         try {
             const supabase = createClient()
-            const redirectTo = `${window.location.origin}/callback`
+            // Préserver le ?redirect= à travers le round-trip OAuth.
+            // Ex: /login?redirect=/admin/crm → Google → /callback?redirect=/admin/crm
+            //     → /admin/crm après sync du JWT.
+            const redirectParam = searchParams.get('redirect')
+            const callbackBase = `${window.location.origin}/callback`
+            const redirectTo = redirectParam
+                ? `${callbackBase}?redirect=${encodeURIComponent(redirectParam)}`
+                : callbackBase
+
             const { error: oauthError } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {

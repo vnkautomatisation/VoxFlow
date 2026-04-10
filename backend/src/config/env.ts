@@ -50,6 +50,11 @@ export const config = {
     fromName:  process.env.EMAIL_FROM_NAME || 'VoxFlow',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    // Supporte plusieurs origines séparées par des virgules
+    // Ex: CORS_ORIGIN=http://localhost:3001,http://localhost:3011,https://app.voxflow.io
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3001')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean),
   },
 }

@@ -60,7 +60,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     useEffect(() => {
         if (!mounted) return
         if (!isAuth) { router.push('/login'); return }
-        if (user?.role !== 'ADMIN' && user?.role !== 'OWNER') router.push('/login')
+        // OWNER + OWNER_STAFF peuvent accéder à l'admin panel (support cross-org)
+        if (user?.role !== 'ADMIN' && user?.role !== 'SUPERVISOR' && user?.role !== 'OWNER' && user?.role !== 'OWNER_STAFF') router.push('/login')
     }, [mounted, isAuth, user, router])
 
     // Fermer dropdowns si clic dehors
