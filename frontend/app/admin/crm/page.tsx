@@ -644,12 +644,12 @@ export default function CRMPage() {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-xl font-bold text-[#eeeef8]">CRM</h1>
                     <div className="text-xs text-[#55557a] mt-0.5">{stats.total} contact{stats.total > 1 ? 's' : ''}</div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                     {/* Vue toggle */}
                     <div className="flex bg-[#18181f] border border-[#2e2e44] rounded-lg p-1">
                         <button onClick={() => setView('list')}
