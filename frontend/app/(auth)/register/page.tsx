@@ -19,31 +19,61 @@ export default function RegisterPage() {
   // ── SSO OAuth handler (Google / Microsoft) ────────────────
   // Note: l'utilisateur SSO sera automatiquement créé avec un essai
   // 14 jours dans le backend via /sso-exchange (voir auth.service.ts).
+  //
+  // Preflight: vérifie que le provider est activé dans Supabase AVANT
+  // de rediriger, sinon l'utilisateur voit le JSON brut de l'erreur.
   const handleSSO = async (provider: "google" | "azure") => {
     setError("")
     setSsoLoading(provider)
+
+    const providerLabel = provider === "google" ? "Google" : "Microsoft"
+
     try {
       const supabase = createClient()
       const redirectTo = `${window.location.origin}/callback`
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
+          skipBrowserRedirect: true, // ← on contrôle la nav
           queryParams: provider === "google"
             ? { access_type: "offline", prompt: "consent" }
             : undefined,
         },
       })
-      if (oauthError) {
-        const providerLabel = provider === "google" ? "Google" : "Microsoft"
-        if (oauthError.message?.toLowerCase().includes("not enabled") ||
-            oauthError.message?.toLowerCase().includes("provider")) {
-          setError(`${providerLabel} SSO n'est pas configuré. Activez-le dans Supabase → Authentication → Providers.`)
+
+      if (oauthError || !data?.url) {
+        const msg = (oauthError?.message || "").toLowerCase()
+        if (msg.includes("not enabled") || msg.includes("unsupported provider")) {
+          setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel}.`)
         } else {
-          setError(`Erreur SSO ${providerLabel}: ${oauthError.message}`)
+          setError(`Erreur SSO ${providerLabel}: ${oauthError?.message || "URL OAuth indisponible"}`)
         }
         setSsoLoading(null)
+        return
       }
+
+      // Preflight: détecter le 400 "provider not enabled"
+      try {
+        const preflight = await fetch(data.url, { method: "GET", redirect: "manual" })
+        if (preflight.status === 400) {
+          const body = await preflight.json().catch(() => null)
+          const errMsg = body?.msg || body?.error_description || body?.error || "Provider non configuré"
+          if (errMsg.toLowerCase().includes("not enabled") ||
+              errMsg.toLowerCase().includes("unsupported provider")) {
+            setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel} (il faut aussi renseigner le Client ID + Secret).`)
+          } else {
+            setError(`Erreur SSO ${providerLabel}: ${errMsg}`)
+          }
+          setSsoLoading(null)
+          return
+        }
+      } catch {
+        // CORS/réseau: on tente quand même
+      }
+
+      window.location.href = data.url
     } catch (err: any) {
       setError(err?.message || "Erreur de connexion SSO")
       setSsoLoading(null)
