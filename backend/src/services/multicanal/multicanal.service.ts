@@ -1,4 +1,5 @@
 ﻿import twilio from "twilio"
+import { Resend } from "resend"
 import { supabaseAdmin } from "../../config/supabase"
 
 // ── Twilio client (lazy, optionnel) ──────────────────────────────
@@ -10,6 +11,13 @@ const twilioClient = isTwilioConfigured() ? twilio(twilioAccountSid, twilioAuthT
 // Numéro d'envoi par défaut pour SMS/WhatsApp (fallback si l'org n'en a pas)
 const defaultSmsFrom      = process.env.TWILIO_SMS_FROM      || process.env.TWILIO_PHONE_NUMBER || ""
 const defaultWhatsappFrom = process.env.TWILIO_WHATSAPP_FROM || ""
+
+// ── Resend (email) — réutilise la config existante ─────────────
+const resendApiKey = process.env.RESEND_API_KEY || ""
+const isResendConfigured = () => !!resendApiKey && !resendApiKey.startsWith("re_xxx")
+const resendClient = isResendConfigured() ? new Resend(resendApiKey) : null
+const emailFrom     = process.env.EMAIL_FROM      || "noreply@voxflow.io"
+const emailFromName = process.env.EMAIL_FROM_NAME || "VoxFlow"
 
 export class MulticanalService {
 
@@ -132,7 +140,7 @@ export class MulticanalService {
   }) {
     const { data: conv } = await supabaseAdmin
       .from("conversations")
-      .select("channel, contact_id, metadata, organization_id")
+      .select("id, channel, contact_id, metadata, organization_id, subject")
       .eq("id", conversationId)
       .single()
 
@@ -239,9 +247,40 @@ export class MulticanalService {
       case "EMAIL": {
         const to = conv.metadata?.email
         if (!to) throw new Error("Email: destinataire manquant (metadata.email)")
-        // TODO: brancher SendGrid/Resend/Mailgun via env SMTP. Pour l'instant stub.
-        console.log("[Email] (stub) vers", to, ":", content.substring(0, 80))
-        return null
+        if (!resendClient) {
+          console.log("[Email] Resend non configuré — message stocké en DB uniquement vers", to)
+          return null
+        }
+
+        const rawSubject = conv.subject || conv.metadata?.subject || "Réponse VoxFlow"
+        const subject    = rawSubject.startsWith("Re:") ? rawSubject : `Re: ${rawSubject}`
+
+        // Wrap content dans un HTML minimaliste
+        const escapedContent = content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br/>")
+
+        const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#222;font-size:14px;line-height:1.5;">${escapedContent}<br/><br/><hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;"/><p style="color:#9ca3af;font-size:12px;margin:0;">Envoyé depuis VoxFlow — Plateforme SaaS Call Center</p></body></html>`
+
+        try {
+          const result = await resendClient.emails.send({
+            from:    `${emailFromName} <${emailFrom}>`,
+            to:      [to],
+            subject,
+            html,
+            text:    content,
+            replyTo: emailFrom,
+            headers: {
+              "X-VoxFlow-Conversation-Id": conv.id || "",
+              "X-VoxFlow-Message-Id":       messageId,
+            },
+          } as any)
+          return (result as any)?.data?.id || null
+        } catch (e: any) {
+          throw new Error("Email: " + (e?.message || "échec Resend"))
+        }
       }
 
       case "CHAT": {

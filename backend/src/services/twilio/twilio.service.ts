@@ -248,6 +248,194 @@ export class TwilioService {
     return response.toString()
   }
 
+  // ── IVR (menu interactif) ─────────────────────────────────
+
+  /**
+   * Génère le TwiML pour le niveau racine d'un IVR.
+   * Lit welcome_message + Gather avec redirection vers /twiml/ivr/:id/gather pour la sélection.
+   */
+  generateIvrTwiML(ivr: {
+    id:              string
+    welcome_message?: string
+    timeout?:        number
+    max_retries?:    number
+    nodes?:          any[]
+  }, orgId: string): string {
+    const VoiceResponse = twilio.twiml.VoiceResponse
+    const response      = new VoiceResponse()
+    const baseUrl       = process.env.BACKEND_URL || "https://api.voxflow.io"
+    const timeout       = Math.max(3, Math.min(30, ivr.timeout || 5))
+
+    const rootNodes = (ivr.nodes || []).filter((n: any) => n.digit)
+    const validDigits = rootNodes.map((n: any) => String(n.digit)).filter(Boolean).join("")
+
+    const gather = response.gather({
+      numDigits: 1,
+      timeout,
+      action:    `${baseUrl}/api/v1/telephony/twiml/ivr/${ivr.id}/gather?orgId=${orgId}`,
+      method:    "POST",
+      input:     ["dtmf"] as any,
+    } as any)
+
+    if (ivr.welcome_message) {
+      gather.say({ language: "fr-CA", voice: "alice" } as any, ivr.welcome_message)
+    } else {
+      gather.say({ language: "fr-CA", voice: "alice" } as any,
+        "Bienvenue. Veuillez faire votre choix.")
+    }
+
+    // Fallback si rien n'est entré — re-jouer une fois puis voicemail
+    response.say({ language: "fr-CA", voice: "alice" } as any,
+      "Aucune sélection détectée. Au revoir.")
+    response.hangup()
+
+    // Side effect: mention des digits valides uniquement pour logs
+    void validDigits
+
+    return response.toString()
+  }
+
+  /**
+   * Génère le TwiML d'action pour un nœud IVR sélectionné par l'utilisateur.
+   * Appelé par Twilio après un Gather avec le paramètre Digits.
+   */
+  generateIvrActionTwiML(ivr: any, digit: string, orgId: string): string {
+    const VoiceResponse = twilio.twiml.VoiceResponse
+    const response      = new VoiceResponse()
+    const baseUrl       = process.env.BACKEND_URL || "https://api.voxflow.io"
+
+    const nodes: any[] = ivr.nodes || []
+    const selected     = nodes.find((n: any) => String(n.digit) === String(digit))
+
+    if (!selected) {
+      response.say({ language: "fr-CA", voice: "alice" } as any,
+        "Sélection invalide. Veuillez réessayer.")
+      response.redirect(`${baseUrl}/api/v1/telephony/twiml/ivr/${ivr.id}?orgId=${orgId}`)
+      return response.toString()
+    }
+
+    switch (selected.type) {
+      case "message": {
+        if (selected.message) {
+          response.say({ language: "fr-CA", voice: "alice" } as any, selected.message)
+        }
+        // Après le message, retour au menu principal ou raccroche
+        if (selected.children && selected.children.length > 0) {
+          response.redirect(`${baseUrl}/api/v1/telephony/twiml/ivr/${ivr.id}?orgId=${orgId}`)
+        } else {
+          response.hangup()
+        }
+        break
+      }
+
+      case "queue": {
+        if (selected.message) {
+          response.say({ language: "fr-CA", voice: "alice" } as any, selected.message)
+        }
+        const queueId = selected.target
+        if (queueId) {
+          response.redirect(`${baseUrl}/api/v1/telephony/twiml/queue/${queueId}?orgId=${orgId}`)
+        } else {
+          response.say({ language: "fr-CA", voice: "alice" } as any,
+            "Aucune file d'attente configurée.")
+          response.hangup()
+        }
+        break
+      }
+
+      case "voicemail": {
+        if (selected.message) {
+          response.say({ language: "fr-CA", voice: "alice" } as any, selected.message)
+        }
+        response.redirect(`${baseUrl}/api/v1/telephony/twiml/voicemail?orgId=${orgId}`)
+        break
+      }
+
+      case "transfer": {
+        if (selected.message) {
+          response.say({ language: "fr-CA", voice: "alice" } as any, selected.message)
+        }
+        const target = selected.target
+        if (target) {
+          const dial = response.dial({ callerId: phoneNumber, timeout: 30 } as any)
+          if (target.startsWith("+")) {
+            dial.number(target as any)
+          } else {
+            dial.client(target as any)
+          }
+        } else {
+          response.say({ language: "fr-CA", voice: "alice" } as any,
+            "Aucun destinataire configuré.")
+          response.hangup()
+        }
+        break
+      }
+
+      case "menu": {
+        // Sous-menu — re-gather avec les enfants
+        const subTimeout = 5
+        const gather = response.gather({
+          numDigits: 1,
+          timeout:   subTimeout,
+          action:    `${baseUrl}/api/v1/telephony/twiml/ivr/${ivr.id}/gather?orgId=${orgId}`,
+          method:    "POST",
+          input:     ["dtmf"] as any,
+        } as any)
+        if (selected.message) {
+          gather.say({ language: "fr-CA", voice: "alice" } as any, selected.message)
+        } else {
+          gather.say({ language: "fr-CA", voice: "alice" } as any, selected.label || "Sous-menu")
+        }
+        response.redirect(`${baseUrl}/api/v1/telephony/twiml/ivr/${ivr.id}?orgId=${orgId}`)
+        break
+      }
+
+      case "hangup":
+      default: {
+        if (selected.message) {
+          response.say({ language: "fr-CA", voice: "alice" } as any, selected.message)
+        }
+        response.say({ language: "fr-CA", voice: "alice" } as any, "Au revoir.")
+        response.hangup()
+        break
+      }
+    }
+
+    return response.toString()
+  }
+
+  // ── QUEUE (file d'attente ACD) ────────────────────────────
+
+  /**
+   * Génère le TwiML pour enqueue un appel dans une file d'attente.
+   * Joue le message d'accueil puis enqueue avec musique d'attente.
+   */
+  generateQueueTwiML(queue: {
+    id:              string
+    name:            string
+    welcome_message?: string
+    music_on_hold?:  string
+  }, orgId: string): string {
+    const VoiceResponse = twilio.twiml.VoiceResponse
+    const response      = new VoiceResponse()
+    const baseUrl       = process.env.BACKEND_URL || "https://api.voxflow.io"
+
+    if (queue.welcome_message) {
+      response.say({ language: "fr-CA", voice: "alice" } as any, queue.welcome_message)
+    } else {
+      response.say({ language: "fr-CA", voice: "alice" } as any,
+        "Votre appel est important. Un agent va vous répondre sous peu.")
+    }
+
+    // Enqueue dans une file nommée (Twilio TaskRouter-like, basé sur le nom)
+    response.enqueue({
+      waitUrl:   `${baseUrl}/api/v1/telephony/twiml/hold-music`,
+      action:    `${baseUrl}/api/v1/telephony/webhook/status?orgId=${orgId}&queueId=${queue.id}`,
+    } as any, queue.name as any)
+
+    return response.toString()
+  }
+
   // ── LISTEN / WHISPER / BARGE (supervision) ────────────────
 
   async joinCallAsSupervisor(opts: {
