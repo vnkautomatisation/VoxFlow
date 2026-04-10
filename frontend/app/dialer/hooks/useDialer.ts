@@ -442,6 +442,18 @@ export function useDialer() {
     const callNum = useCallback(async (n?: string) => {
         const to = n || dialNum
         if (!to) return
+
+        // Vérif forfait côté client : STARTER/BASIC = INBOUND_ONLY
+        // Le backend enforce aussi (défense en profondeur) mais on
+        // donne un feedback immédiat sans round-trip.
+        try {
+            const currentPlan = String(localStorage.getItem('vf_plan') || '').toUpperCase()
+            if (currentPlan === 'INBOUND_ONLY') {
+                showToast('Appels sortants non inclus dans votre forfait — passez au Confort')
+                return
+            }
+        } catch { }
+
         S.current.contact = null; setContact(null)
         try {
             const r = await api('/api/v1/telephony/call/outbound', { method: 'POST', body: { to } })
@@ -453,7 +465,13 @@ export function useDialer() {
                 S.current.dir = 'OUTBOUND'
                 startCallUI(to)
             } else {
-                showToast(r.message || 'Erreur appel')
+                // Backend retourne DIALER_INBOUND_ONLY pour les STARTER/BASIC
+                if (r.code === 'DIALER_INBOUND_ONLY') {
+                    showToast(r.error || 'Forfait entrant uniquement')
+                    try { localStorage.setItem('vf_plan', 'INBOUND_ONLY') } catch { }
+                    return
+                }
+                showToast(r.message || r.error || 'Erreur appel')
             }
         } catch { showToast('Erreur réseau') }
 

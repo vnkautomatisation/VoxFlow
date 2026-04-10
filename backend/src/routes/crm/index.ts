@@ -4,7 +4,9 @@ import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
 
 const router = Router()
-const getOrgId = (req: AuthRequest) => req.user?.organizationId || String(req.query.orgId || "")
+// Source de vérité: JWT décodé uniquement. Pas de fallback query —
+// empêche un attaquant de passer ?orgId=OTHER_ORG.
+const getOrgId = (req: AuthRequest) => String(req.user?.organizationId || "")
 
 // ── Indicatifs régionaux Canada/USA ───────────────────────────
 // ── Indicatifs pays ───────────────────────────────────────────

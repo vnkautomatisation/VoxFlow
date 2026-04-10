@@ -27,6 +27,42 @@ router.post("/register", validate(registerSchema), async (req: Request, res: Res
   }
 })
 
+// POST /api/v1/auth/sso-exchange
+// Receives a Supabase OAuth access_token after the frontend OAuth redirect,
+// validates it, creates or links our user, and returns our own JWT.
+//
+// Body: { supabaseAccessToken: string, provider: 'google' | 'azure' }
+router.post("/sso-exchange", async (req: Request, res: Response) => {
+  try {
+    const { supabaseAccessToken, provider } = req.body || {}
+
+    if (!supabaseAccessToken || typeof supabaseAccessToken !== 'string') {
+      return sendError(res, "Token Supabase manquant", 400)
+    }
+    if (!provider || !['google', 'azure'].includes(provider)) {
+      return sendError(res, "Provider SSO invalide (google | azure)", 400)
+    }
+
+    const result = await authService.ssoExchange(supabaseAccessToken, provider)
+
+    // Même cookie que login classique
+    res.cookie("refreshToken", result.refreshToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge:   30 * 24 * 60 * 60 * 1000,
+    })
+
+    sendSuccess(res, {
+      user:        result.user,
+      accessToken: result.accessToken,
+      isNew:       result.isNew,
+    }, 200, result.isNew ? "Compte créé via SSO" : "Connexion SSO réussie")
+  } catch (err: any) {
+    sendError(res, err.message || "Erreur SSO", 401)
+  }
+})
+
 // POST /api/v1/auth/login
 router.post("/login", validate(loginSchema), async (req: Request, res: Response) => {
   try {
