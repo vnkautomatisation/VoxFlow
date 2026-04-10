@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { omniApi } from "@/lib/omniApi"
 import ChannelIcon, { CHANNELS, CHANNEL_META, ChannelKey } from "./ChannelIcon"
+import ContactPicker, { PickedContact } from "./ContactPicker"
 
 const PRIORITY_OPTIONS = [
   { value: "LOW",    label: "Basse" },
@@ -18,43 +19,62 @@ interface Props {
 }
 
 export default function NewConversationModal({ token, onClose, onCreated }: Props) {
-  const [form, setForm] = useState({
-    channel: "EMAIL" as ChannelKey,
-    subject: "",
-    priority: "NORMAL",
-    toEmail: "",
-    toPhone: "",
-    visitorName: "",
-    initialMessage: "",
-  })
-  const [saving, setSaving] = useState(false)
-  const [err,    setErr]    = useState("")
+  const [channel,  setChannel]  = useState<ChannelKey>("EMAIL")
+  const [subject,  setSubject]  = useState("")
+  const [priority, setPriority] = useState("NORMAL")
+  const [initialMessage, setInitialMessage] = useState("")
+  const [contact,  setContact]  = useState<PickedContact | null>(null)
+  const [saving,   setSaving]   = useState(false)
+  const [err,      setErr]      = useState("")
+
+  const needsEmail = channel === "EMAIL"
+  const needsPhone = channel === "WHATSAPP" || channel === "SMS"
+  const needsName  = channel === "CHAT"
+
+  const canCreate = (() => {
+    if (!contact) return false
+    if (needsEmail && !contact.email) return false
+    if (needsPhone && !contact.phone) return false
+    if (needsName  && !contact.first_name) return false
+    return true
+  })()
 
   const handleCreate = async () => {
+    if (!contact) { setErr("Sélectionnez ou créez un contact"); return }
+
     setSaving(true)
     setErr("")
     try {
       const metadata: any = {}
-      if (form.channel === "EMAIL")    metadata.email = form.toEmail
-      if (form.channel === "WHATSAPP") metadata.phone = form.toPhone
-      if (form.channel === "SMS")      metadata.phone = form.toPhone
-      if (form.channel === "CHAT")     metadata.visitorName = form.visitorName
+      if (channel === "EMAIL")    metadata.email       = contact.email
+      if (channel === "WHATSAPP") metadata.phone       = contact.phone
+      if (channel === "SMS")      metadata.phone       = contact.phone
+      if (channel === "CHAT") {
+        metadata.visitorName  = `${contact.first_name} ${contact.last_name || ""}`.trim()
+        if (contact.email) metadata.visitorEmail = contact.email
+      }
 
-      if (form.channel === "EMAIL") {
-        await omniApi.createEmailTicket(token, {
-          fromEmail: form.toEmail,
-          subject:   form.subject,
-          bodyText:  form.initialMessage,
+      if (channel === "EMAIL") {
+        const res = await omniApi.createEmailTicket(token, {
+          fromEmail: contact.email!,
+          fromName:  `${contact.first_name} ${contact.last_name || ""}`.trim(),
+          subject,
+          bodyText:  initialMessage,
         })
+        // Link the created conversation to the contact
+        if (res.success && res.data?.conversation?.id && contact.id) {
+          await omniApi.updateConversation(token, res.data.conversation.id, { contactId: contact.id })
+        }
       } else {
         const convRes = await omniApi.createConversation(token, {
-          channel:  form.channel,
-          subject:  form.subject || null,
-          priority: form.priority,
+          channel,
+          subject:   subject || null,
+          priority,
+          contactId: contact.id || undefined,
           metadata,
         })
-        if (convRes.success && form.initialMessage) {
-          await omniApi.sendMessage(token, convRes.data.id, form.initialMessage)
+        if (convRes.success && initialMessage) {
+          await omniApi.sendMessage(token, convRes.data.id, initialMessage)
         }
       }
       onCreated()
@@ -65,10 +85,10 @@ export default function NewConversationModal({ token, onClose, onCreated }: Prop
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-md shadow-2xl">
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2e2e44]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2e2e44] sticky top-0 bg-[#18181f] z-10">
           <h2 className="text-[#eeeef8] font-bold">Nouvelle conversation</h2>
           <button onClick={onClose} className="text-[#55557a] hover:text-[#eeeef8] transition-colors p-1 rounded-lg hover:bg-[#1f1f2a]">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -95,65 +115,46 @@ export default function NewConversationModal({ token, onClose, onCreated }: Prop
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Canal</label>
             <div className="flex items-center gap-2">
-              <ChannelIcon channel={form.channel} size="sm" />
+              <ChannelIcon channel={channel} size="sm" />
               <select
-                value={form.channel}
-                onChange={(e) => setForm({ ...form, channel: e.target.value as ChannelKey })}
+                value={channel}
+                onChange={(e) => setChannel(e.target.value as ChannelKey)}
                 className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm focus:outline-none focus:border-[#7b61ff] transition-colors"
               >
-                {CHANNELS.filter(ch => ch !== "CALL").map((ch) => (
+                {CHANNELS.filter((ch) => ch !== "CALL").map((ch) => (
                   <option key={ch} value={ch}>{CHANNEL_META[ch].labelFR}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Email */}
-          {form.channel === "EMAIL" && (
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Email</label>
-              <input
-                value={form.toEmail}
-                onChange={(e) => setForm({ ...form, toEmail: e.target.value })}
-                placeholder="client@exemple.com"
-                className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm placeholder-[#55557a] focus:outline-none focus:border-[#7b61ff] transition-colors"
-              />
-            </div>
-          )}
-
-          {/* WhatsApp / SMS */}
-          {(form.channel === "WHATSAPP" || form.channel === "SMS") && (
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Numéro</label>
-              <input
-                value={form.toPhone}
-                onChange={(e) => setForm({ ...form, toPhone: e.target.value })}
-                placeholder="+15141234567"
-                className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm placeholder-[#55557a] focus:outline-none focus:border-[#7b61ff] transition-colors"
-              />
-            </div>
-          )}
-
-          {/* Chat */}
-          {form.channel === "CHAT" && (
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Nom visiteur</label>
-              <input
-                value={form.visitorName}
-                onChange={(e) => setForm({ ...form, visitorName: e.target.value })}
-                placeholder="Jean Tremblay"
-                className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm placeholder-[#55557a] focus:outline-none focus:border-[#7b61ff] transition-colors"
-              />
-            </div>
-          )}
+          {/* Contact picker */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">
+              Contact {needsEmail ? "· email requis" : needsPhone ? "· téléphone requis" : ""}
+            </label>
+            <ContactPicker
+              token={token}
+              value={contact}
+              onChange={setContact}
+              requireEmail={needsEmail}
+              requirePhone={needsPhone}
+            />
+            {contact && needsEmail && !contact.email && (
+              <p className="text-rose-400 text-[10px] mt-1">Ce contact n'a pas d'email — créez-en un ou choisissez un autre contact.</p>
+            )}
+            {contact && needsPhone && !contact.phone && (
+              <p className="text-rose-400 text-[10px] mt-1">Ce contact n'a pas de téléphone — créez-en un ou choisissez un autre contact.</p>
+            )}
+          </div>
 
           {/* Sujet + Priorité */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Sujet</label>
               <input
-                value={form.subject}
-                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
                 placeholder="Sujet..."
                 className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm placeholder-[#55557a] focus:outline-none focus:border-[#7b61ff] transition-colors"
               />
@@ -161,8 +162,8 @@ export default function NewConversationModal({ token, onClose, onCreated }: Prop
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Priorité</label>
               <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
                 className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm focus:outline-none focus:border-[#7b61ff] transition-colors"
               >
                 {PRIORITY_OPTIONS.map((p) => (
@@ -176,8 +177,8 @@ export default function NewConversationModal({ token, onClose, onCreated }: Prop
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Message initial</label>
             <textarea
-              value={form.initialMessage}
-              onChange={(e) => setForm({ ...form, initialMessage: e.target.value })}
+              value={initialMessage}
+              onChange={(e) => setInitialMessage(e.target.value)}
               rows={3}
               placeholder="Message..."
               className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-[#eeeef8] text-sm placeholder-[#55557a] focus:outline-none focus:border-[#7b61ff] resize-none transition-colors"
@@ -191,7 +192,7 @@ export default function NewConversationModal({ token, onClose, onCreated }: Prop
             >
               Annuler
             </button>
-            <button onClick={handleCreate} disabled={saving}
+            <button onClick={handleCreate} disabled={saving || !canCreate}
               className="flex-1 bg-[#7b61ff] hover:bg-[#6145ff] disabled:bg-[#2e2e44] disabled:text-[#55557a] text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
             >
               {saving ? "Création..." : "Créer"}

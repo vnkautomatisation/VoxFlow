@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import ChannelIcon from "./ChannelIcon"
+import ContactPicker, { PickedContact } from "./ContactPicker"
 
 const PRIORITY_CHIPS = [
   { value: "LOW",    label: "Basse",   tw: "border-zinc-400/30 text-zinc-400 bg-zinc-400/10" },
@@ -52,6 +53,7 @@ const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string;
 )
 
 interface Props {
+  token:        string
   conversation: any
   agents:       any[]
   agentsError?: boolean
@@ -59,11 +61,12 @@ interface Props {
   onUpdate:     (patch: any) => Promise<void>
 }
 
-export default function ConversationDetailDrawer({ conversation, agents, agentsError, onClose, onUpdate }: Props) {
+export default function ConversationDetailDrawer({ token, conversation, agents, agentsError, onClose, onUpdate }: Props) {
   const router = useRouter()
   const [saving,     setSaving]     = useState(false)
   const [delConfirm, setDelConfirm] = useState(false)
   const [newTag,     setNewTag]     = useState("")
+  const [linking,    setLinking]    = useState(false)
 
   const contact = conversation.contact
   const name = contact
@@ -97,6 +100,19 @@ export default function ConversationDetailDrawer({ conversation, agents, agentsE
     await wrap({ status: "CLOSED" })
     setDelConfirm(false)
     onClose()
+  }
+
+  const handleLinkContact = async (picked: PickedContact | null) => {
+    if (!picked || !picked.id) return
+    setLinking(true)
+    try { await onUpdate({ contactId: picked.id }) }
+    finally { setLinking(false) }
+  }
+
+  const handleUnlinkContact = async () => {
+    setLinking(true)
+    try { await onUpdate({ contactId: null }) }
+    finally { setLinking(false) }
   }
 
   const assignedAgent = conversation.agent
@@ -162,23 +178,42 @@ export default function ConversationDetailDrawer({ conversation, agents, agentsE
                 />
 
                 {contact.id && (
-                  <button
-                    onClick={() => router.push(`/admin/crm?contactId=${contact.id}`)}
-                    className="w-full mt-2 bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-3 py-2 rounded-lg text-xs font-bold hover:text-[#7b61ff] hover:border-[#7b61ff]/30 transition-colors flex items-center justify-center gap-2"
-                  >
-                    Voir dans le CRM
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button
+                      onClick={() => router.push(`/admin/crm?contactId=${contact.id}`)}
+                      className="bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-3 py-2 rounded-lg text-xs font-bold hover:text-[#7b61ff] hover:border-[#7b61ff]/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      Voir CRM
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={handleUnlinkContact}
+                      disabled={linking}
+                      className="bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-3 py-2 rounded-lg text-xs font-bold hover:text-rose-400 hover:border-rose-400/30 transition-colors disabled:opacity-50"
+                    >
+                      Délier
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
-              <div className="bg-[#1f1f2a] rounded-lg px-4 py-3">
-                <div className="text-xs text-[#eeeef8] font-semibold">Visiteur anonyme</div>
-                <div className="text-[11px] text-[#55557a] mt-0.5">
-                  {conversation.metadata?.visitorName || conversation.metadata?.phone || "Aucune information"}
+              <div className="space-y-2">
+                <div className="bg-[#1f1f2a] rounded-lg px-4 py-3">
+                  <div className="text-xs text-[#eeeef8] font-semibold">Visiteur anonyme</div>
+                  <div className="text-[11px] text-[#55557a] mt-0.5">
+                    {conversation.metadata?.visitorName || conversation.metadata?.phone || "Aucune information"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Lier à un contact CRM</div>
+                  <ContactPicker
+                    token={token}
+                    value={null}
+                    onChange={handleLinkContact}
+                  />
                 </div>
               </div>
             )}
