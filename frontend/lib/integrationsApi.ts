@@ -29,4 +29,10 @@ export const integrationsApi = {
     apiRequest<any>(base + "/hubspot/sync", { method: "POST", token }),
   syncSalesforce:    (token: string) =>
     apiRequest<any>(base + "/salesforce/sync", { method: "POST", token }),
+  syncZendesk:       (token: string) =>
+    apiRequest<any>(base + "/zendesk/sync", { method: "POST", token }),
+  testSlack:         (token: string) =>
+    apiRequest<any>(base + "/slack/test", { method: "POST", token }),
+  syncGoogleCalendar:(token: string) =>
+    apiRequest<any>(base + "/google-calendar/sync", { method: "POST", token }),
 }

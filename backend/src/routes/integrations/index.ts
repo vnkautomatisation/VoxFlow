@@ -113,6 +113,24 @@ router.post("/salesforce/sync", authenticate, async (req: AuthRequest, res: Resp
   } catch (err: any) { sendError(res, err.message, 400) }
 })
 
+router.post("/zendesk/sync", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    sendSuccess(res, await integrationsService.syncZendesk(getOrgId(req)))
+  } catch (err: any) { sendError(res, err.message, 400) }
+})
+
+router.post("/slack/test", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    sendSuccess(res, await integrationsService.testSlack(getOrgId(req)))
+  } catch (err: any) { sendError(res, err.message, 400) }
+})
+
+router.post("/google-calendar/sync", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    sendSuccess(res, await integrationsService.syncGoogleCalendar(getOrgId(req)))
+  } catch (err: any) { sendError(res, err.message, 400) }
+})
+
 // ── API PUBLIQUE v2 (authentification par API key) ────────────
 router.get("/v2/calls", async (req: Request, res: Response) => {
   try {
