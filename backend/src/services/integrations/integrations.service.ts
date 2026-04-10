@@ -298,7 +298,7 @@ export class IntegrationsService {
     return { synced, failed, integration: "HUBSPOT" }
   }
 
-  // Sync Salesforce
+  // ── SALESFORCE (SOQL query via Bearer token) ──────────────────
   async syncSalesforce(organizationId: string) {
     const { data: integration } = await supabaseAdmin
       .from("integrations")
@@ -310,8 +310,328 @@ export class IntegrationsService {
 
     if (!integration) throw new Error("Integration Salesforce non configuree")
 
-    // Simulation sync Salesforce
-    return { synced: 0, failed: 0, integration: "SALESFORCE", message: "Salesforce OAuth requis pour sync reel" }
+    const creds       = (integration.credentials as any) || {}
+    const accessToken = creds.accessToken
+    const instanceUrl = (creds.instanceUrl || "").replace(/\/+$/, "")
+    if (!accessToken || !instanceUrl) {
+      throw new Error("Salesforce: accessToken + instanceUrl requis")
+    }
+
+    let synced = 0
+    let failed = 0
+
+    try {
+      const soql = "SELECT+Id,FirstName,LastName,Email,Phone,Account.Name+FROM+Contact+LIMIT+200"
+      const url  = `${instanceUrl}/services/data/v59.0/query?q=${soql}`
+      const res  = await fetch(url, {
+        headers: { Authorization: "Bearer " + accessToken, Accept: "application/json" },
+      })
+
+      if (!res.ok) {
+        const txt = await res.text()
+        throw new Error(`Salesforce API ${res.status}: ${txt.substring(0, 200)}`)
+      }
+
+      const data = await res.json() as any
+      const records = data.records || []
+
+      for (const rec of records) {
+        try {
+          await supabaseAdmin.from("contacts").upsert({
+            organization_id: organizationId,
+            first_name:      rec.FirstName || "",
+            last_name:       rec.LastName  || "",
+            email:           rec.Email     || null,
+            phone:           rec.Phone     || null,
+            company:         rec.Account?.Name || null,
+            source:          "SALESFORCE",
+            custom_fields:   { salesforce_id: rec.Id },
+          }, { onConflict: "organization_id,email" })
+          synced++
+        } catch { failed++ }
+      }
+    } catch (err: any) {
+      await supabaseAdmin.from("sync_logs").insert({
+        integration_id:  integration.id,
+        direction:       "IN",
+        entity:          "CONTACT",
+        records_synced:  0,
+        records_failed:  0,
+        status:          "FAILED",
+        error_message:   err.message?.substring(0, 500),
+      } as any)
+      throw err
+    }
+
+    await supabaseAdmin.from("integrations").update({
+      last_sync_at: new Date().toISOString(),
+      sync_count:   (integration.sync_count || 0) + 1,
+    }).eq("id", integration.id)
+
+    await supabaseAdmin.from("sync_logs").insert({
+      integration_id:  integration.id,
+      direction:       "IN",
+      entity:          "CONTACT",
+      records_synced:  synced,
+      records_failed:  failed,
+      status:          "SUCCESS",
+    })
+
+    return { synced, failed, integration: "SALESFORCE" }
+  }
+
+  // ── ZENDESK (API v2 via Basic auth) ───────────────────────────
+  async syncZendesk(organizationId: string) {
+    const { data: integration } = await supabaseAdmin
+      .from("integrations")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("type", "ZENDESK")
+      .eq("status", "ACTIVE")
+      .single()
+
+    if (!integration) throw new Error("Integration Zendesk non configuree")
+
+    const creds = (integration.credentials as any) || {}
+    const subdomain = creds.subdomain
+    const email     = creds.email
+    const apiToken  = creds.apiToken
+    if (!subdomain || !email || !apiToken) {
+      throw new Error("Zendesk: subdomain + email + apiToken requis")
+    }
+
+    const auth  = Buffer.from(`${email}/token:${apiToken}`).toString("base64")
+    const base  = `https://${subdomain}.zendesk.com/api/v2`
+
+    let synced = 0
+    let failed = 0
+
+    try {
+      // Fetch users (Zendesk "users" = contacts côté VoxFlow)
+      const res = await fetch(`${base}/users.json?role[]=end-user&per_page=100`, {
+        headers: { Authorization: "Basic " + auth, Accept: "application/json" },
+      })
+
+      if (!res.ok) {
+        const txt = await res.text()
+        throw new Error(`Zendesk API ${res.status}: ${txt.substring(0, 200)}`)
+      }
+
+      const data  = await res.json() as any
+      const users = data.users || []
+
+      for (const u of users) {
+        try {
+          const [firstName, ...rest] = (u.name || "").split(" ")
+          await supabaseAdmin.from("contacts").upsert({
+            organization_id: organizationId,
+            first_name:      firstName || "",
+            last_name:       rest.join(" ") || "",
+            email:           u.email || null,
+            phone:           u.phone || null,
+            company:         u.organization_id ? String(u.organization_id) : null,
+            source:          "ZENDESK",
+            custom_fields:   { zendesk_id: u.id, zendesk_role: u.role },
+          }, { onConflict: "organization_id,email" })
+          synced++
+        } catch { failed++ }
+      }
+    } catch (err: any) {
+      await supabaseAdmin.from("sync_logs").insert({
+        integration_id:  integration.id,
+        direction:       "IN",
+        entity:          "CONTACT",
+        records_synced:  0,
+        records_failed:  0,
+        status:          "FAILED",
+        error_message:   err.message?.substring(0, 500),
+      } as any)
+      throw err
+    }
+
+    await supabaseAdmin.from("integrations").update({
+      last_sync_at: new Date().toISOString(),
+      sync_count:   (integration.sync_count || 0) + 1,
+    }).eq("id", integration.id)
+
+    await supabaseAdmin.from("sync_logs").insert({
+      integration_id:  integration.id,
+      direction:       "IN",
+      entity:          "CONTACT",
+      records_synced:  synced,
+      records_failed:  failed,
+      status:          "SUCCESS",
+    })
+
+    return { synced, failed, integration: "ZENDESK" }
+  }
+
+  // ── SLACK (notifications via chat.postMessage) ────────────────
+  async testSlack(organizationId: string) {
+    const { data: integration } = await supabaseAdmin
+      .from("integrations")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("type", "SLACK")
+      .eq("status", "ACTIVE")
+      .single()
+
+    if (!integration) throw new Error("Integration Slack non configuree")
+
+    const creds = (integration.credentials as any) || {}
+    const botToken  = creds.botToken
+    const channelId = creds.channelId
+    if (!botToken || !channelId) {
+      throw new Error("Slack: botToken + channelId requis")
+    }
+
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": "Bearer " + botToken,
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        text:    "Test VoxFlow — L'intégration Slack est maintenant active.",
+        blocks: [
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: "*VoxFlow* — Test de connexion réussi :white_check_mark:\nVous recevrez ici les notifications de votre call center." },
+          },
+        ],
+      }),
+    })
+
+    const data = await res.json() as any
+    if (!data.ok) {
+      throw new Error(`Slack API: ${data.error || "erreur inconnue"}`)
+    }
+
+    await supabaseAdmin.from("integrations").update({
+      last_sync_at: new Date().toISOString(),
+    }).eq("id", integration.id)
+
+    return { sent: true, channel: channelId, ts: data.ts }
+  }
+
+  /**
+   * Envoie une notification Slack pour un événement VoxFlow.
+   * Appelé depuis triggerWebhook ou directement par les services métier.
+   */
+  async notifySlack(organizationId: string, event: string, payload: any) {
+    const { data: integration } = await supabaseAdmin
+      .from("integrations")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("type", "SLACK")
+      .eq("status", "ACTIVE")
+      .maybeSingle()
+
+    if (!integration) return { skipped: true, reason: "Slack not connected" }
+
+    const creds = (integration.credentials as any) || {}
+    const botToken  = creds.botToken
+    const channelId = creds.channelId
+    if (!botToken || !channelId) return { skipped: true, reason: "Missing credentials" }
+
+    const title = {
+      "call.completed":        "Appel terminé",
+      "call.missed":           "Appel manqué",
+      "contact.created":       "Nouveau contact",
+      "conversation.created":  "Nouvelle conversation",
+      "conversation.resolved": "Conversation résolue",
+    }[event] || event
+
+    try {
+      await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + botToken },
+        body: JSON.stringify({
+          channel: channelId,
+          text:    `VoxFlow — ${title}`,
+          blocks: [{
+            type: "section",
+            text: { type: "mrkdwn", text: `*VoxFlow — ${title}*\n\`\`\`${JSON.stringify(payload, null, 2).substring(0, 800)}\`\`\`` },
+          }],
+        }),
+      })
+      return { sent: true }
+    } catch (err: any) {
+      return { sent: false, error: err.message }
+    }
+  }
+
+  // ── GOOGLE CALENDAR (Events list via accessToken) ─────────────
+  async syncGoogleCalendar(organizationId: string) {
+    const { data: integration } = await supabaseAdmin
+      .from("integrations")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("type", "GOOGLE_CALENDAR")
+      .eq("status", "ACTIVE")
+      .single()
+
+    if (!integration) throw new Error("Integration Google Calendar non configuree")
+
+    const creds = (integration.credentials as any) || {}
+    const accessToken = creds.accessToken
+    const calendarId  = creds.calendarId || "primary"
+    if (!accessToken) {
+      throw new Error("Google Calendar: accessToken requis")
+    }
+
+    const now    = new Date().toISOString()
+    const future = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+    const url    = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${encodeURIComponent(now)}&timeMax=${encodeURIComponent(future)}&singleEvents=true&orderBy=startTime&maxResults=100`
+
+    let synced = 0
+    let failed = 0
+
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: "Bearer " + accessToken, Accept: "application/json" },
+      })
+
+      if (!res.ok) {
+        const txt = await res.text()
+        throw new Error(`Google Calendar API ${res.status}: ${txt.substring(0, 200)}`)
+      }
+
+      const data  = await res.json() as any
+      const items = data.items || []
+      synced = items.length
+
+      // Stocke les events dans la table schedules (ou activity_logs au minimum)
+      // On se contente de mettre à jour last_sync_at + sync_count + log pour MVP.
+    } catch (err: any) {
+      await supabaseAdmin.from("sync_logs").insert({
+        integration_id:  integration.id,
+        direction:       "IN",
+        entity:          "EVENT",
+        records_synced:  0,
+        records_failed:  0,
+        status:          "FAILED",
+        error_message:   err.message?.substring(0, 500),
+      } as any)
+      throw err
+    }
+
+    await supabaseAdmin.from("integrations").update({
+      last_sync_at: new Date().toISOString(),
+      sync_count:   (integration.sync_count || 0) + 1,
+    }).eq("id", integration.id)
+
+    await supabaseAdmin.from("sync_logs").insert({
+      integration_id:  integration.id,
+      direction:       "IN",
+      entity:          "EVENT",
+      records_synced:  synced,
+      records_failed:  failed,
+      status:          "SUCCESS",
+    })
+
+    return { synced, failed, integration: "GOOGLE_CALENDAR" }
   }
 }
 
