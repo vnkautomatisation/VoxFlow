@@ -131,10 +131,11 @@ export default function InboxPage() {
   )
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="h-[calc(100vh-49px)] overflow-hidden">
+      <div className="p-6 max-w-7xl mx-auto h-full flex flex-col">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
           <h1 className="text-xl font-bold text-[#eeeef8]">Boîte unifiée</h1>
           <div className="text-xs text-[#55557a] mt-0.5">
@@ -154,13 +155,13 @@ export default function InboxPage() {
 
       {/* Stats */}
       {stats && (
-        <div className="mb-4">
+        <div className="mb-3 flex-shrink-0">
           <InboxStats stats={stats} />
         </div>
       )}
 
       {/* Toolbar filtres */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
+      <div className="flex items-center gap-2 flex-wrap mb-3 flex-shrink-0">
         {/* Canaux */}
         <div className="flex gap-1 bg-[#18181f] border border-[#2e2e44] rounded-xl p-1">
           <button
@@ -207,8 +208,8 @@ export default function InboxPage() {
         </span>
       </div>
 
-      {/* Layout 2 colonnes */}
-      <div className="flex gap-4" style={{ height: "calc(100vh - 380px)", minHeight: "420px" }}>
+      {/* Layout 2 colonnes — prend le reste de la hauteur via flex-1 */}
+      <div className="flex gap-4 flex-1 min-h-0">
 
         {/* Liste conversations */}
         <div className="w-80 flex-shrink-0 overflow-y-auto pr-1">
@@ -244,6 +245,8 @@ export default function InboxPage() {
             </div>
           )}
         </div>
+      </div>
+
       </div>
 
       {/* Modal nouvelle conversation */}
