@@ -694,18 +694,18 @@ export default function CRMPage() {
             </div>
 
             {/* Barre filtres */}
-            <div className="flex items-center gap-3 mb-5">
-                <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+                <div className="relative w-full sm:flex-1 sm:max-w-sm">
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#55557a]" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un contact..."
                         className="w-full bg-[#18181f] border border-[#2e2e44] rounded-lg pl-9 pr-4 py-2 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]" />
                 </div>
                 <select value={tagFilter} onChange={e => setTagFilter(e.target.value)}
-                    className="bg-[#18181f] border border-[#2e2e44] rounded-lg px-3 py-2 text-xs text-[#eeeef8] outline-none focus:border-[#7b61ff]">
+                    className="bg-[#18181f] border border-[#2e2e44] rounded-lg px-3 py-2 text-xs text-[#eeeef8] outline-none focus:border-[#7b61ff] w-full sm:w-auto">
                     <option value="">Tous les tags</option>
                     {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-                <div className="text-xs text-[#55557a]">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
+                <div className="text-xs text-[#55557a] whitespace-nowrap">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
             </div>
 
             {/* ── VUE LISTE ──────────────────────────────────────── */}
