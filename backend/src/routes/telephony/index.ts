@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express"
-import { authenticate, AuthRequest } from "../../middleware/auth"
+import { authenticate, AuthRequest, resolveOrgId } from "../../middleware/auth"
 import { twilioService } from "../../services/twilio/twilio.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
@@ -7,8 +7,11 @@ import voiceRoutes from './voice'
 
 const router = Router()
 const BACKEND = () => process.env.BACKEND_URL || "http://localhost:4000"
-const getOrgId = (req: AuthRequest) =>
-    req.user?.organizationId || String(req.query.orgId || "")
+// Utilise resolveOrgId qui permet ?orgId uniquement pour OWNER/OWNER_STAFF.
+// ATTENTION: cette helper n'est utilisé QUE pour les routes authentifiées.
+// Les handlers TwiML publics (webhooks Twilio) ont leur propre logique
+// car Twilio passe l'orgId dans l'URL (pas de JWT).
+const getOrgId = (req: AuthRequest) => resolveOrgId(req)
 
 // ── Détection pays depuis numéro ─────────────────────────────
 const COUNTRY_PREFIXES: Record<string, string> = {
@@ -77,6 +80,38 @@ async function validateDest(to: string, orgId: string) {
     return { allowed: false, country, countryName: REGION_NAMES[country] || country, plan: (sub as any)?.plan }
 }
 
+// Vérifie que l'organisation a le droit d'effectuer des appels SORTANTS
+// selon son forfait. Les plans STARTER / BASIC / INBOUND sont entrant seulement.
+// Appelé avant toute tentative d'appel sortant (frontend + backend).
+//
+// Retourne { allowed: true } si OK, ou { allowed: false, reason } sinon.
+async function validateDialerPlan(orgId: string): Promise<{ allowed: boolean, reason?: string, plan?: string }> {
+    try {
+        const { data: org } = await supabaseAdmin
+            .from("organizations")
+            .select("plan, status")
+            .eq("id", orgId)
+            .maybeSingle()
+
+        if (!org) return { allowed: false, reason: "Organisation introuvable" }
+
+        const planUpper = String((org as any).plan || "").toUpperCase()
+        // Plans inbound-only → refuser les appels sortants
+        if (["STARTER", "BASIC", "INBOUND"].includes(planUpper)) {
+            return {
+                allowed: false,
+                plan:    planUpper,
+                reason:  `Les appels sortants ne sont pas inclus dans votre forfait ${planUpper}. Passez au forfait CONFORT ou supérieur pour activer le dialer sortant.`,
+            }
+        }
+
+        return { allowed: true, plan: planUpper }
+    } catch {
+        // Fail-open en cas d'erreur DB pour ne pas bloquer le service
+        return { allowed: true }
+    }
+}
+
 // ── helpers ──────────────────────────────────────────────────
 async function findContactByPhone(phone: string, orgId: string) {
     try {
@@ -110,10 +145,23 @@ router.get("/check-destination", authenticate, async (req: AuthRequest, res: Res
         const to = String(req.query.to || "").trim()
         const orgId = getOrgId(req)
         if (!to) return sendError(res, "Numéro requis", 400)
+
+        // Plan dialer — STARTER/BASIC ne peuvent pas sortir
+        const planCheck = await validateDialerPlan(orgId)
+        if (!planCheck.allowed) {
+            return res.status(403).json({
+                success: false,
+                error:   planCheck.reason,
+                code:    "DIALER_INBOUND_ONLY",
+                plan:    planCheck.plan,
+            })
+        }
+
         const check = await validateDest(to, orgId)
         const allowed = await getOrgAllowedRegions(orgId)
         sendSuccess(res, {
             ...check,
+            dialerPlan:     planCheck.plan,
             allowedRegions: allowed.map(r => ({ code: r, name: REGION_NAMES[r] || r })),
         })
     } catch (err: any) { sendError(res, err.message) }
@@ -129,7 +177,18 @@ router.post("/call/outbound", authenticate, async (req: AuthRequest, res: Respon
 
     if (!to) return sendError(res, "Numéro requis", 400)
 
-    // Valider la région selon le forfait
+    // 1. Vérifier le forfait dialer — STARTER/BASIC = inbound only
+    const planCheck = await validateDialerPlan(orgId)
+    if (!planCheck.allowed) {
+        return res.status(403).json({
+            success: false,
+            error:   planCheck.reason,
+            code:    "DIALER_INBOUND_ONLY",
+            plan:    planCheck.plan,
+        })
+    }
+
+    // 2. Valider la région selon le forfait
     const check = await validateDest(to, orgId)
     if (!check.allowed) {
         return sendError(res,

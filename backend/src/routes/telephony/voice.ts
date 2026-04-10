@@ -1,13 +1,12 @@
 ﻿import { Router, Request, Response } from 'express'
-import { authenticate, AuthRequest } from '../../middleware/auth'
+import { authenticate, AuthRequest, resolveOrgId } from '../../middleware/auth'
 import { twilioService } from '../../services/twilio/twilio.service'
 import { supabaseAdmin } from '../../config/supabase'
 import { sendSuccess, sendError } from '../../utils/response'
 
 const router = Router()
 const BACKEND = () => process.env.BACKEND_URL || 'http://localhost:4000'
-const getOrgId = (req: AuthRequest) =>
-  req.user?.organizationId || String(req.query.orgId || '')
+const getOrgId = (req: AuthRequest) => resolveOrgId(req)
 
 // ════════════════════════════════════════════════════════════
 //  GET /voice/token  — JWT pour Twilio.Device (dialer)
