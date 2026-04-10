@@ -87,6 +87,76 @@ router.post("/email", authenticate, async (req: AuthRequest, res: Response) => {
   } catch (err: any) { sendError(res, err.message) }
 })
 
+// ── WEBHOOK SMS entrant (Twilio) ──────────────────────────────
+router.post("/webhook/sms", async (req: Request, res: Response) => {
+  try {
+    const { From, Body, To, MessageSid } = req.body
+    console.log("[SMS] Message entrant de", From, "->", To, ":", Body)
+
+    // Trouver l'org par le numéro destinataire
+    const { data: phoneNum } = await (await import("../../config/supabase")).supabaseAdmin
+      .from("phone_numbers")
+      .select("organization_id")
+      .eq("number", To)
+      .single()
+
+    if (phoneNum) {
+      // Trouver ou créer la conversation par phone
+      const { data: existing } = await (await import("../../config/supabase")).supabaseAdmin
+        .from("conversations")
+        .select("id")
+        .eq("organization_id", phoneNum.organization_id)
+        .eq("channel", "SMS")
+        .contains("metadata", { phone: From })
+        .maybeSingle()
+
+      let convId = existing?.id
+      if (!convId) {
+        // Auto-lier à un contact existant si le numéro est connu du CRM
+        const { data: existingContact } = await (await import("../../config/supabase")).supabaseAdmin
+          .from("contacts")
+          .select("id")
+          .eq("organization_id", phoneNum.organization_id)
+          .or(`phone.eq.${From},phone_2.eq.${From}`)
+          .maybeSingle()
+
+        const conv = await multicanalService.createConversation(phoneNum.organization_id, {
+          channel:   "SMS",
+          contactId: existingContact?.id,
+          metadata:  { phone: From, providerSid: MessageSid },
+        })
+        convId = conv.id
+      }
+
+      await multicanalService.sendMessage(convId, phoneNum.organization_id, {
+        content:    Body || "",
+        senderType: "CONTACT",
+      })
+    }
+
+    res.set("Content-Type", "text/xml")
+    res.send("<Response></Response>")
+  } catch (err: any) {
+    console.error("[SMS webhook] error:", err.message)
+    res.set("Content-Type", "text/xml")
+    res.send("<Response></Response>")
+  }
+})
+
+// ── WEBHOOK delivery status (Twilio MessageStatus callback) ──
+router.post("/webhook/twilio-status", async (req: Request, res: Response) => {
+  try {
+    const { MessageSid, MessageStatus } = req.body
+    if (MessageSid && MessageStatus) {
+      await multicanalService.updateMessageStatus(MessageSid, MessageStatus)
+    }
+    res.status(200).send("OK")
+  } catch (err: any) {
+    console.error("[Twilio status webhook] error:", err.message)
+    res.status(200).send("OK")
+  }
+})
+
 // ── WEBHOOK WhatsApp (Twilio) ─────────────────────────────────
 router.post("/webhook/whatsapp", async (req: Request, res: Response) => {
   try {
