@@ -261,6 +261,7 @@ export default function InboxPage() {
       {/* Drawer détail */}
       {showDetail && selected && (
         <ConversationDetailDrawer
+          token={token}
           conversation={selected}
           agents={agents}
           agentsError={agentsError}

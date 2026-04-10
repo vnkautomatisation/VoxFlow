@@ -1,4 +1,15 @@
-﻿import { supabaseAdmin } from "../../config/supabase"
+﻿import twilio from "twilio"
+import { supabaseAdmin } from "../../config/supabase"
+
+// ── Twilio client (lazy, optionnel) ──────────────────────────────
+const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID || ""
+const twilioAuthToken  = process.env.TWILIO_AUTH_TOKEN  || ""
+const isTwilioConfigured = () => twilioAccountSid.startsWith("AC") && twilioAuthToken.length > 10
+const twilioClient = isTwilioConfigured() ? twilio(twilioAccountSid, twilioAuthToken) : null
+
+// Numéro d'envoi par défaut pour SMS/WhatsApp (fallback si l'org n'en a pas)
+const defaultSmsFrom      = process.env.TWILIO_SMS_FROM      || process.env.TWILIO_PHONE_NUMBER || ""
+const defaultWhatsappFrom = process.env.TWILIO_WHATSAPP_FROM || ""
 
 export class MulticanalService {
 
@@ -87,14 +98,16 @@ export class MulticanalService {
   async updateConversation(id: string, organizationId: string, dto: {
     status?:      string
     priority?:    string
-    assignedTo?:  string
+    assignedTo?:  string | null
     tags?:        string[]
+    contactId?:   string | null
   }) {
     const update: any = { updated_at: new Date().toISOString() }
     if (dto.status !== undefined)     update.status      = dto.status
     if (dto.priority !== undefined)   update.priority    = dto.priority
     if (dto.assignedTo !== undefined) update.assigned_to = dto.assignedTo
     if (dto.tags !== undefined)       update.tags        = dto.tags
+    if (dto.contactId !== undefined)  update.contact_id  = dto.contactId
     if (dto.status === "RESOLVED")    update.resolved_at = new Date().toISOString()
     if (dto.status === "CLOSED")      update.closed_at   = new Date().toISOString()
 
@@ -119,13 +132,16 @@ export class MulticanalService {
   }) {
     const { data: conv } = await supabaseAdmin
       .from("conversations")
-      .select("channel, contact_id, metadata")
+      .select("channel, contact_id, metadata, organization_id")
       .eq("id", conversationId)
       .single()
 
     if (!conv) throw new Error("Conversation non trouvee")
 
-    // Inserer le message
+    // Inserer le message (status initial = SENT pour les agents, DELIVERED pour les entrants)
+    const isOutbound = dto.senderType === "AGENT" || dto.senderType === "BOT"
+    const initialStatus = isOutbound ? "SENT" : "DELIVERED"
+
     const { data: message, error } = await supabaseAdmin
       .from("messages")
       .insert({
@@ -135,7 +151,7 @@ export class MulticanalService {
         sender_id:       dto.senderId || null,
         content:         dto.content,
         content_type:    dto.contentType || "TEXT",
-        status:          "SENT",
+        status:          initialStatus,
       })
       .select().single()
 
@@ -146,32 +162,133 @@ export class MulticanalService {
       .from("conversations")
       .update({
         last_message_at: new Date().toISOString(),
-        status:          conv ? "OPEN" : "OPEN",
+        status:          "OPEN",
         updated_at:      new Date().toISOString(),
       })
       .eq("id", conversationId)
 
-    // Envoyer via le bon canal
-    await this.dispatchMessage(conv.channel, conv, dto.content)
+    // Envoyer via le bon canal (uniquement pour les messages sortants)
+    if (isOutbound) {
+      try {
+        const providerSid = await this.dispatchMessage(conv.channel, conv, dto.content, message.id)
+        if (providerSid) {
+          await supabaseAdmin
+            .from("messages")
+            .update({ provider_sid: providerSid })
+            .eq("id", message.id)
+          message.provider_sid = providerSid
+        }
+      } catch (dispatchErr: any) {
+        // Log + marquer FAILED, mais ne pas throw (le message est sauvé en DB)
+        console.error("[multicanal] dispatch error:", dispatchErr.message)
+        await supabaseAdmin
+          .from("messages")
+          .update({ status: "FAILED", metadata: { error: dispatchErr.message } })
+          .eq("id", message.id)
+        message.status = "FAILED"
+      }
+    }
 
     return message
   }
 
-  private async dispatchMessage(channel: string, conv: any, content: string) {
+  /**
+   * Envoie le message via le canal externe.
+   * Retourne le SID provider (Twilio, etc.) pour le tracking des delivery receipts.
+   */
+  private async dispatchMessage(channel: string, conv: any, content: string, messageId: string): Promise<string | null> {
+    const statusCallback = process.env.PUBLIC_BASE_URL
+      ? `${process.env.PUBLIC_BASE_URL}/api/v1/omni/webhook/twilio-status`
+      : undefined
+
     switch (channel) {
-      case "WHATSAPP":
-        console.log("[WhatsApp] Envoi vers", conv.metadata?.phone, ":", content)
-        break
-      case "SMS":
-        console.log("[SMS] Envoi vers", conv.metadata?.phone, ":", content)
-        break
-      case "EMAIL":
-        console.log("[Email] Reponse vers", conv.metadata?.email, ":", content)
-        break
-      case "CHAT":
-        console.log("[Chat] Message vers session", conv.metadata?.sessionId, ":", content)
-        break
+      case "SMS": {
+        const to = conv.metadata?.phone
+        if (!to) throw new Error("SMS: numéro destinataire manquant (metadata.phone)")
+        if (!twilioClient) {
+          console.log("[SMS] Twilio non configuré — message stocké en DB uniquement vers", to)
+          return null
+        }
+        const from = await this.getOrgSmsFrom(conv.organization_id) || defaultSmsFrom
+        if (!from) throw new Error("SMS: aucun numéro d'envoi configuré")
+        const msg = await twilioClient.messages.create({
+          from, to, body: content,
+          ...(statusCallback ? { statusCallback } : {}),
+        })
+        return msg.sid
+      }
+
+      case "WHATSAPP": {
+        const to = conv.metadata?.phone
+        if (!to) throw new Error("WhatsApp: numéro destinataire manquant (metadata.phone)")
+        if (!twilioClient) {
+          console.log("[WhatsApp] Twilio non configuré — message stocké en DB uniquement vers", to)
+          return null
+        }
+        const from = defaultWhatsappFrom
+        if (!from) throw new Error("WhatsApp: TWILIO_WHATSAPP_FROM non configuré")
+        const msg = await twilioClient.messages.create({
+          from: `whatsapp:${from}`,
+          to:   to.startsWith("whatsapp:") ? to : `whatsapp:${to}`,
+          body: content,
+          ...(statusCallback ? { statusCallback } : {}),
+        })
+        return msg.sid
+      }
+
+      case "EMAIL": {
+        const to = conv.metadata?.email
+        if (!to) throw new Error("Email: destinataire manquant (metadata.email)")
+        // TODO: brancher SendGrid/Resend/Mailgun via env SMTP. Pour l'instant stub.
+        console.log("[Email] (stub) vers", to, ":", content.substring(0, 80))
+        return null
+      }
+
+      case "CHAT": {
+        // Les messages CHAT sont délivrés via le widget qui poll ou via WebSocket.
+        // Rien à faire côté serveur ici — le widget récupère les messages via getConversation.
+        return null
+      }
+
+      default:
+        return null
     }
+  }
+
+  /** Récupère le premier numéro SMS configuré pour l'organisation. */
+  private async getOrgSmsFrom(organizationId: string): Promise<string | null> {
+    try {
+      const { data } = await supabaseAdmin
+        .from("phone_numbers")
+        .select("number")
+        .eq("organization_id", organizationId)
+        .limit(1)
+        .single()
+      return data?.number || null
+    } catch { return null }
+  }
+
+  // ── DELIVERY STATUS (webhook Twilio) ──────────────────────────
+
+  async updateMessageStatus(providerSid: string, status: string) {
+    // Map Twilio status vers notre enum
+    const map: Record<string, string> = {
+      queued:      "SENT",
+      sent:        "SENT",
+      delivered:   "DELIVERED",
+      read:        "READ",
+      undelivered: "FAILED",
+      failed:      "FAILED",
+    }
+    const mapped = map[status.toLowerCase()] || status.toUpperCase()
+
+    const { data } = await supabaseAdmin
+      .from("messages")
+      .update({ status: mapped, provider_status_at: new Date().toISOString() })
+      .eq("provider_sid", providerSid)
+      .select("id, conversation_id")
+
+    return data?.[0] || null
   }
 
   // ── STATS OMNICANAL ───────────────────────────────────────────
