@@ -679,7 +679,7 @@ export default function CRMPage() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[
                     { label: 'Total', val: stats.total, color: 'text-[#eeeef8]' },
                     { label: 'Avec telephone', val: stats.withPhone, color: 'text-emerald-400' },

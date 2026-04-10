@@ -277,7 +277,7 @@ export default function IVRPage() {
                             )}
 
                             {/* Stats / infos */}
-                            <div className="border-t border-[#1f1f2a] grid grid-cols-4 divide-x divide-[#1f1f2a]">
+                            <div className="border-t border-[#1f1f2a] grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-[#1f1f2a]">
                                 {[
                                     { label: 'Nœuds', val: (ivr.nodes || []).length },
                                     { label: 'Timeout', val: `${ivr.timeout || 5}s` },
@@ -378,7 +378,7 @@ export default function IVRPage() {
                                 </div>
 
                                 {/* Types disponibles */}
-                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                                     {NODE_TYPES.map(t => (
                                         <button key={t.value} onClick={() => {
                                             const newNode: IVRNode = {

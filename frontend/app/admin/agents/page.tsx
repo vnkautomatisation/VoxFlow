@@ -256,7 +256,7 @@ export default function AgentsPage() {
             </div>
 
             {/* KPIs statuts */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[
                     { label: 'Disponibles', val: online, color: 'text-emerald-400', bg: 'border-emerald-400/20', dot: 'bg-emerald-400' },
                     { label: 'En appel', val: busy, color: 'text-rose-400', bg: 'border-rose-400/20', dot: 'bg-rose-400' },
@@ -406,7 +406,7 @@ export default function AgentsPage() {
             {showDrawer && selectedAgent && (
                 <div className="fixed inset-0 z-50 flex">
                     <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowDrawer(false)} />
-                    <div className="w-[480px] bg-[#111118] border-l border-[#2e2e44] flex flex-col h-full overflow-hidden">
+                    <div className="w-full sm:w-[480px] max-w-full bg-[#111118] border-l border-[#2e2e44] flex flex-col h-full overflow-hidden">
 
                         {/* Header drawer */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2e2e44] bg-[#18181f]">

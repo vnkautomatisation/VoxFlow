@@ -184,7 +184,7 @@ export default function QueuesPage() {
             </div>
 
             {/* KPIs globaux */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                 <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
                     <div className="text-2xl font-bold font-mono text-amber-400">{totalWaiting}</div>
                     <div className="text-[10px] text-[#55557a] font-bold uppercase tracking-wider mt-1">En attente total</div>
@@ -260,7 +260,7 @@ export default function QueuesPage() {
                                 )}
 
                                 {/* Stats temps réel */}
-                                <div className="border-t border-[#1f1f2a] grid grid-cols-5 divide-x divide-[#1f1f2a]">
+                                <div className="border-t border-[#1f1f2a] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-[#1f1f2a]">
                                     {[
                                         { label: 'En attente', val: rt?.waiting ?? 0, color: (rt?.waiting ?? 0) > 0 ? 'text-amber-400' : 'text-[#9898b8]' },
                                         { label: 'Agents dispo', val: rt?.onlineAgents ?? 0, color: (rt?.onlineAgents ?? 0) > 0 ? 'text-emerald-400' : 'text-rose-400' },
@@ -303,7 +303,7 @@ export default function QueuesPage() {
             {showDrawer && selectedQueue && (
                 <div className="fixed inset-0 z-50 flex">
                     <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowDrawer(false)} />
-                    <div className="w-[480px] bg-[#111118] border-l border-[#2e2e44] flex flex-col h-full">
+                    <div className="w-full sm:w-[480px] max-w-full bg-[#111118] border-l border-[#2e2e44] flex flex-col h-full">
 
                         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2e2e44] bg-[#18181f]">
                             <div>
