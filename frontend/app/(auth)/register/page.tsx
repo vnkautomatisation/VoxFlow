@@ -18,62 +18,62 @@ export default function RegisterPage() {
 
   // ── SSO OAuth handler (Google / Microsoft) ────────────────
   // Note: l'utilisateur SSO sera automatiquement créé avec un essai
-  // 14 jours dans le backend via /sso-exchange (voir auth.service.ts).
+  // 14 jours dans le backend via /sso-exchange.
   //
-  // Preflight: vérifie que le provider est activé dans Supabase AVANT
-  // de rediriger, sinon l'utilisateur voit le JSON brut de l'erreur.
+  // Vérif pre-OAuth via /auth/v1/settings pour détecter si le provider
+  // est activé (sinon l'utilisateur voit le JSON brut de Supabase).
   const handleSSO = async (provider: "google" | "azure") => {
     setError("")
     setSsoLoading(provider)
 
     const providerLabel = provider === "google" ? "Google" : "Microsoft"
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      setError("Supabase non configuré")
+      setSsoLoading(null)
+      return
+    }
 
     try {
+      // 1. Vérifier si le provider est activé via /auth/v1/settings
+      try {
+        const settingsRes = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+          method: "GET",
+          headers: { "apikey": supabaseKey },
+        })
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json()
+          const enabled = settings?.external?.[provider]
+          if (!enabled) {
+            setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel} (il faut renseigner le Client ID + Client Secret).`)
+            setSsoLoading(null)
+            return
+          }
+        }
+      } catch {
+        // Fail-open si settings inaccessible
+      }
+
+      // 2. Provider activé → lancer l'OAuth
       const supabase = createClient()
       const redirectTo = `${window.location.origin}/callback`
 
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
-          skipBrowserRedirect: true, // ← on contrôle la nav
           queryParams: provider === "google"
             ? { access_type: "offline", prompt: "consent" }
             : undefined,
         },
       })
 
-      if (oauthError || !data?.url) {
-        const msg = (oauthError?.message || "").toLowerCase()
-        if (msg.includes("not enabled") || msg.includes("unsupported provider")) {
-          setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel}.`)
-        } else {
-          setError(`Erreur SSO ${providerLabel}: ${oauthError?.message || "URL OAuth indisponible"}`)
-        }
+      if (oauthError) {
+        setError(`Erreur SSO ${providerLabel}: ${oauthError.message}`)
         setSsoLoading(null)
-        return
       }
-
-      // Preflight: détecter le 400 "provider not enabled"
-      try {
-        const preflight = await fetch(data.url, { method: "GET", redirect: "manual" })
-        if (preflight.status === 400) {
-          const body = await preflight.json().catch(() => null)
-          const errMsg = body?.msg || body?.error_description || body?.error || "Provider non configuré"
-          if (errMsg.toLowerCase().includes("not enabled") ||
-              errMsg.toLowerCase().includes("unsupported provider")) {
-            setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel} (il faut aussi renseigner le Client ID + Secret).`)
-          } else {
-            setError(`Erreur SSO ${providerLabel}: ${errMsg}`)
-          }
-          setSsoLoading(null)
-          return
-        }
-      } catch {
-        // CORS/réseau: on tente quand même
-      }
-
-      window.location.href = data.url
     } catch (err: any) {
       setError(err?.message || "Erreur de connexion SSO")
       setSsoLoading(null)
