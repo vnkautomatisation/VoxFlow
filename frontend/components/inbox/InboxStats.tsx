@@ -1,30 +1,56 @@
-﻿"use client"
+"use client"
 
-const CHANNEL_ICONS: Record<string, string> = {
-  WHATSAPP: "📱",
-  CHAT:     "💬",
-  EMAIL:    "✉️",
-  SMS:      "💌",
-  CALL:     "📞",
-}
+import ChannelIcon, { CHANNELS, CHANNEL_META } from "./ChannelIcon"
 
 interface Props { stats: any }
 
+const KPI_CONFIG = [
+  { key: "total",    label: "Total",      color: "text-violet-400" },
+  { key: "open",     label: "Ouverts",    color: "text-emerald-400" },
+  { key: "pending",  label: "En attente", color: "text-amber-400" },
+  { key: "resolved", label: "Résolus",    color: "text-sky-400" },
+  { key: "urgent",   label: "Urgents",    color: "text-rose-400", zeroColor: "text-[#55557a]" },
+]
+
 export default function InboxStats({ stats }: Props) {
+  const s = stats || {}
+
   return (
-    <div className="grid grid-cols-5 gap-3">
-      {[
-        { label: "Total",    value: stats.total,    color: "text-white" },
-        { label: "Ouverts",  value: stats.open,     color: "text-teal-400" },
-        { label: "En attente", value: stats.pending, color: "text-amber-400" },
-        { label: "Resolus",  value: stats.resolved, color: "text-green-400" },
-        { label: "Urgents",  value: stats.urgent,   color: stats.urgent > 0 ? "text-red-400" : "text-gray-500" },
-      ].map((s) => (
-        <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
-          <p className={"text-2xl font-bold " + s.color}>{s.value}</p>
-          <p className="text-gray-500 text-xs mt-0.5">{s.label}</p>
-        </div>
-      ))}
+    <div className="space-y-3">
+      {/* Rangée 1 — 5 KPI globaux */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {KPI_CONFIG.map((k) => {
+          const val = s[k.key] ?? 0
+          const col = k.zeroColor && val === 0 ? k.zeroColor : k.color
+          return (
+            <div key={k.key} className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-[#55557a] mb-1">{k.label}</div>
+              <div className={`text-2xl font-bold font-mono ${col}`}>{val}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Rangée 2 — 5 mini-cartes par canal */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {CHANNELS.map((ch) => {
+          const cs   = s.byChannel?.[ch] ?? { total: 0, open: 0, pending: 0, resolved: 0 }
+          const meta = CHANNEL_META[ch]
+          const dim  = cs.total === 0 ? "opacity-40" : ""
+          return (
+            <div key={ch} className={`bg-[#18181f] border border-[#2e2e44] rounded-xl p-3 flex items-center gap-3 transition-opacity ${dim}`}>
+              <ChannelIcon channel={ch} size="sm" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#55557a] truncate">{meta.labelFR}</div>
+                <div className="text-sm font-mono text-[#eeeef8]">
+                  <span className={meta.tw.text}>{cs.open}</span>
+                  <span className="text-[#55557a]">/{cs.total}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
