@@ -369,23 +369,23 @@ export default function LivePage() {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h1 className="text-xl font-bold text-[#eeeef8]">Supervision Live</h1>
                     <div className="flex items-center gap-2 mt-0.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"
                             style={{ boxShadow: '0 0 6px rgba(0,212,170,.8)' }} />
                         <span className="text-xs text-[#55557a]">
-                            Temps reel — {now.toLocaleTimeString('fr-CA')}
+                            Temps réel — {now.toLocaleTimeString('fr-CA')}
                         </span>
                     </div>
                 </div>
                 <button onClick={load}
-                    className="flex items-center gap-2 text-[10px] font-bold text-[#9898b8] border border-[#2e2e44] bg-[#18181f] px-3 py-2 rounded-lg hover:text-[#eeeef8] transition-colors">
+                    className="self-start sm:self-auto flex items-center gap-2 text-[10px] font-bold text-[#9898b8] border border-[#2e2e44] bg-[#18181f] px-3 py-2 rounded-lg hover:text-[#eeeef8] transition-colors">
                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+                        <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                     </svg>
-                    Rafraichir
+                    Rafraîchir
                 </button>
             </div>
 
