@@ -1,6 +1,7 @@
-﻿export type Role = 'OWNER' | 'ADMIN' | 'SUPERVISOR' | 'AGENT'
-export type Plan = 'STARTER' | 'PRO' | 'ENTERPRISE'
-export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'ON_CALL' | 'BREAK'
+﻿export type Role = 'OWNER' | 'OWNER_STAFF' | 'ADMIN' | 'SUPERVISOR' | 'AGENT'
+export type Plan = 'STARTER' | 'BASIC' | 'CONFORT' | 'PRO' | 'ENTERPRISE'
+export type OrgStatus = 'ACTIVE' | 'TRIAL' | 'SUSPENDED' | 'CANCELLED'
+export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'ON_CALL' | 'BREAK' | 'BUSY'
 
 export interface User {
   id:             string

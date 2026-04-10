@@ -76,8 +76,31 @@ export default function OAuthCallbackPage() {
         // Nettoyer la session Supabase (on utilise notre propre JWT)
         await supabase.auth.signOut().catch(() => {})
 
-        const redirect = searchParams.get('redirect')
-        router.replace(redirect || getDashboardRoute(res.data.user.role))
+        // 7. Router selon le contexte:
+        //   - Nouveau user (isNew=true)    → /onboarding (wizard premier setup)
+        //   - Existant + ?redirect=/xxx    → /xxx (préservé depuis /login?redirect=)
+        //   - Existant sans redirect       → dashboard selon role
+        const isNew         = res.data.isNew
+        const redirectParam = searchParams.get('redirect')
+        const userRole      = res.data.user.role
+        const dashboardUrl  = getDashboardRoute(userRole)
+
+        let target: string
+        if (isNew && (userRole === 'ADMIN' || userRole === 'OWNER')) {
+          // Nouveau owner/admin → onboarding wizard
+          target = '/onboarding'
+        } else if (redirectParam && redirectParam.startsWith('/')) {
+          // Préserver le redirect original du login
+          target = redirectParam
+        } else {
+          // Dashboard par défaut du role
+          target = dashboardUrl
+        }
+
+        // Attendre l'écriture de la cookie HTTP-only puis hard-nav
+        // pour garantir que le middleware voit bien le token
+        await new Promise(r => setTimeout(r, 150))
+        window.location.href = target
       } catch (err: any) {
         console.error('[OAuth callback]', err)
         setError(err?.message || 'Erreur de connexion SSO')
