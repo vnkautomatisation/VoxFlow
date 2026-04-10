@@ -68,29 +68,41 @@ export default function AdminDashboardPage() {
   )
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="h-[calc(100vh-49px)] overflow-hidden flex flex-col">
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 flex-shrink-0">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-[#eeeef8]">Tableau de bord</h1>
-          <div className="text-xs text-[#55557a] mt-0.5">Mise à jour toutes les 20s</div>
-        </div>
-        <button onClick={refresh} className="text-xs bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-3 py-1.5 rounded-lg hover:text-[#eeeef8] transition-colors">
-          ↻ Rafraîchir
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-[#2e2e44] mb-6">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px
-              ${tab === t.id ? 'text-[#eeeef8] border-[#7b61ff]' : 'text-[#55557a] border-transparent hover:text-[#9898b8]'}`}>
-            {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
+        {/* Header — responsive stack sur mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-[#eeeef8] truncate">Tableau de bord</h1>
+            <div className="text-xs text-[#55557a] mt-0.5">Mise à jour toutes les 20s</div>
+          </div>
+          <button onClick={refresh}
+            className="self-start sm:self-auto text-xs bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-3 py-1.5 rounded-lg hover:text-[#eeeef8] hover:border-[#7b61ff]/30 transition-colors flex items-center gap-1.5 flex-shrink-0"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            Rafraîchir
           </button>
-        ))}
+        </div>
+
+        {/* Tabs — scrollables horizontalement sur petit écran */}
+        <div className="flex gap-1 border-b border-[#2e2e44] overflow-x-auto scrollbar-hide -mx-4 sm:-mx-0 px-4 sm:px-0">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px whitespace-nowrap flex-shrink-0
+                ${tab === t.id ? 'text-[#eeeef8] border-[#7b61ff]' : 'text-[#55557a] border-transparent hover:text-[#9898b8]'}`}>
+              {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Zone contenu scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
 
       {/* ── VUE GLOBALE ── */}
       {tab === 'overview' && (
@@ -508,6 +520,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+        </div>
+      </div>
     </div>
   )
 }
