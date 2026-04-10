@@ -1,29 +1,22 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { omniApi } from "@/lib/omniApi"
+import { adminApi } from "@/lib/adminApi"
 import ConversationList from "@/components/inbox/ConversationList"
 import ConversationView from "@/components/inbox/ConversationView"
 import InboxStats from "@/components/inbox/InboxStats"
 import NewConversationModal from "@/components/inbox/NewConversationModal"
-
-const CHANNELS = [
-  { id: "",          label: "Tout",      icon: "📬" },
-  { id: "CHAT",      label: "Chat",      icon: "💬" },
-  { id: "EMAIL",     label: "Email",     icon: "✉️" },
-  { id: "WHATSAPP",  label: "WhatsApp",  icon: "📱" },
-  { id: "SMS",       label: "SMS",       icon: "💌" },
-]
+import ConversationDetailDrawer from "@/components/inbox/ConversationDetailDrawer"
+import ChannelIcon, { CHANNELS, CHANNEL_META } from "@/components/inbox/ChannelIcon"
 
 const STATUSES = [
   { id: "OPEN",     label: "Ouverts" },
   { id: "PENDING",  label: "En attente" },
-  { id: "RESOLVED", label: "Resolus" },
+  { id: "RESOLVED", label: "Résolus" },
 ]
 
 export default function InboxPage() {
-  const router = useRouter()
   const [token,    setToken]    = useState<string | null>(null)
   const [mounted,  setMounted]  = useState(false)
   const [convs,    setConvs]    = useState<any[]>([])
@@ -35,10 +28,16 @@ export default function InboxPage() {
   const [showNew,  setShowNew]  = useState(false)
   const [total,    setTotal]    = useState(0)
 
+  // Drawer détail
+  const [showDetail,   setShowDetail]   = useState(false)
+  const [agents,       setAgents]       = useState<any[]>([])
+  const [agentsError,  setAgentsError]  = useState(false)
+  const [agentsLoaded, setAgentsLoaded] = useState(false)
+
   useEffect(() => {
     setMounted(true)
     try {
-      const raw    = localStorage.getItem("voxflow-auth")
+      const raw = localStorage.getItem("voxflow-auth")
       if (!raw) { window.location.href = "/login"; return }
       const parsed = JSON.parse(raw)
       const state  = parsed.state || parsed
@@ -65,6 +64,27 @@ export default function InboxPage() {
 
   useEffect(() => { if (token) load() }, [token, channel, status])
 
+  // Fetch agents lazily quand le drawer s'ouvre la première fois
+  useEffect(() => {
+    if (!showDetail || agentsLoaded || !token) return
+    adminApi.getAgents(token)
+      .then((r) => {
+        if (r.success) {
+          setAgents(Array.isArray(r.data) ? r.data : [])
+          setAgentsError(false)
+        } else {
+          setAgentsError(true)
+        }
+      })
+      .catch(() => setAgentsError(true))
+      .finally(() => setAgentsLoaded(true))
+  }, [showDetail, agentsLoaded, token])
+
+  // Auto-close drawer si la conversation sélectionnée devient null
+  useEffect(() => {
+    if (!selected) setShowDetail(false)
+  }, [selected])
+
   const handleSelect = async (conv: any) => {
     if (!token) return
     const res = await omniApi.getConversation(token, conv.id)
@@ -82,112 +102,167 @@ export default function InboxPage() {
   const handleUpdateStatus = async (newStatus: string) => {
     if (!token || !selected) return
     await omniApi.updateConversation(token, selected.id, { status: newStatus })
-    setSelected({ ...selected, status: newStatus })
+    const res = await omniApi.getConversation(token, selected.id)
+    if (res.success) setSelected(res.data)
     load()
   }
 
-  const handleAssign = async (agentId: string) => {
+  // Handler consolidé pour les PATCH depuis le drawer
+  const handleUpdateConversation = async (patch: any) => {
     if (!token || !selected) return
-    await omniApi.updateConversation(token, selected.id, { assignedTo: agentId })
+    await omniApi.updateConversation(token, selected.id, patch)
+    // Re-fetch pour récupérer les joins (agent) que la réponse PATCH ne renvoie pas
+    const res = await omniApi.getConversation(token, selected.id)
+    if (res.success) setSelected(res.data)
     load()
+  }
+
+  const handleRefresh = () => {
+    if (!token || !selected) return
+    omniApi.getConversation(token, selected.id).then((r) => {
+      if (r.success) setSelected(r.data)
+    })
   }
 
   if (!mounted || !token) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-gray-500 animate-pulse text-sm">Chargement...</p>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <p className="text-[#55557a] animate-pulse text-sm">Chargement...</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="p-6 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="border-b border-gray-800 bg-gray-900/50 flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.push("/admin/dashboard")} className="text-gray-400 hover:text-white text-sm">Dashboard</button>
-            <h1 className="text-xl font-bold text-white">
-              VoxFlow <span className="text-gray-500 text-sm font-normal">Boite unifiee</span>
-            </h1>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-[#eeeef8]">Boîte unifiée</h1>
+          <div className="text-xs text-[#55557a] mt-0.5">
+            {total} conversation{total !== 1 ? "s" : ""} · {stats?.open ?? 0} ouverte{(stats?.open ?? 0) !== 1 ? "s" : ""}
           </div>
-          <button onClick={() => setShowNew(true)}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
-          >+ Nouvelle conversation</button>
         </div>
+        <button onClick={() => setShowNew(true)}
+          className="bg-[#7b61ff] hover:bg-[#6145ff] text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5"  y1="12" x2="19" y2="12" />
+          </svg>
+          Nouvelle conversation
+        </button>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-4 w-full flex-1 flex flex-col gap-4">
+      {/* Stats */}
+      {stats && (
+        <div className="mb-4">
+          <InboxStats stats={stats} />
+        </div>
+      )}
 
-        {/* Stats */}
-        {stats && <InboxStats stats={stats} />}
-
-        {/* Filtres canaux */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1">
-            {CHANNELS.map((ch) => (
-              <button key={ch.id} onClick={() => setChannel(ch.id)}
-                className={"px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-1.5 " + (channel === ch.id ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white")}
-              >
-                <span className="text-base">{ch.icon}</span>
-                {ch.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1">
-            {STATUSES.map((s) => (
-              <button key={s.id} onClick={() => setStatus(s.id)}
-                className={"px-3 py-1.5 rounded-lg text-sm transition-colors " + (status === s.id ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white")}
-              >{s.label}</button>
-            ))}
-          </div>
-          <span className="text-gray-600 text-xs">{total} conversation{total !== 1 ? "s" : ""}</span>
+      {/* Toolbar filtres */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        {/* Canaux */}
+        <div className="flex gap-1 bg-[#18181f] border border-[#2e2e44] rounded-xl p-1">
+          <button
+            onClick={() => setChannel("")}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
+              channel === "" ? "bg-[#2e2e44] text-[#eeeef8]" : "text-[#55557a] hover:text-[#9898b8]"
+            }`}
+          >
+            Tout
+          </button>
+          {CHANNELS.map((ch) => (
+            <button key={ch}
+              onClick={() => setChannel(ch)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
+                channel === ch
+                  ? "bg-[#7b61ff]/15 text-[#eeeef8] border border-[#7b61ff]/30"
+                  : "border border-transparent text-[#55557a] hover:text-[#9898b8]"
+              }`}
+            >
+              <ChannelIcon channel={ch} size="sm" />
+              <span className="hidden md:inline">{CHANNEL_META[ch].labelFR}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Layout 2 colonnes */}
-        <div className="flex gap-4 flex-1 min-h-0" style={{ height: "calc(100vh - 280px)" }}>
+        {/* Status */}
+        <div className="flex gap-1 bg-[#18181f] border border-[#2e2e44] rounded-xl p-1">
+          {STATUSES.map((s) => (
+            <button key={s.id}
+              onClick={() => setStatus(s.id)}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                status === s.id
+                  ? "bg-[#7b61ff]/15 text-[#eeeef8] border border-[#7b61ff]/30"
+                  : "border border-transparent text-[#55557a] hover:text-[#9898b8]"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Liste conversations */}
-          <div className="w-80 flex-shrink-0 overflow-y-auto">
-            <ConversationList
-              conversations={convs}
-              loading={loading}
-              selectedId={selected?.id}
-              onSelect={handleSelect}
+        <span className="text-[#55557a] text-xs ml-auto">
+          {total} conversation{total !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* Layout 2 colonnes */}
+      <div className="flex gap-4" style={{ height: "calc(100vh - 380px)", minHeight: "420px" }}>
+
+        {/* Liste conversations */}
+        <div className="w-80 flex-shrink-0 overflow-y-auto pr-1">
+          <ConversationList
+            conversations={convs}
+            loading={loading}
+            selectedId={selected?.id}
+            onSelect={handleSelect}
+          />
+        </div>
+
+        {/* Vue conversation */}
+        <div className="flex-1 overflow-hidden min-w-0">
+          {selected ? (
+            <ConversationView
+              conversation={selected}
+              token={token}
+              onSendMessage={handleSendMessage}
+              onUpdateStatus={handleUpdateStatus}
+              onRefresh={handleRefresh}
+              onOpenDetail={() => setShowDetail(true)}
             />
-          </div>
-
-          {/* Vue conversation */}
-          <div className="flex-1 overflow-hidden">
-            {selected ? (
-              <ConversationView
-                conversation={selected}
-                token={token}
-                onSendMessage={handleSendMessage}
-                onUpdateStatus={handleUpdateStatus}
-                onRefresh={() => {
-                  omniApi.getConversation(token, selected.id).then((r) => {
-                    if (r.success) setSelected(r.data)
-                  })
-                }}
-              />
-            ) : (
-              <div className="h-full bg-gray-900 border border-gray-800 rounded-xl flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-5xl mb-3">📬</div>
-                  <p className="text-gray-400 text-sm">Selectionnez une conversation</p>
-                  <p className="text-gray-600 text-xs mt-1">ou creez-en une nouvelle</p>
-                </div>
+          ) : (
+            <div className="h-full bg-[#18181f] border border-[#2e2e44] rounded-xl flex items-center justify-center">
+              <div className="text-center">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" className="text-[#2e2e44] mx-auto mb-3">
+                  <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                  <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                </svg>
+                <p className="text-[#9898b8] text-sm font-medium">Sélectionnez une conversation</p>
+                <p className="text-[#55557a] text-xs mt-1">ou créez-en une nouvelle</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Modal nouvelle conversation */}
       {showNew && (
         <NewConversationModal
           token={token}
           onClose={() => setShowNew(false)}
           onCreated={() => { load(); setShowNew(false) }}
+        />
+      )}
+
+      {/* Drawer détail */}
+      {showDetail && selected && (
+        <ConversationDetailDrawer
+          conversation={selected}
+          agents={agents}
+          agentsError={agentsError}
+          onClose={() => setShowDetail(false)}
+          onUpdate={handleUpdateConversation}
         />
       )}
     </div>
