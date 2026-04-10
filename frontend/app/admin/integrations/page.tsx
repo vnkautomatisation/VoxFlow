@@ -111,64 +111,70 @@ export default function IntegrationsPage() {
   ]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="h-[calc(100vh-49px)] overflow-hidden flex flex-col">
+      <div className="max-w-7xl w-full mx-auto px-6 pt-6 flex-shrink-0">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-[#eeeef8]">Intégrations & API</h1>
-          <div className="text-xs text-[#55557a] mt-0.5">
-            {activeCount} intégration{activeCount !== 1 ? "s" : ""} active{activeCount !== 1 ? "s" : ""}
-            {" · "}
-            {activeWebhooks}/{webhooks.length} webhook{webhooks.length !== 1 ? "s" : ""} actif{activeWebhooks !== 1 ? "s" : ""}
-            {" · "}
-            {apiKeys.length} clé{apiKeys.length !== 1 ? "s" : ""} API
+        {/* Header fixe */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-bold text-[#eeeef8]">Intégrations & API</h1>
+            <div className="text-xs text-[#55557a] mt-0.5">
+              {activeCount} intégration{activeCount !== 1 ? "s" : ""} active{activeCount !== 1 ? "s" : ""}
+              {" · "}
+              {activeWebhooks}/{webhooks.length} webhook{webhooks.length !== 1 ? "s" : ""} actif{activeWebhooks !== 1 ? "s" : ""}
+              {" · "}
+              {apiKeys.length} clé{apiKeys.length !== 1 ? "s" : ""} API
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-[#2e2e44] mb-6">
-        {tabs.map((t) => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px ${
-              activeTab === t.id
-                ? "text-[#eeeef8] border-[#7b61ff]"
-                : "text-[#55557a] border-transparent hover:text-[#9898b8]"
-            }`}
-          >
-            {t.label}{t.count !== undefined ? ` (${t.count})` : ""}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-[#55557a] text-sm animate-pulse">Chargement...</p>
+        {/* Tabs fixes */}
+        <div className="flex gap-1 border-b border-[#2e2e44]">
+          {tabs.map((t) => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px ${
+                activeTab === t.id
+                  ? "text-[#eeeef8] border-[#7b61ff]"
+                  : "text-[#55557a] border-transparent hover:text-[#9898b8]"
+              }`}
+            >
+              {t.label}{t.count !== undefined ? ` (${t.count})` : ""}
+            </button>
+          ))}
         </div>
-      ) : (
-        <>
-          {activeTab === "crm" && (
-            <CRMIntegrations
-              token={token}
-              catalog={INTEGRATIONS_CATALOG}
-              integrations={integrations}
-              connectedTypes={connectedTypes}
-              onRefresh={load}
-            />
+      </div>
+
+      {/* Zone contenu scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl w-full mx-auto px-6 py-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-[#55557a] text-sm animate-pulse">Chargement...</p>
+            </div>
+          ) : (
+            <>
+              {activeTab === "crm" && (
+                <CRMIntegrations
+                  token={token}
+                  catalog={INTEGRATIONS_CATALOG}
+                  integrations={integrations}
+                  connectedTypes={connectedTypes}
+                  onRefresh={load}
+                />
+              )}
+              {activeTab === "webhooks" && (
+                <WebhooksPanel token={token} webhooks={webhooks} onRefresh={load} />
+              )}
+              {activeTab === "apikeys" && (
+                <APIKeysPanel token={token} apiKeys={apiKeys} onRefresh={load} />
+              )}
+              {activeTab === "docs" && (
+                <APIDocs />
+              )}
+            </>
           )}
-          {activeTab === "webhooks" && (
-            <WebhooksPanel token={token} webhooks={webhooks} onRefresh={load} />
-          )}
-          {activeTab === "apikeys" && (
-            <APIKeysPanel token={token} apiKeys={apiKeys} onRefresh={load} />
-          )}
-          {activeTab === "docs" && (
-            <APIDocs />
-          )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   )
 }
