@@ -180,72 +180,109 @@ export default function IntegrationsPage() {
 }
 
 // ── Documentation API ─────────────────────────────────────────
+// IMPORTANT: seuls les endpoints CLIENT-FACING sont listés ici.
+// Les webhooks internes (Twilio, SendGrid, Mailgun, TwiML handlers)
+// sont configurés par VoxFlow côté infrastructure et ne sont PAS
+// appelables par les clients. Les exposer dans cette doc révélerait
+// notre architecture et augmenterait la surface d'attaque.
 function APIDocs() {
-  const endpoints = [
-    { method: "GET",  path: "/api/v1/integrations/v2/calls",          desc: "Liste des appels",                    auth: "API Key" },
-    { method: "GET",  path: "/api/v1/integrations/v2/contacts",       desc: "Liste des contacts",                  auth: "API Key" },
-    { method: "POST", path: "/api/v1/omni/chat/start",                 desc: "Démarrer une session chat widget",   auth: "Aucune" },
-    { method: "POST", path: "/api/v1/omni/chat/:id/message",           desc: "Envoyer un message chat",             auth: "Aucune" },
-    { method: "POST", path: "/api/v1/omni/webhook/sms",                desc: "SMS entrant Twilio",                  auth: "Twilio" },
-    { method: "POST", path: "/api/v1/omni/webhook/whatsapp",           desc: "WhatsApp entrant Twilio",             auth: "Twilio" },
-    { method: "POST", path: "/api/v1/omni/webhook/twilio-status",      desc: "Delivery status SMS/WhatsApp",        auth: "Twilio" },
-    { method: "POST", path: "/api/v1/omni/webhook/email",              desc: "Email entrant (SendGrid/Mailgun)",    auth: "Vendor" },
-    { method: "POST", path: "/api/v1/telephony/webhook/voice",         desc: "Appel entrant Twilio",                auth: "Twilio" },
-    { method: "POST", path: "/api/v1/telephony/webhook/status",        desc: "Call status callback Twilio",         auth: "Twilio" },
-    { method: "GET",  path: "/api/v1/telephony/twiml/ivr/:id",         desc: "TwiML menu IVR dynamique",            auth: "Twilio" },
-    { method: "GET",  path: "/api/v1/telephony/twiml/queue/:id",       desc: "TwiML enqueue ACD dynamique",         auth: "Twilio" },
+  // API publique — protégée par clé API (vf_...)
+  const publicApi = [
+    { method: "GET",  path: "/api/v1/integrations/v2/calls",     desc: "Liste de vos appels (filtrés par votre organisation)",   auth: "API Key" },
+    { method: "GET",  path: "/api/v1/integrations/v2/contacts",  desc: "Liste de vos contacts CRM",                                auth: "API Key" },
   ]
+
+  // Widget chat public — pour embed dans un site web (sans auth)
+  const widgetApi = [
+    { method: "POST", path: "/api/v1/omni/chat/start",          desc: "Démarrer une session chat widget (retourne conversationId + visitorId)", auth: "Aucune" },
+    { method: "POST", path: "/api/v1/omni/chat/:id/message",    desc: "Envoyer un message depuis le widget chat",                                auth: "Aucune" },
+  ]
+
+  const methodStyle = (m: string) =>
+    m === "GET"    ? "bg-sky-400/10 text-sky-400 border-sky-400/30" :
+    m === "POST"   ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/30" :
+    m === "PATCH"  ? "bg-amber-400/10 text-amber-400 border-amber-400/30" :
+    m === "DELETE" ? "bg-rose-400/10 text-rose-400 border-rose-400/30" :
+    "bg-zinc-400/10 text-zinc-400 border-zinc-400/30"
+
+  const EndpointsTable = ({ rows }: { rows: typeof publicApi }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-[#55557a] border-b border-[#2e2e44] bg-[#1f1f2a]">
+            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Méthode</th>
+            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Endpoint</th>
+            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Description</th>
+            <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Auth</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((ep, i) => (
+            <tr key={i} className="border-b border-[#1f1f2a] last:border-0 hover:bg-[#1f1f2a] transition-colors">
+              <td className="px-4 py-2.5">
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${methodStyle(ep.method)}`}>
+                  {ep.method}
+                </span>
+              </td>
+              <td className="px-4 py-2.5 font-mono text-[#eeeef8]">{ep.path}</td>
+              <td className="px-4 py-2.5 text-[#9898b8]">{ep.desc}</td>
+              <td className="px-4 py-2.5 text-[#55557a]">{ep.auth}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
       {/* Authentication */}
       <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5">
         <h2 className="text-[#eeeef8] font-semibold mb-1">Authentification API</h2>
-        <p className="text-[#55557a] text-xs mb-4">Générez une clé API dans l'onglet « Clés API ». Chaque clé est liée à votre organisation.</p>
+        <p className="text-[#55557a] text-xs mb-4">Générez une clé API dans l'onglet « Clés API ». Chaque clé est liée à votre organisation et ne donne accès qu'à vos propres données.</p>
 
         <div className="bg-[#1f1f2a] border border-[#2e2e44] rounded-lg p-4 font-mono text-xs text-[#9898b8]">
-          <p className="text-[#55557a] mb-2"># Via header HTTP</p>
+          <p className="text-[#55557a] mb-2"># Via header HTTP (recommandé)</p>
           <p className="text-[#eeeef8]">X-API-Key: vf_votre_cle_api</p>
           <p className="text-[#55557a] mt-3 mb-2"># Ou via paramètre URL</p>
           <p className="text-[#eeeef8]">GET /api/v1/integrations/v2/calls?api_key=vf_votre_cle</p>
         </div>
       </div>
 
-      {/* Endpoints */}
+      {/* API publique */}
       <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-[#2e2e44]">
-          <h2 className="text-[#eeeef8] font-semibold text-sm">Endpoints disponibles</h2>
-          <p className="text-[10px] text-[#55557a] mt-0.5">{endpoints.length} routes — mis à jour avec les derniers webhooks multicanal</p>
+          <h2 className="text-[#eeeef8] font-semibold text-sm">API publique</h2>
+          <p className="text-[10px] text-[#55557a] mt-0.5">Endpoints REST avec authentification par clé API — pour vos intégrations Zapier, Make, n8n ou serveur custom</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-[#55557a] border-b border-[#2e2e44] bg-[#1f1f2a]">
-                <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Méthode</th>
-                <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Endpoint</th>
-                <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Description</th>
-                <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Auth</th>
-              </tr>
-            </thead>
-            <tbody>
-              {endpoints.map((ep, i) => (
-                <tr key={i} className="border-b border-[#1f1f2a] last:border-0 hover:bg-[#1f1f2a] transition-colors">
-                  <td className="px-4 py-2.5">
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                      ep.method === "GET"    ? "bg-sky-400/10 text-sky-400 border-sky-400/30" :
-                      ep.method === "POST"   ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/30" :
-                      ep.method === "PATCH"  ? "bg-amber-400/10 text-amber-400 border-amber-400/30" :
-                      ep.method === "DELETE" ? "bg-rose-400/10 text-rose-400 border-rose-400/30" :
-                      "bg-zinc-400/10 text-zinc-400 border-zinc-400/30"
-                    }`}>{ep.method}</span>
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-[#eeeef8]">{ep.path}</td>
-                  <td className="px-4 py-2.5 text-[#9898b8]">{ep.desc}</td>
-                  <td className="px-4 py-2.5 text-[#55557a]">{ep.auth}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <EndpointsTable rows={publicApi} />
+      </div>
+
+      {/* Widget public */}
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-[#2e2e44]">
+          <h2 className="text-[#eeeef8] font-semibold text-sm">Widget chat (embed)</h2>
+          <p className="text-[10px] text-[#55557a] mt-0.5">Endpoints sans authentification, conçus pour être appelés depuis le widget JavaScript embarqué sur votre site web</p>
+        </div>
+        <EndpointsTable rows={widgetApi} />
+      </div>
+
+      {/* Webhooks sortants info */}
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5">
+        <div className="flex items-start gap-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-sky-400 flex-shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <div>
+            <h2 className="text-[#eeeef8] font-semibold text-sm mb-1">Recevoir les événements VoxFlow</h2>
+            <p className="text-[#55557a] text-xs">
+              Pour recevoir des notifications d'événements (appel terminé, nouveau contact, conversation résolue, etc.),
+              configurez un <span className="text-[#9898b8] font-medium">webhook sortant</span> dans l'onglet « Webhooks ».
+              VoxFlow POSTera vers votre URL à chaque événement avec une signature HMAC SHA256 pour vérifier l'origine.
+            </p>
+          </div>
         </div>
       </div>
 
