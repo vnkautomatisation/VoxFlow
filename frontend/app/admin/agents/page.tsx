@@ -229,28 +229,27 @@ export default function AgentsPage() {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-xl font-bold text-[#eeeef8]">Agents</h1>
                     <div className="text-xs text-[#55557a] mt-0.5">{agents.length} agent{agents.length > 1 ? 's' : ''} · Mise à jour toutes les 15s</div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Badge forfait */}
-                    <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${planCfg.callBg} ${planCfg.callBorder} ${planCfg.callColor}`}>
-                            {planCfg.callBadge} {planCfg.callType}
-                        </span>
-                        <span className="text-[10px] text-[#55557a]">
-                            {agents.length}/{maxAgents === -1 ? '∞' : maxAgents} agents · EXT {planCfg.extLabel}
-                        </span>
-                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${planCfg.callBg} ${planCfg.callBorder} ${planCfg.callColor}`}>
+                        {planCfg.callBadge} {planCfg.callType}
+                    </span>
+                    <span className="text-[10px] text-[#55557a]">
+                        {agents.length}/{maxAgents === -1 ? '∞' : maxAgents} agents · EXT {planCfg.extLabel}
+                    </span>
                     <button
                         onClick={() => { if (!agentLimitReached) { setNewAgent({ ...EMPTY_AGENT, extension: nextExt() }); setShowNewModal(true) } }}
                         disabled={agentLimitReached}
                         title={agentLimitReached ? `Limite atteinte (${maxAgents} agents max sur le forfait ${subscription?.plan_name})` : ''}
-                        className="bg-[#7b61ff] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#6145ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+                        className="bg-[#7b61ff] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#6145ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2 ml-auto sm:ml-0">
                         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                        {agentLimitReached ? 'Limite atteinte' : 'Nouvel agent'}
+                        <span className="hidden sm:inline">{agentLimitReached ? 'Limite atteinte' : 'Nouvel agent'}</span>
+                        <span className="sm:hidden">{agentLimitReached ? 'Limite' : 'Nouveau'}</span>
                     </button>
                 </div>
             </div>

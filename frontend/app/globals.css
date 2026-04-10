@@ -29,3 +29,69 @@ html, body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* DialerFAB — bouton floating phone (responsive) */
+.vf-fab-button {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .3s, box-shadow .3s, transform .2s;
+}
+.vf-fab-button:hover {
+  transform: scale(1.05);
+}
+@media (min-width: 640px) {
+  .vf-fab-button {
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+  }
+  .vf-fab-button svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
+
+/* Indicateur live à côté du FAB quand dialer ouvert */
+.vf-fab-live {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 10000;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #00d4aa;
+  border: 2.5px solid #111118;
+  box-shadow: 0 0 8px rgba(0, 212, 170, .9);
+  pointer-events: none;
+  animation: vfLive 2s ease-in-out infinite;
+}
+@media (min-width: 640px) {
+  .vf-fab-live {
+    bottom: 18px;
+    right: 18px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Main admin: padding bottom pour laisser place au FAB */
+.admin-main-scroll {
+  padding-bottom: 72px;
+}
+@media (min-width: 640px) {
+  .admin-main-scroll {
+    padding-bottom: 96px;
+  }
+}
