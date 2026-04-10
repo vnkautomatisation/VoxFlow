@@ -74,21 +74,63 @@ export default function LoginPage() {
 
     // ── SSO OAuth handler (Google / Microsoft) ────────────────
     //
-    // Supabase JS `signInWithOAuth` construit une URL vers
-    // /auth/v1/authorize?provider=X mais NE VÉRIFIE PAS si le provider
-    // est activé côté Supabase. Si désactivé, le browser navigue vers
-    // cette URL qui retourne du JSON `{error_code:"validation_failed"}`
-    // et l'utilisateur voit la réponse brute, pas notre message d'erreur.
+    // Problème: Supabase `signInWithOAuth` NE VÉRIFIE PAS si le provider
+    // est activé. Si désactivé, le browser navigue vers une URL qui
+    // retourne du JSON brut `{error_code:"validation_failed"}` au lieu
+    // d'une redirect vers Google/MS.
     //
-    // Solution: preflight GET sur l'URL Supabase avec `redirect: manual`,
-    // détecter le 400 et afficher un message clair AVANT de rediriger.
+    // Solution: GET `/auth/v1/settings` (endpoint public avec CORS OK)
+    // qui retourne `{external:{google:bool, azure:bool, ...}}`. On vérifie
+    // AVANT de faire quoi que ce soit que le provider est activé.
     const handleSSO = async (provider: 'google' | 'azure') => {
         setError('')
         setSsoLoading(provider)
 
         const providerLabel = provider === 'google' ? 'Google' : 'Microsoft'
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+        if (!supabaseUrl || !supabaseKey) {
+            setError('Supabase non configuré (NEXT_PUBLIC_SUPABASE_URL manquant)')
+            setSsoLoading(null)
+            return
+        }
 
         try {
+            // 1. Pré-vérification: le provider est-il activé dans Supabase ?
+            //    L'endpoint /auth/v1/settings est public et retourne
+            //    { external: { google: bool, azure: bool, ... } }
+            let settingsChecked = false
+            try {
+                const settingsRes = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+                    method: 'GET',
+                    headers: { 'apikey': supabaseKey },
+                })
+                if (settingsRes.ok) {
+                    settingsChecked = true
+                    const settings = await settingsRes.json()
+                    const enabled = settings?.external?.[provider]
+                    if (!enabled) {
+                        setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel} (il faut renseigner le Client ID + Client Secret).`)
+                        setSsoLoading(null)
+                        return
+                    }
+                } else if (settingsRes.status === 401) {
+                    // Clé anon invalide / tronquée
+                    setError('Clé Supabase anon invalide — vérifie NEXT_PUBLIC_SUPABASE_ANON_KEY dans .env.local (peut-être tronquée).')
+                    setSsoLoading(null)
+                    return
+                }
+            } catch {
+                // Erreur réseau sur settings → on tente quand même l'OAuth
+            }
+
+            // Si on n'a pas pu vérifier, on avertit dans le log console
+            if (!settingsChecked) {
+                console.warn('[SSO] Impossible de vérifier /auth/v1/settings — tentative OAuth directe')
+            }
+
+            // 2. Le provider est activé → on lance l'OAuth
             const supabase = createClient()
 
             // Préserver le ?redirect= à travers le round-trip OAuth.
@@ -100,54 +142,21 @@ export default function LoginPage() {
                 ? `${callbackBase}?redirect=${encodeURIComponent(redirectParam)}`
                 : callbackBase
 
-            // 1. Construire l'URL OAuth via Supabase SDK (skipBrowserRedirect)
-            const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+            const { error: oauthError } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {
                     redirectTo,
-                    skipBrowserRedirect: true, // ← on contrôle la nav nous-mêmes
                     queryParams: provider === 'google'
                         ? { access_type: 'offline', prompt: 'consent' }
                         : undefined,
                 },
             })
 
-            if (oauthError || !data?.url) {
-                const msg = (oauthError?.message || '').toLowerCase()
-                if (msg.includes('not enabled') || msg.includes('unsupported provider')) {
-                    setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel}.`)
-                } else {
-                    setError(`Erreur SSO ${providerLabel}: ${oauthError?.message || 'URL OAuth indisponible'}`)
-                }
+            if (oauthError) {
+                setError(`Erreur SSO ${providerLabel}: ${oauthError.message}`)
                 setSsoLoading(null)
-                return
             }
-
-            // 2. Preflight: fetch l'URL Supabase pour détecter le 400 "not enabled"
-            //    Si activé → Supabase retourne 302 (opaqueredirect via CORS)
-            //    Si désactivé → Supabase retourne 400 avec JSON lisible
-            try {
-                const preflight = await fetch(data.url, { method: 'GET', redirect: 'manual' })
-                if (preflight.status === 400) {
-                    const body = await preflight.json().catch(() => null)
-                    const errMsg = body?.msg || body?.error_description || body?.error || 'Provider non configuré'
-                    if (errMsg.toLowerCase().includes('not enabled') ||
-                        errMsg.toLowerCase().includes('unsupported provider')) {
-                        setError(`${providerLabel} SSO n'est pas activé dans Supabase. Dashboard → Authentication → Providers → activer ${providerLabel} (il faut aussi renseigner le Client ID + Secret).`)
-                    } else {
-                        setError(`Erreur SSO ${providerLabel}: ${errMsg}`)
-                    }
-                    setSsoLoading(null)
-                    return
-                }
-                // status 0/opaqueredirect/302 → OK, provider activé, on navigue
-            } catch {
-                // Si preflight échoue (CORS, réseau), on tente la redirection
-                // quand même — l'utilisateur verra l'erreur Supabase sinon.
-            }
-
-            // 3. Navigation manuelle vers l'URL OAuth
-            window.location.href = data.url
+            // Si pas d'erreur → Supabase auto-redirect vers le provider
         } catch (err: any) {
             setError(err?.message || 'Erreur de connexion SSO')
             setSsoLoading(null)
