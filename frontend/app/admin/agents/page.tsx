@@ -299,11 +299,12 @@ export default function AgentsPage() {
 
             {/* Table agents */}
             <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
-                <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
                     <thead>
                         <tr className="bg-[#1f1f2a] border-b border-[#2e2e44]">
                             {['Agent', 'Extension', 'Rôle', 'Statut', 'Files assignées', 'Appels auj.', 'Dernière activité', 'Actions'].map(h => (
-                                <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a]">{h}</th>
+                                <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a] whitespace-nowrap">{h}</th>
                             ))}
                         </tr>
                     </thead>
@@ -392,6 +393,7 @@ export default function AgentsPage() {
                         })}
                     </tbody>
                 </table>
+              </div>
                 {!filtered.length && (
                     <div className="text-center text-[#55557a] py-12">
                         <svg className="mx-auto mb-3 text-[#2e2e44]" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
