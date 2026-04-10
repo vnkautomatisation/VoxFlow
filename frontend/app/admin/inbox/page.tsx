@@ -131,7 +131,7 @@ export default function InboxPage() {
   )
 
   return (
-    <div className="h-[calc(100vh-48px)] overflow-hidden">
+    <div className="h-[calc(100vh-49px)] overflow-hidden">
       <div className="p-6 max-w-7xl mx-auto h-full flex flex-col">
 
       {/* Header */}
