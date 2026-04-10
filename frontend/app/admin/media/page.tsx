@@ -260,7 +260,7 @@ export default function MediaPage() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[
                     { label: 'Total fichiers', val: files.length, color: 'text-[#eeeef8]' },
                     { label: 'Musiques d\'attente', val: holdMusic, color: 'text-violet-400' },

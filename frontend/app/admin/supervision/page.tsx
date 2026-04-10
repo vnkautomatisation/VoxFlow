@@ -390,7 +390,7 @@ export default function LivePage() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 {[
                     { label: 'Appels actifs', val: kpis.activeCalls || 0, color: kpis.activeCalls > 0 ? 'text-rose-400' : 'text-[#eeeef8]', glow: kpis.activeCalls > 0 },
                     { label: 'Agents en ligne', val: `${kpis.onlineAgents || 0}/${kpis.totalAgents || 0}`, color: 'text-emerald-400' },
@@ -412,7 +412,7 @@ export default function LivePage() {
                 <div className="text-xs font-bold text-[#eeeef8] mb-3">
                     Agents ({kpis.onlineAgents || 0}/{kpis.totalAgents || 0} en ligne)
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {agents.map((a: any, i: number) => {
                         const isOnCall = !!a.callId
                         const st = isOnCall ? 'BUSY' : (a.status || 'OFFLINE')
@@ -534,7 +534,7 @@ export default function LivePage() {
             {queues.length > 0 && (
                 <div>
                     <div className="text-xs font-bold text-[#eeeef8] mb-3">Files d&apos;attente</div>
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {queues.map((q: any) => (
                             <div key={q.id} className={`bg-[#18181f] border rounded-xl p-4 ${q.is_vip ? 'border-violet-400/40' : 'border-[#2e2e44]'}`}>
                                 <div className="flex items-center gap-2 mb-2">
