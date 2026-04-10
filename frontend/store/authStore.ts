@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-export type Role = "OWNER" | "ADMIN" | "SUPERVISOR" | "AGENT"
+export type Role = "OWNER" | "OWNER_STAFF" | "ADMIN" | "SUPERVISOR" | "AGENT"
 
 export interface AuthUser {
   id:             string
@@ -168,10 +168,11 @@ if (typeof window !== "undefined") {
 
 export const getDashboardRoute = (role: Role): string => {
   const map: Record<Role, string> = {
-    OWNER:      '/owner/dashboard',
-    ADMIN:      '/admin/dashboard',
-    SUPERVISOR: '/agent/dashboard',
-    AGENT:      '/agent/dashboard',
+    OWNER:       '/owner/dashboard',
+    OWNER_STAFF: '/owner/dashboard', // Même portail que OWNER (champs cachés gérés dans les pages)
+    ADMIN:       '/admin/dashboard',
+    SUPERVISOR:  '/agent/dashboard',
+    AGENT:       '/agent/dashboard',
   }
   return map[role] || '/login'
 }

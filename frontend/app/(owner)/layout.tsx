@@ -14,7 +14,9 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   if (!token) redirect('/login')
   const payload = decodeJwt(token!)
   const role = payload?.role?.toUpperCase()
-  if (role !== 'OWNER') {
+  // OWNER + OWNER_STAFF partagent le même portail. Le filtrage des champs
+  // sensibles (facturation, Stripe, etc.) est géré dans chaque page.
+  if (role !== 'OWNER' && role !== 'OWNER_STAFF') {
     const dash: Record<string,string> = {
       ADMIN: '/admin/dashboard',
       AGENT: '/agent/dashboard',

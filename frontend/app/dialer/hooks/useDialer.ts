@@ -279,7 +279,10 @@ export function useDialer() {
 
     // ── isAdmin helper ─────────────────────────────────────────
     const isAdmin = useCallback(() =>
-        S.current.role === 'ADMIN' || S.current.role === 'OWNER', [])
+        S.current.role === 'ADMIN' ||
+        S.current.role === 'OWNER' ||
+        S.current.role === 'OWNER_STAFF' ||
+        S.current.role === 'SUPERVISOR', [])
 
     // ── Toast ──────────────────────────────────────────────────
     const showToast = useCallback((msg: string, dur = 2500) => {
