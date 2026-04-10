@@ -694,25 +694,25 @@ export default function CRMPage() {
             </div>
 
             {/* Barre filtres */}
-            <div className="flex items-center gap-3 mb-5">
-                <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+                <div className="relative w-full sm:flex-1 sm:max-w-sm">
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#55557a]" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un contact..."
                         className="w-full bg-[#18181f] border border-[#2e2e44] rounded-lg pl-9 pr-4 py-2 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]" />
                 </div>
                 <select value={tagFilter} onChange={e => setTagFilter(e.target.value)}
-                    className="bg-[#18181f] border border-[#2e2e44] rounded-lg px-3 py-2 text-xs text-[#eeeef8] outline-none focus:border-[#7b61ff]">
+                    className="bg-[#18181f] border border-[#2e2e44] rounded-lg px-3 py-2 text-xs text-[#eeeef8] outline-none focus:border-[#7b61ff] w-full sm:w-auto">
                     <option value="">Tous les tags</option>
                     {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-                <div className="text-xs text-[#55557a]">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
+                <div className="text-xs text-[#55557a] whitespace-nowrap">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
             </div>
 
             {/* ── VUE LISTE ──────────────────────────────────────── */}
             {view === 'list' && (
-                <div className="flex gap-5">
+                <div className="flex flex-col lg:flex-row gap-5">
                     {/* Table */}
-                    <div className={`flex-1 min-w-0 bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden ${selContact ? 'max-w-[60%]' : ''}`}>
+                    <div className={`flex-1 min-w-0 bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden ${selContact ? 'lg:max-w-[60%]' : ''}`}>
                         {filtered.length === 0 ? (
                             <div className="p-12 text-center">
                                 <svg className="mx-auto mb-3 text-[#2e2e44]" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
@@ -721,11 +721,12 @@ export default function CRMPage() {
                                     className="text-xs text-[#7b61ff] hover:underline mt-2">Ajouter le premier contact</button>
                             </div>
                         ) : (
-                            <table className="w-full">
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[720px]">
                                 <thead>
                                     <tr className="bg-[#1f1f2a] border-b border-[#2e2e44]">
                                         {['Contact', 'Telephone', 'Entreprise', 'Tags', 'Dernier appel', ''].map(h => (
-                                            <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a]">{h}</th>
+                                            <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-[#55557a] whitespace-nowrap">{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
@@ -773,12 +774,13 @@ export default function CRMPage() {
                                     ))}
                                 </tbody>
                             </table>
+                          </div>
                         )}
                     </div>
 
                     {/* Panneau détail */}
                     {selContact && (
-                        <div className="w-80 flex-shrink-0 bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden flex flex-col">
+                        <div className="w-full lg:w-80 flex-shrink-0 bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden flex flex-col">
                             {/* Header panneau */}
                             <div className="px-5 py-4 border-b border-[#2e2e44] flex items-center justify-between">
                                 <div className="flex items-center gap-3">

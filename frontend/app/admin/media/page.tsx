@@ -314,22 +314,22 @@ export default function MediaPage() {
             )}
 
             {/* Filtres */}
-            <div className="flex items-center gap-3 mb-4">
-                <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                <div className="relative w-full sm:flex-1 sm:max-w-sm">
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#55557a]" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
                         className="w-full bg-[#18181f] border border-[#2e2e44] rounded-lg pl-9 pr-4 py-2 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]" />
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-1 px-1">
                     {[{ val: 'all', label: 'Tous' }, ...AUDIO_TYPES.map(t => ({ val: t.value, label: t.label }))].map(f => (
                         <button key={f.val} onClick={() => setFilter(f.val)}
-                            className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors
+                            className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex-shrink-0
                 ${filter === f.val ? 'bg-[#7b61ff]/20 text-violet-300 border border-[#7b61ff]/40' : 'text-[#55557a] hover:text-[#9898b8]'}`}>
                             {f.label}
                         </button>
                     ))}
                 </div>
-                <div className="ml-auto text-xs text-[#55557a]">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
+                <div className="text-xs text-[#55557a] sm:ml-auto whitespace-nowrap">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
             </div>
 
             {/* Grille fichiers */}
