@@ -480,5 +480,81 @@ router.get("/twiml/voicemail", (req: Request, res: Response) => {
     res.send(twilioService.generateVoicemailTwiML(String(req.query.orgId || "org_test_001")))
 })
 
+// ── TwiML IVR (menu interactif) ──────────────────────────────
+// GET /twiml/ivr/:id — racine du menu IVR (play welcome + gather DTMF)
+router.get("/twiml/ivr/:id", async (req: Request, res: Response) => {
+    try {
+        const ivrId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+        const orgId = String(req.query.orgId || "")
+
+        const { data: ivr } = await supabaseAdmin
+            .from("ivr_configs")
+            .select("id, name, welcome_message, timeout, max_retries, nodes")
+            .eq("id", ivrId)
+            .maybeSingle()
+
+        res.set("Content-Type", "text/xml")
+        if (!ivr) {
+            // Fallback si IVR inexistant — voicemail générique
+            res.send(twilioService.generateVoicemailTwiML(orgId))
+            return
+        }
+        res.send(twilioService.generateIvrTwiML(ivr, orgId))
+    } catch (err: any) {
+        res.set("Content-Type", "text/xml")
+        res.send(`<?xml version="1.0"?><Response><Say language="fr-CA" voice="alice">Une erreur est survenue. Au revoir.</Say><Hangup/></Response>`)
+    }
+})
+
+// POST /twiml/ivr/:id/gather — callback après saisie DTMF utilisateur
+router.post("/twiml/ivr/:id/gather", async (req: Request, res: Response) => {
+    try {
+        const ivrId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+        const orgId = String(req.query.orgId || "")
+        const digit = String(req.body?.Digits || req.query?.Digits || "")
+
+        const { data: ivr } = await supabaseAdmin
+            .from("ivr_configs")
+            .select("id, name, welcome_message, timeout, max_retries, nodes")
+            .eq("id", ivrId)
+            .maybeSingle()
+
+        res.set("Content-Type", "text/xml")
+        if (!ivr) {
+            res.send(`<?xml version="1.0"?><Response><Hangup/></Response>`)
+            return
+        }
+        res.send(twilioService.generateIvrActionTwiML(ivr, digit, orgId))
+    } catch (err: any) {
+        res.set("Content-Type", "text/xml")
+        res.send(`<?xml version="1.0"?><Response><Hangup/></Response>`)
+    }
+})
+
+// GET /twiml/queue/:id — enqueue un appel dans une file d'attente ACD
+router.get("/twiml/queue/:id", async (req: Request, res: Response) => {
+    try {
+        const queueId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+        const orgId   = String(req.query.orgId || "")
+
+        const { data: queue } = await supabaseAdmin
+            .from("queues")
+            .select("id, name, welcome_message, music_on_hold")
+            .eq("id", queueId)
+            .maybeSingle()
+
+        res.set("Content-Type", "text/xml")
+        if (!queue) {
+            // Fallback si queue inexistante — voicemail générique
+            res.send(twilioService.generateVoicemailTwiML(orgId))
+            return
+        }
+        res.send(twilioService.generateQueueTwiML(queue, orgId))
+    } catch (err: any) {
+        res.set("Content-Type", "text/xml")
+        res.send(`<?xml version="1.0"?><Response><Say language="fr-CA" voice="alice">File d'attente indisponible. Au revoir.</Say><Hangup/></Response>`)
+    }
+})
+
 router.use('/', voiceRoutes)
 export default router

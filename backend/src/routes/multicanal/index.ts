@@ -143,6 +143,95 @@ router.post("/webhook/sms", async (req: Request, res: Response) => {
   }
 })
 
+// ── WEBHOOK EMAIL entrant (SendGrid / Mailgun / Postmark / generic) ──
+// Supporte plusieurs formats en normalisant la payload. L'org peut être
+// identifiée via ?orgId=... ou par le `to` address si une lookup existe.
+router.post("/webhook/email", async (req: Request, res: Response) => {
+  try {
+    const b = req.body || {}
+
+    // Normalisation multi-vendor vers un format commun
+    // SendGrid inbound: form-urlencoded {from, to, subject, text, html, headers}
+    // Mailgun: {sender, recipient, subject, "body-plain", "body-html", "Message-Id"}
+    // Postmark: {From, To, Subject, TextBody, HtmlBody, MessageID}
+    // Generic JSON: {from, to, subject, text, html, messageId}
+    const fromEmail = String(
+      b.from || b.From || b.sender || b.envelope?.from || ""
+    ).trim().replace(/^.*<([^>]+)>.*$/, "$1") // Extract email from "Name <email@x.com>"
+    const fromName = String(b.fromName || b.FromName || b.from_name || "").trim() ||
+                     (String(b.from || b.From || "").match(/^(.*?)<[^>]+>$/)?.[1]?.trim() || "")
+    const toEmail = String(b.to || b.To || b.recipient || "").trim()
+    const subject = String(b.subject || b.Subject || "").trim() || "(sans sujet)"
+    const bodyText = String(
+      b.text || b.TextBody || b["body-plain"] || b.plain || ""
+    )
+    const bodyHtml = String(
+      b.html || b.HtmlBody || b["body-html"] || ""
+    )
+    const messageId = String(
+      b.messageId || b["Message-Id"] || b.MessageID || b["message-id"] || `email_${Date.now()}`
+    )
+
+    if (!fromEmail) {
+      console.warn("[Email webhook] from manquant dans payload")
+      return res.status(200).json({ ok: false, error: "from manquant" })
+    }
+
+    // Identifier l'org: via query param ?orgId=... en priorité
+    let orgId = String(req.query.orgId || "")
+    if (!orgId && toEmail) {
+      // Fallback: chercher dans organizations.inbound_email (si colonne existe)
+      try {
+        const { data: org } = await (await import("../../config/supabase")).supabaseAdmin
+          .from("organizations")
+          .select("id")
+          .eq("inbound_email", toEmail)
+          .maybeSingle()
+        if (org) orgId = org.id
+      } catch { /* colonne peut ne pas exister */ }
+    }
+
+    if (!orgId) {
+      console.warn("[Email webhook] orgId non résolu, to=", toEmail)
+      return res.status(200).json({ ok: false, error: "orgId non résolu" })
+    }
+
+    // Auto-link CRM: chercher contact par email
+    let contactId: string | undefined
+    try {
+      const { data: contact } = await (await import("../../config/supabase")).supabaseAdmin
+        .from("contacts")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("email", fromEmail)
+        .maybeSingle()
+      if (contact) contactId = contact.id
+    } catch { /* pas grave */ }
+
+    // Créer ticket email + conversation associée (service gère le threading)
+    const result = await multicanalService.createEmailTicket(orgId, {
+      fromEmail,
+      fromName:  fromName || undefined,
+      toEmail,
+      subject,
+      bodyText:  bodyText || undefined,
+      bodyHtml:  bodyHtml || undefined,
+      messageId,
+    })
+
+    // Si on a trouvé un contact, lier la conversation
+    if (contactId && result?.conversation?.id) {
+      await multicanalService.updateConversation(result.conversation.id, orgId, { contactId })
+    }
+
+    res.status(200).json({ ok: true, conversationId: result?.conversation?.id })
+  } catch (err: any) {
+    console.error("[Email webhook] error:", err.message)
+    // Always return 200 pour éviter que le vendor retry en boucle
+    res.status(200).json({ ok: false, error: err.message })
+  }
+})
+
 // ── WEBHOOK delivery status (Twilio MessageStatus callback) ──
 router.post("/webhook/twilio-status", async (req: Request, res: Response) => {
   try {
