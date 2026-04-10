@@ -186,10 +186,15 @@ export default function IntegrationsPage() {
 // appelables par les clients. Les exposer dans cette doc révélerait
 // notre architecture et augmenterait la surface d'attaque.
 function APIDocs() {
-  // API publique — protégée par clé API (vf_...)
+  // API publique — protégée par clé API (vf_...) + permissions granulaires
   const publicApi = [
-    { method: "GET",  path: "/api/v1/integrations/v2/calls",     desc: "Liste de vos appels (filtrés par votre organisation)",   auth: "API Key" },
-    { method: "GET",  path: "/api/v1/integrations/v2/contacts",  desc: "Liste de vos contacts CRM",                                auth: "API Key" },
+    { method: "GET",   path: "/api/v1/integrations/v2/calls",         desc: "Liste des appels (pagination: limit, offset)",         auth: "calls:read" },
+    { method: "POST",  path: "/api/v1/integrations/v2/calls",         desc: "Initier un appel sortant (body: {to, from?})",           auth: "calls:write" },
+    { method: "GET",   path: "/api/v1/integrations/v2/contacts",      desc: "Liste des contacts (pagination + search)",               auth: "contacts:read" },
+    { method: "POST",  path: "/api/v1/integrations/v2/contacts",      desc: "Créer ou mettre à jour un contact (upsert par email)",   auth: "contacts:write" },
+    { method: "PATCH", path: "/api/v1/integrations/v2/contacts/:id",  desc: "Modifier un contact existant",                           auth: "contacts:write" },
+    { method: "GET",   path: "/api/v1/integrations/v2/conversations", desc: "Liste des conversations omnicanal (channel, status)",   auth: "conversations:read" },
+    { method: "GET",   path: "/api/v1/integrations/v2/analytics",     desc: "Statistiques agrégées (query: ?days=30)",                auth: "analytics:read" },
   ]
 
   // Widget chat public — pour embed dans un site web (sans auth)
