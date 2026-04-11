@@ -38,13 +38,15 @@ export interface AuthUser {
 }
 
 interface AuthState {
-  user:        AuthUser | null
-  accessToken: string | null
-  isLoading:   boolean
-  isAuth:      boolean
-  setAuth:    (user: AuthUser, token: string) => void
-  logout:     () => void
-  setLoading: (v: boolean) => void
+  user:         AuthUser | null
+  accessToken:  string | null
+  isLoading:    boolean
+  isAuth:       boolean
+  setAuth:     (user: AuthUser, token: string) => void
+  logout:      () => void
+  setLoading:  (v: boolean) => void
+  // Force un refresh du user depuis /auth/me (plan, features, trial)
+  refreshUser: () => Promise<void>
 }
 
 // ── Cookies via route API (lisibles par middleware) ───────────────
@@ -131,7 +133,7 @@ function clearDialerSync() {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user:        null,
       accessToken: null,
       isLoading:   false,
@@ -170,6 +172,45 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setLoading: (isLoading) => set({ isLoading }),
+
+      // Refresh depuis /auth/me pour récupérer les nouvelles features/plan/trial
+      // Appelé par le poller 2min et manuellement après un plan change
+      refreshUser: async () => {
+        const state = get()
+        if (!state.accessToken) return
+        try {
+          const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+          const res = await fetch(url + '/api/v1/auth/me', {
+            headers: { Authorization: 'Bearer ' + state.accessToken },
+          })
+          if (!res.ok) return
+          const json = await res.json()
+          if (!json?.success || !json.data) return
+          const freshUser: AuthUser = {
+            ...state.user,
+            ...json.data,
+            // Normalisation : organization_id peut s'appeler organization_id ou organizationId
+            organizationId: json.data.organization_id || json.data.organizationId || state.user?.organizationId || null,
+          }
+          // Detect plan change pour log / notification
+          const oldPlanId = state.user?.planId
+          const newPlanId = freshUser.planId
+          if (oldPlanId && newPlanId && oldPlanId !== newPlanId) {
+            console.log(`[authStore] Plan change detected: ${oldPlanId} -> ${newPlanId}`)
+            // Broadcast à l'Electron dialer pour forcer un refresh des features
+            try {
+              const bc = new BroadcastChannel('voxflow_sync')
+              bc.postMessage({ type: 'PLAN_CHANGED', planId: newPlanId, features: freshUser.features })
+              bc.close()
+            } catch {}
+            // Notify Electron via HTTP 9876
+            notifyElectron('refresh-features', state.accessToken || undefined, freshUser.role)
+          }
+          // Sync localStorage avec les nouvelles valeurs
+          if (state.accessToken) syncToDialer(freshUser, state.accessToken)
+          set({ user: freshUser })
+        } catch {}
+      },
     }),
     {
       name: "voxflow-auth",

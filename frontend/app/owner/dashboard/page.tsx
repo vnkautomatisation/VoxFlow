@@ -82,6 +82,13 @@ export default function OwnerDashboard() {
                   {tab.label}
                 </button>
               ))}
+              {/* Lien séparé vers la page /owner/plans (vraie page, pas un tab) */}
+              <button
+                onClick={() => router.push("/owner/plans")}
+                className="px-3 py-1.5 rounded-lg text-sm text-[#7b61ff] hover:text-white hover:bg-[#7b61ff]/20 transition-colors font-bold"
+              >
+                Forfaits →
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-3">
