@@ -1,7 +1,7 @@
 {
   "name": "voxflow-dialer",
-  "version": "1.1.0",
-  "description": "VoxFlow Dialer — Call center desktop app by VNK Automatisation Inc.",
+  "version": "1.2.0",
+  "description": "VoxFlow Dialer — Minimal Electron shell loading the Next.js dialer page. By VNK Automatisation Inc.",
   "main": "main.js",
   "author": "VNK Automatisation Inc.",
   "license": "UNLICENSED",
