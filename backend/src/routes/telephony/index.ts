@@ -336,47 +336,109 @@ router.get("/numbers", authenticate, async (req: AuthRequest, res: Response) => 
     catch (err: any) { sendError(res, err.message) }
 })
 
-// GET /my-numbers — retourne les numéros actifs de l'org depuis la DB,
-// groupés par pays pour afficher un sélecteur avec drapeaux dans le dialer.
-// Lecture directe de phone_numbers (pas de round-trip Twilio).
+// GET /my-numbers — retourne les vrais numéros Twilio de l'org, enrichis
+// avec pays détecté + drapeau ISO. Fusionne :
+//   1. Twilio API (source de vérité) — incomingPhoneNumbers.list()
+//   2. phone_numbers table en DB (cache + mapping org_id ← twilio_sid)
+//
+// Seuls les numéros dont le twilio_sid est mappé à l'org courante
+// sont retournés, sauf si le twilio_sid n'existe pas (numéros simulés
+// en dev) — dans ce cas on accepte les numéros DB avec le bon org_id
+// pour ne pas casser le dev.
 router.get("/my-numbers", authenticate, async (req: AuthRequest, res: Response) => {
     try {
         const orgId = getOrgId(req)
-        if (!orgId) return sendError(res, "Organisation requise", 403)
+        // OWNER / OWNER_STAFF sans orgId → liste vide (staff VNK)
+        const role = req.user?.role
+        if (!orgId) {
+            if (role === 'OWNER' || role === 'OWNER_STAFF') {
+                return sendSuccess(res, { numbers: [], byCountry: {}, total: 0, sources: { twilio: 0, simulated: 0, db: 0 } })
+            }
+            return sendError(res, "Organisation requise", 403)
+        }
 
-        const { data, error } = await supabaseAdmin
+        // 1. Lire la DB (mapping org → twilio_sid)
+        const { data: dbNumbers, error } = await supabaseAdmin
             .from('phone_numbers')
             .select('number, country, twilio_sid')
             .eq('organization_id', orgId)
-            .order('country', { ascending: true })
         if (error) throw new Error(error.message)
 
-        // Enrichir chaque numéro avec son pays détecté + drapeau emoji
-        const enriched = (data || []).map((n: any) => {
+        const dbByNumber: Record<string, any> = {}
+        const dbBySid:    Record<string, any> = {}
+        ;(dbNumbers || []).forEach((n: any) => {
+            dbByNumber[n.number] = n
+            if (n.twilio_sid) dbBySid[n.twilio_sid] = n
+        })
+
+        // 2. Essayer de fetch Twilio (source de vérité). Fail-open si down.
+        let twilioNums: any[] = []
+        try {
+            twilioNums = await twilioService.getPhoneNumbers()
+        } catch (e: any) {
+            console.warn('[my-numbers] Twilio fetch failed:', e?.message)
+        }
+
+        // 3. Fusionner : priorité Twilio pour les champs officiels
+        //    Garder uniquement ceux mappés à l'org (twilio_sid ∈ dbBySid)
+        const merged: any[] = []
+        const seen = new Set<string>()
+
+        for (const t of twilioNums) {
+            if (!dbBySid[t.sid]) continue // pas mappé à cette org
+            seen.add(t.phoneNumber)
+            const detected = detectCountry(t.phoneNumber)
+            const country  = dbBySid[t.sid]?.country || detected
+            merged.push({
+                number:        t.phoneNumber,
+                friendly_name: t.friendlyName || t.phoneNumber,
+                twilio_sid:    t.sid,
+                country_code:  country,
+                country_name:  REGION_NAMES[country] || country,
+                flag:          countryFlag(country),
+                source:        'twilio',
+            })
+        }
+
+        // 4. Ajouter les numéros DB non retrouvés dans Twilio (simulés/legacy)
+        for (const n of (dbNumbers || [])) {
+            if (seen.has(n.number)) continue
             const detected = detectCountry(n.number)
             const country  = n.country || detected
-            return {
+            merged.push({
                 number:        n.number,
                 friendly_name: n.number,
                 twilio_sid:    n.twilio_sid,
                 country_code:  country,
                 country_name:  REGION_NAMES[country] || country,
                 flag:          countryFlag(country),
-            }
+                source:        n.twilio_sid?.startsWith('simulated_') ? 'simulated' : 'db',
+            })
+        }
+
+        // 5. Trier par pays puis numéro
+        merged.sort((a, b) => {
+            if (a.country_code !== b.country_code) return a.country_code.localeCompare(b.country_code)
+            return a.number.localeCompare(b.number)
         })
 
-        // Grouper par pays
+        // 6. Grouper par pays pour affichage
         const byCountry: Record<string, any[]> = {}
-        enriched.forEach(n => {
+        merged.forEach(n => {
             const key = n.country_code
             if (!byCountry[key]) byCountry[key] = []
             byCountry[key].push(n)
         })
 
         sendSuccess(res, {
-            numbers: enriched,
+            numbers:   merged,
             byCountry,
-            total: enriched.length,
+            total:     merged.length,
+            sources:   {
+                twilio:    merged.filter(n => n.source === 'twilio').length,
+                simulated: merged.filter(n => n.source === 'simulated').length,
+                db:        merged.filter(n => n.source === 'db').length,
+            },
         })
     } catch (err: any) { sendError(res, err.message) }
 })

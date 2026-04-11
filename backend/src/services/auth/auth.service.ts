@@ -380,14 +380,35 @@ export class AuthService {
   // ── Helper formatage utilisateur ─────────────────────────────
   // Devient async parce qu'on va chercher la plan_definition en DB
   // (avec un cache 60s pour ne pas faire un round-trip par login).
+  //
+  // Règle : OWNER et OWNER_STAFF (staff VNK) ont TOUJOURS accès à
+  // toutes les features, sans égard au plan de leur org (ils n'ont
+  // souvent pas d'org attachée). Ils peuvent tout voir/faire dans
+  // le dialer car c'est leur produit.
   private async _formatUser(user: any, agent: any, org?: any) {
-    const orgPlanId = (org?.plan || 'STARTER').toUpperCase()
-    const planDef   = await this._getPlanDefinition(orgPlanId)
+    const isStaff = user.role === 'OWNER' || user.role === 'OWNER_STAFF'
 
-    const features: Record<string, boolean> =
+    const orgPlanId = isStaff
+      ? 'ENTERPRISE' // staff VNK = accès Enterprise par défaut
+      : (org?.plan || 'STARTER').toUpperCase()
+    const planDef = await this._getPlanDefinition(orgPlanId)
+
+    let features: Record<string, boolean> =
       planDef?.features && typeof planDef.features === 'object'
         ? planDef.features
         : FALLBACK_FEATURES
+
+    // OWNER/OWNER_STAFF : override — tout activé quel que soit le plan
+    if (isStaff) {
+      features = {
+        outbound_calls: true, inbound_calls: true, queues: true,
+        agents_supervision: true, history: true, voicemails: true,
+        contacts_search: true, messaging: true, call_recording: true,
+        ai_transcription: true, ai_sentiment: true, robot_dialer: true,
+        crm_basic: true, crm_advanced: true, reports_basic: true,
+        reports_advanced: true, api_access: true, white_label: true,
+      }
+    }
 
     // Rétrocompatibilité : 'FULL' | 'INBOUND_ONLY' déduit des features
     const dialerPlan = features.outbound_calls ? 'FULL' : 'INBOUND_ONLY'
