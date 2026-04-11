@@ -24,13 +24,28 @@ const http = require('http')
 const channels = require('./src/ipc-channels')
 
 // ── Configuration ────────────────────────────────────────────
-const IS_DEV       = !app.isPackaged || process.env.NODE_ENV === 'development'
-const FRONTEND_URL = process.env.VOXFLOW_FRONTEND_URL || (IS_DEV ? 'http://localhost:3001' : 'https://app.voxflow.io')
+const IS_DEV = !app.isPackaged || process.env.NODE_ENV === 'development'
+// L'URL frontend est résolue depuis (dans l'ordre) :
+//   1. VOXFLOW_FRONTEND_URL env var
+//   2. ~/.voxflow/config.json { "frontendUrl": "https://..." }
+//   3. http://localhost:3001 (défaut — tant que la prod n'est pas live)
+function resolveFrontendUrl() {
+    if (process.env.VOXFLOW_FRONTEND_URL) return process.env.VOXFLOW_FRONTEND_URL
+    try {
+        const cfgPath = path.join(os.homedir(), '.voxflow', 'config.json')
+        if (fs.existsSync(cfgPath)) {
+            const data = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'))
+            if (data?.frontendUrl) return data.frontendUrl
+        }
+    } catch {}
+    return 'http://localhost:3001'
+}
+const FRONTEND_URL = resolveFrontendUrl()
 const DIALER_PATH  = '/dialer?fromElectron=1'
 const DIALER_URL   = FRONTEND_URL + DIALER_PATH
 const LOCAL_PORT   = 9876
-const MAX_BOOT_RETRIES = 10
-const BOOT_RETRY_BASE_MS = 500 // backoff: 500, 1000, 2000, 4000, ... max 8000
+const MAX_BOOT_RETRIES = 6
+const BOOT_RETRY_BASE_MS = 400 // backoff: 400, 800, 1600, 3200 max 4000
 
 // ── State ─────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock()
@@ -210,8 +225,12 @@ function createWindow() {
         log('[window] shown')
     })
 
-    // ── Boot : tenter de charger le dialer, retry en cas d'échec ──
-    loadWithRetry()
+    // ── Boot : afficher offline.html IMMÉDIATEMENT pour ne pas ──
+    // laisser l'utilisateur sur un écran noir pendant le DNS/TCP.
+    // Puis tenter de joindre le frontend. Si succès, on swap vers le
+    // vrai dialer. Si échec après N retries, on reste sur offline.
+    showLoadingPage()
+    setTimeout(() => loadWithRetry(), 150)
 
     // ── IPC handlers ───────────────────────────────────────────
     ipcMain.on(channels.callStarted,    () => { callActive = true;  log('[call] started') })
@@ -278,6 +297,18 @@ function createWindow() {
 }
 
 // Charge l'URL avec retry exponentiel. Fallback offline.html après N tentatives.
+// Affiche immédiatement offline.html en mode "connexion en cours"
+// pour ne pas laisser l'utilisateur sur un écran noir pendant le
+// DNS/TCP/TLS handshake vers le frontend.
+function showLoadingPage() {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    const offlineFile = path.join(__dirname, 'src', 'offline.html')
+    const hash = '#url=' + encodeURIComponent(DIALER_URL) + '&retries=0&mode=loading'
+    mainWindow.loadFile(offlineFile, { hash }).catch(err => {
+        log('[loading] loadFile error:', err.message)
+    })
+}
+
 function loadWithRetry() {
     if (!mainWindow || mainWindow.isDestroyed()) return
 
