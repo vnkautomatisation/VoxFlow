@@ -52,29 +52,9 @@ html, body {
     overflow: hidden;
 }
 
-/* En mode PC (> 440px de large), on centre le popup comme une
-   fausse fenêtre phone-like pour le debug navigateur. */
-@media screen and (min-width: 441px) {
-    html, body {
-        display: flex;
-        align-items: flex-end;
-        justify-content: flex-end;
-        padding: 16px;
-        min-height: 100vh;
-        height: auto;
-    }
-    .popup {
-        width: 360px;
-        height: 700px;
-        border-radius: 20px;
-        border: 1px solid var(--line);
-        box-shadow: 0 0 0 1px rgba(123,97,255,.08),0 40px 100px rgba(0,0,0,.9),0 12px 40px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);
-    }
-}
-
-/* Sinon (≤ 440px — Electron window, mobile, popup web) :
-   le popup remplit la fenêtre pour ne jamais déborder ou laisser
-   un fond noir visible. */
+/* Base popup : remplit la fenêtre (Electron, mobile, popup).
+   Surcharge par @media min-width:441 juste en dessous pour le
+   mode PC browser (phone-like centré). */
 .popup {
     width: 100%;
     height: 100vh;
@@ -86,6 +66,33 @@ html, body {
     flex-direction: column;
     overflow: hidden;
     position: relative;
+}
+
+/* Mode PC browser (> 440px) — popup 360x700 centré en bas-droite
+   comme une fausse fenêtre phone-like. DOIT venir APRÈS .popup base
+   sinon la cascade écrase les règles par ordre d'apparition. */
+@media screen and (min-width: 441px) {
+    html, body {
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        padding: 16px;
+        min-height: 100vh;
+        height: auto;
+        overflow: auto;
+    }
+    .popup {
+        width: 360px;
+        height: 700px;
+        flex: 0 0 auto;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        box-shadow:
+          0 0 0 1px rgba(123,97,255,.08),
+          0 40px 100px rgba(0,0,0,.9),
+          0 12px 40px rgba(0,0,0,.7),
+          inset 0 1px 0 rgba(255,255,255,.05);
+    }
 }
 
 /* ── TOAST ── */
