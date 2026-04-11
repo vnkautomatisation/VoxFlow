@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { VoxFlowLogo } from '@/components/shared/VoxFlowLogo'
+import TrialBanner from '@/components/shared/TrialBanner'
+import { usePlanPoller } from '@/hooks/usePlanPoller'
 
 
 
@@ -34,6 +36,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const router   = useRouter()
   const user     = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  // Poller /auth/me toutes les 2 min pour détecter les changements de plan
+  usePlanPoller()
 
 
   const [status, setStatus] = useState<'online'|'away'|'offline'>('online')
@@ -140,6 +144,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
         {/* Main */}
         <main style={{ flex:1, overflowY:'auto', padding:24 }}>
+          <TrialBanner />
           {children}
         </main>
       </div>

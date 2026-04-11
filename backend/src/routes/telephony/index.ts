@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express"
 import { authenticate, AuthRequest, resolveOrgId } from "../../middleware/auth"
+import { requireFeature } from "../../middleware/features"
 import { twilioService } from "../../services/twilio/twilio.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
@@ -55,6 +56,28 @@ function detectCountry(phone: string): string {
         if (COUNTRY_PREFIXES[p]) return COUNTRY_PREFIXES[p]
     }
     return "UNKNOWN"
+}
+
+// Conversion code pays → drapeau emoji (Regional Indicator Symbols)
+// Ex: "FR" → 🇫🇷 · "CA" → 🇨🇦 · "CA_US" → 🇨🇦 (on privilégie CA pour la région)
+const COUNTRY_ISO2: Record<string, string> = {
+    CA_US: 'CA', MX: 'MX', FR: 'FR', BE: 'BE', CH: 'CH', LU: 'LU',
+    GB: 'GB', DE: 'DE', ES: 'ES', IT: 'IT', PT: 'PT', NL: 'NL',
+    AT: 'AT', IE: 'IE', PL: 'PL', SE: 'SE', NO: 'NO', DK: 'DK',
+    FI: 'FI', RO: 'RO', HU: 'HU', CZ: 'CZ', SK: 'SK', HR: 'HR',
+    GR: 'GR', MA: 'MA', DZ: 'DZ', TN: 'TN', SN: 'SN', CI: 'CI',
+    CM: 'CM', NG: 'NG', KE: 'KE', ZA: 'ZA', BR: 'BR', AR: 'AR',
+    CL: 'CL', CO: 'CO', PE: 'PE', JP: 'JP', KR: 'KR', CN: 'CN',
+    IN: 'IN', AU: 'AU', NZ: 'NZ', RU: 'RU', UA: 'UA', AE: 'AE',
+    SA: 'SA', IL: 'IL', TR: 'TR',
+}
+
+function countryFlag(code: string): string {
+    const iso = COUNTRY_ISO2[code] || code.substring(0, 2).toUpperCase()
+    if (iso.length !== 2) return '🌐'
+    // 127397 = 0x1F1E6 - 'A'.charCodeAt(0)
+    const offset = 127397
+    return String.fromCodePoint(...iso.split('').map(c => c.charCodeAt(0) + offset))
 }
 
 async function getOrgAllowedRegions(orgId: string): Promise<string[]> {
@@ -140,28 +163,16 @@ router.get("/token", authenticate, async (req: AuthRequest, res: Response) => {
 // ════════════════════════════════════════════════════════════
 //  VÉRIFICATION DESTINATION (appelé par le dialer avant de composer)
 // ════════════════════════════════════════════════════════════
-router.get("/check-destination", authenticate, async (req: AuthRequest, res: Response) => {
+router.get("/check-destination", authenticate, requireFeature('outbound_calls'), async (req: AuthRequest, res: Response) => {
     try {
         const to = String(req.query.to || "").trim()
         const orgId = getOrgId(req)
         if (!to) return sendError(res, "Numéro requis", 400)
 
-        // Plan dialer — STARTER/BASIC ne peuvent pas sortir
-        const planCheck = await validateDialerPlan(orgId)
-        if (!planCheck.allowed) {
-            return res.status(403).json({
-                success: false,
-                error:   planCheck.reason,
-                code:    "DIALER_INBOUND_ONLY",
-                plan:    planCheck.plan,
-            })
-        }
-
         const check = await validateDest(to, orgId)
         const allowed = await getOrgAllowedRegions(orgId)
         sendSuccess(res, {
             ...check,
-            dialerPlan:     planCheck.plan,
             allowedRegions: allowed.map(r => ({ code: r, name: REGION_NAMES[r] || r })),
         })
     } catch (err: any) { sendError(res, err.message) }
@@ -170,25 +181,15 @@ router.get("/check-destination", authenticate, async (req: AuthRequest, res: Res
 // ════════════════════════════════════════════════════════════
 //  APPEL SORTANT
 // ════════════════════════════════════════════════════════════
-router.post("/call/outbound", authenticate, async (req: AuthRequest, res: Response) => {
+router.post("/call/outbound", authenticate, requireFeature('outbound_calls'), async (req: AuthRequest, res: Response) => {
     const { to, contactId, fromNumber } = req.body
     const orgId = getOrgId(req)
     const userId = req.user!.userId
 
     if (!to) return sendError(res, "Numéro requis", 400)
 
-    // 1. Vérifier le forfait dialer — STARTER/BASIC = inbound only
-    const planCheck = await validateDialerPlan(orgId)
-    if (!planCheck.allowed) {
-        return res.status(403).json({
-            success: false,
-            error:   planCheck.reason,
-            code:    "DIALER_INBOUND_ONLY",
-            plan:    planCheck.plan,
-        })
-    }
-
-    // 2. Valider la région selon le forfait
+    // Note: le gating plan (outbound_calls) est appliqué par requireFeature().
+    // Ici on valide juste la région géographique selon le forfait.
     const check = await validateDest(to, orgId)
     if (!check.allowed) {
         return sendError(res,
@@ -333,6 +334,51 @@ router.patch("/voicemail/:id/listen", authenticate, async (req: AuthRequest, res
 router.get("/numbers", authenticate, async (req: AuthRequest, res: Response) => {
     try { sendSuccess(res, await twilioService.getPhoneNumbers()) }
     catch (err: any) { sendError(res, err.message) }
+})
+
+// GET /my-numbers — retourne les numéros actifs de l'org depuis la DB,
+// groupés par pays pour afficher un sélecteur avec drapeaux dans le dialer.
+// Lecture directe de phone_numbers (pas de round-trip Twilio).
+router.get("/my-numbers", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        if (!orgId) return sendError(res, "Organisation requise", 403)
+
+        const { data, error } = await supabaseAdmin
+            .from('phone_numbers')
+            .select('number, country, twilio_sid')
+            .eq('organization_id', orgId)
+            .order('country', { ascending: true })
+        if (error) throw new Error(error.message)
+
+        // Enrichir chaque numéro avec son pays détecté + drapeau emoji
+        const enriched = (data || []).map((n: any) => {
+            const detected = detectCountry(n.number)
+            const country  = n.country || detected
+            return {
+                number:        n.number,
+                friendly_name: n.number,
+                twilio_sid:    n.twilio_sid,
+                country_code:  country,
+                country_name:  REGION_NAMES[country] || country,
+                flag:          countryFlag(country),
+            }
+        })
+
+        // Grouper par pays
+        const byCountry: Record<string, any[]> = {}
+        enriched.forEach(n => {
+            const key = n.country_code
+            if (!byCountry[key]) byCountry[key] = []
+            byCountry[key].push(n)
+        })
+
+        sendSuccess(res, {
+            numbers: enriched,
+            byCountry,
+            total: enriched.length,
+        })
+    } catch (err: any) { sendError(res, err.message) }
 })
 
 router.get("/numbers/search", authenticate, async (req: AuthRequest, res: Response) => {

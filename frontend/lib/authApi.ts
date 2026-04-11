@@ -10,6 +10,20 @@ function saveDialerKeys(user: any) {
   if (user?.extension) localStorage.setItem('vf_ext',  user.extension)
   else                 localStorage.removeItem('vf_ext')
   if (user?.plan)      localStorage.setItem('vf_plan', user.plan)
+  else                 localStorage.removeItem('vf_plan')
+
+  // Nouveau : planId + features + trial (JSON stringifiés)
+  if (user?.planId)    localStorage.setItem('vf_plan_id', user.planId)
+  else                 localStorage.removeItem('vf_plan_id')
+  if (user?.planName)  localStorage.setItem('vf_plan_name', user.planName)
+  else                 localStorage.removeItem('vf_plan_name')
+  if (user?.features)  localStorage.setItem('vf_features', JSON.stringify(user.features))
+  else                 localStorage.removeItem('vf_features')
+  if (user?.limits)    localStorage.setItem('vf_limits', JSON.stringify(user.limits))
+  else                 localStorage.removeItem('vf_limits')
+  if (user?.trial)     localStorage.setItem('vf_trial', JSON.stringify(user.trial))
+  else                 localStorage.removeItem('vf_trial')
+
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || ''
   if (name)            localStorage.setItem('vf_name', name)
 }
@@ -63,11 +77,9 @@ export const authApi = {
   logout: (token: string) => {
     // Nettoyer le localStorage dialer a la deconnexion
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('vf_tok')
-      localStorage.removeItem('vf_role')
-      localStorage.removeItem('vf_ext')
-      localStorage.removeItem('vf_plan')
-      localStorage.removeItem('vf_name')
+      ;['vf_tok', 'vf_role', 'vf_ext', 'vf_plan', 'vf_plan_id', 'vf_plan_name',
+        'vf_features', 'vf_limits', 'vf_trial', 'vf_name']
+        .forEach(k => localStorage.removeItem(k))
     }
     return apiRequest<any>(base + "/logout", { method: "POST", token })
   },

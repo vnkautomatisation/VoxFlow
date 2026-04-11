@@ -33,4 +33,30 @@ export const ownerApi = {
   // Revenus
   getRevenue: (token: string) =>
     apiRequest<any>("/api/v1/owner/revenue", { token }),
+
+  // ── Plans (forfaits) ─────────────────────────────────────────
+  // CRUD des plan_definitions pilotées par le owner (avec features)
+  getPlans: (token: string) =>
+    apiRequest<any>("/api/v1/owner/plans", { token }),
+
+  getPlan: (token: string, id: string) =>
+    apiRequest<any>("/api/v1/owner/plans/" + id, { token }),
+
+  createPlan: (token: string, body: any) =>
+    apiRequest<any>("/api/v1/owner/plans", { method: "POST", body, token }),
+
+  updatePlan: (token: string, id: string, body: any) =>
+    apiRequest<any>("/api/v1/owner/plans/" + id, { method: "PATCH", body, token }),
+
+  deletePlan: (token: string, id: string) =>
+    apiRequest<any>("/api/v1/owner/plans/" + id, { method: "DELETE", token }),
+
+  getPlanUsage: (token: string, id: string) =>
+    apiRequest<any>("/api/v1/owner/plans/" + id + "/usage", { token }),
+
+  // Changer le forfait d'une org
+  setOrgPlan: (token: string, orgId: string, plan: string) =>
+    apiRequest<any>("/api/v1/owner/organizations/" + orgId + "/plan", {
+      method: "PATCH", body: { plan }, token
+    }),
 }

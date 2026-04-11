@@ -3,6 +3,28 @@ import { hashPassword, comparePassword } from '../../utils/hash'
 import { generateAccessToken, generateRefreshToken } from '../../utils/jwt'
 import { JwtPayload, Role } from '../../types'
 
+// Features minimales de fallback si un plan est introuvable — ne débloque
+// que la lecture (inbound, history, contacts). Utilisé pour éviter de tout
+// bloquer en dev quand la migration 027 n'est pas encore appliquée.
+const FALLBACK_FEATURES: Record<string, boolean> = {
+  inbound_calls:   true,
+  outbound_calls:  false,
+  queues:          true,
+  history:         true,
+  contacts_search: true,
+  reports_basic:   true,
+}
+
+// Cache en mémoire des plan_definitions (invalidé toutes les 60s)
+// pour éviter un round-trip DB à chaque login/me.
+const _planCache: Map<string, { data: any; ts: number }> = new Map()
+const PLAN_CACHE_TTL_MS = 60_000
+
+export function invalidatePlanCache(planId?: string) {
+  if (planId) _planCache.delete(planId.toUpperCase())
+  else _planCache.clear()
+}
+
 /**
  * Self-signup public — crée une nouvelle organisation ADMIN avec son owner.
  * Le rôle est TOUJOURS forcé à ADMIN. Les rôles OWNER et OWNER_STAFF ne
@@ -103,7 +125,7 @@ export class AuthService {
     }
 
     return {
-      user:         this._formatUser(user, null, org),
+      user:         await this._formatUser(user, null, org),
       accessToken:  generateAccessToken(payload),
       refreshToken: generateRefreshToken(payload),
     }
@@ -122,7 +144,10 @@ export class AuthService {
         organizations!users_organization_id_fkey (
           plan,
           name,
-          status
+          status,
+          seats,
+          trial_started_at,
+          trial_ends_at
         )
       `)
       .eq('email', dto.email)
@@ -130,6 +155,11 @@ export class AuthService {
 
     if (error || !user) throw new Error('Email ou mot de passe incorrect')
     if (user.status !== 'ACTIVE') throw new Error('Compte suspendu ou inactif')
+
+    // Les users SSO n'ont pas de password_hash local — refuser le login password
+    if (!user.password_hash) {
+      throw new Error('Ce compte utilise une connexion SSO (Google/Microsoft). Utilisez le bouton SSO approprié.')
+    }
 
     const isValid = await comparePassword(dto.password, user.password_hash)
     if (!isValid) throw new Error('Email ou mot de passe incorrect')
@@ -145,7 +175,7 @@ export class AuthService {
     const org   = Array.isArray(user.organizations) ? user.organizations[0] : user.organizations
 
     return {
-      user:        this._formatUser(user, agent, org),
+      user:        await this._formatUser(user, agent, org),
       accessToken:  generateAccessToken(payload),
       refreshToken: generateRefreshToken(payload),
     }
@@ -169,7 +199,9 @@ export class AuthService {
           plan,
           name,
           status,
-          seats
+          seats,
+          trial_started_at,
+          trial_ends_at
         )
       `)
       .eq('id', userId)
@@ -180,7 +212,7 @@ export class AuthService {
     const agent = Array.isArray(user.agents) ? user.agents[0] : user.agents
     const org   = Array.isArray(user.organizations) ? user.organizations[0] : user.organizations
 
-    return this._formatUser(user, agent, org)
+    return await this._formatUser(user, agent, org)
   }
 
   // ── SSO Exchange (Google / Microsoft via Supabase OAuth) ────
@@ -220,7 +252,7 @@ export class AuthService {
       .select(`
         *,
         agents!agents_user_id_fkey (extension, status),
-        organizations!users_organization_id_fkey (plan, name, status)
+        organizations!users_organization_id_fkey (plan, name, status, seats, trial_started_at, trial_ends_at)
       `)
       .eq('email', email)
       .maybeSingle()
@@ -290,7 +322,7 @@ export class AuthService {
         .select(`
           *,
           agents!agents_user_id_fkey (extension, status),
-          organizations!users_organization_id_fkey (plan, name, status)
+          organizations!users_organization_id_fkey (plan, name, status, seats, trial_started_at, trial_ends_at)
         `)
         .single()
 
@@ -315,7 +347,7 @@ export class AuthService {
     const org   = Array.isArray(finalUser.organizations) ? finalUser.organizations[0] : finalUser.organizations
 
     return {
-      user:         this._formatUser(finalUser, agent, org),
+      user:         await this._formatUser(finalUser, agent, org),
       accessToken:  generateAccessToken(payload),
       refreshToken: generateRefreshToken(payload),
       isNew:        !existingUser,
@@ -346,10 +378,34 @@ export class AuthService {
   }
 
   // ── Helper formatage utilisateur ─────────────────────────────
-  private _formatUser(user: any, agent: any, org?: any) {
-    // Déterminer le plan d'accès au dialer
-    const orgPlan   = org?.plan || 'STARTER'
-    const dialerPlan = this._resolveDialerPlan(orgPlan, user.role)
+  // Devient async parce qu'on va chercher la plan_definition en DB
+  // (avec un cache 60s pour ne pas faire un round-trip par login).
+  private async _formatUser(user: any, agent: any, org?: any) {
+    const orgPlanId = (org?.plan || 'STARTER').toUpperCase()
+    const planDef   = await this._getPlanDefinition(orgPlanId)
+
+    const features: Record<string, boolean> =
+      planDef?.features && typeof planDef.features === 'object'
+        ? planDef.features
+        : FALLBACK_FEATURES
+
+    // Rétrocompatibilité : 'FULL' | 'INBOUND_ONLY' déduit des features
+    const dialerPlan = features.outbound_calls ? 'FULL' : 'INBOUND_ONLY'
+
+    // Trial info si l'org est en essai
+    let trial: any = null
+    if (org?.status === 'TRIAL' && org?.trial_ends_at) {
+      const endsAt  = new Date(org.trial_ends_at)
+      const now     = new Date()
+      const msLeft  = endsAt.getTime() - now.getTime()
+      const daysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)))
+      trial = {
+        starts_at:  org.trial_started_at || null,
+        ends_at:    org.trial_ends_at,
+        days_left:  daysLeft,
+        expired:    msLeft <= 0,
+      }
+    }
 
     return {
       id:              user.id,
@@ -364,34 +420,57 @@ export class AuthService {
       agent_status:    user.agent_status || 'OFFLINE',
       // Extension SIP — depuis la table agents
       extension:       agent?.extension || user.extension || null,
-      // Plan dialer
+      // Plan dialer (legacy 'FULL'|'INBOUND_ONLY' pour rétrocompat)
       plan:            dialerPlan,
+      // Nouveau : plan ID + nom + features JSON + limites + trial
+      planId:          orgPlanId,
+      planName:        planDef?.name || orgPlanId,
+      features,
+      limits: {
+        max_agents:      planDef?.max_agents      ?? null,
+        max_dids:        planDef?.max_dids        ?? null,
+        max_calls_month: planDef?.max_calls_month ?? null,
+      },
+      trial,
       // Organisation
       organization: org ? {
         name:   org.name,
-        plan:   orgPlan,
+        plan:   orgPlanId,
         status: org.status,
         seats:  org.seats || null,
       } : null,
     }
   }
 
+  // ── Récupère une plan_definition depuis la DB (avec cache 60s) ─
+  private async _getPlanDefinition(planId: string): Promise<any> {
+    const key = (planId || 'STARTER').toUpperCase()
+    const now = Date.now()
+    const cached = _planCache.get(key)
+    if (cached && now - cached.ts < PLAN_CACHE_TTL_MS) {
+      return cached.data
+    }
+    try {
+      const { data } = await supabaseAdmin
+        .from('plan_definitions')
+        .select('id, name, features, max_agents, max_dids, max_calls_month, price_monthly')
+        .eq('id', key)
+        .maybeSingle()
+      _planCache.set(key, { data, ts: now })
+      return data
+    } catch {
+      return null
+    }
+  }
+
   // ── Résoudre le plan dialer selon le forfait org ─────────────
-  // FULL        → accès complet entrant + sortant
+  // Conservé pour rétrocompat si du code externe l'appelle.
+  // FULL         → accès complet entrant + sortant
   // INBOUND_ONLY → entrant uniquement (pas de dialer sortant)
-  // NONE        → pas d'accès dialer (rôle owner sans extension)
   private _resolveDialerPlan(orgPlan: string, role: string): string {
     const upperPlan = (orgPlan || '').toUpperCase()
-
-    // Plans qui incluent le dialer complet
-    if (['PRO', 'ENTERPRISE', 'CONFORT', 'PREMIUM', 'FULL'].includes(upperPlan)) {
-      return 'FULL'
-    }
-    // Plans entrants seulement
-    if (['STARTER', 'BASIC', 'INBOUND'].includes(upperPlan)) {
-      return 'INBOUND_ONLY'
-    }
-    // Par défaut FULL pour ne pas bloquer pendant le dev
+    if (['PRO', 'ENTERPRISE', 'CONFORT', 'PREMIUM', 'FULL'].includes(upperPlan)) return 'FULL'
+    if (['STARTER', 'BASIC', 'TRIAL', 'INBOUND'].includes(upperPlan))           return 'INBOUND_ONLY'
     return 'FULL'
   }
 }

@@ -1,13 +1,14 @@
 {
   "name": "voxflow-dialer",
-  "version": "1.0.0",
-  "description": "VoxFlow Dialer",
+  "version": "1.1.0",
+  "description": "VoxFlow Dialer — Call center desktop app by VNK Automatisation Inc.",
   "main": "main.js",
   "author": "VNK Automatisation Inc.",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "start": "electron .",
+    "dev":   "electron .",
     "build": "electron-builder --win --publish never"
   },
   "dependencies": {},
@@ -19,7 +20,12 @@
     "appId": "io.voxflow.dialer",
     "productName": "VoxFlow Dialer",
     "directories": { "output": "dist" },
-    "files": [ "main.js", "src/**/*" ],
+    "files": [
+      "main.js",
+      "src/**/*",
+      "!src/index.html.bak",
+      "!*.bak*"
+    ],
     "win": {
       "target": [
         {
