@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.3 — disableHardwareAcceleration + navigation URL logging
+//  v1.2.4 — Chromium crash workarounds + did-start-navigation logging
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
@@ -30,6 +30,23 @@ app.commandLine.appendSwitch('high-dpi-support', '1')
 // liés à WebRTC/Twilio qui partagent le pipeline GPU.
 app.disableHardwareAcceleration()
 
+// Switches qui éliminent plusieurs classes de crashs connus sur Windows
+// Electron 28 + Next.js dev + Twilio WebRTC :
+//  - CalculateNativeWinOcclusion : bug Chromium quand la fenêtre est
+//    masquée/restaurée rapidement (tray → show)
+//  - HardwareMediaKeyHandling + MediaSessionService : crashs au moment
+//    de l'init d'AudioContext (qui arrive quand Twilio.Device se charge)
+//  - disable-renderer-backgrounding + disable-background-timer-throttling :
+//    évite que Chromium suspende le renderer 43 ms après load, ce qui
+//    était notre symptôme observé dans les logs.
+app.commandLine.appendSwitch(
+    'disable-features',
+    'CalculateNativeWinOcclusion,HardwareMediaKeyHandling,MediaSessionService'
+)
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+
 if (!app.requestSingleInstanceLock()) {
     app.quit()
     process.exit(0)
@@ -52,7 +69,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.3 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.2.4 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -161,6 +178,19 @@ function createWindow() {
     mainWindow.webContents.on('dom-ready',         () => log('[load] dom-ready →', mainWindow.webContents.getURL()))
     mainWindow.webContents.on('will-navigate', (_, url) => log('[will-navigate]', url))
     mainWindow.webContents.on('will-redirect', (_, url) => log('[will-redirect]', url))
+    // did-start-navigation catche aussi les location.reload() et les
+    // client-side router transitions (Next.js App Router), contrairement
+    // à will-navigate qui ne voit que les nav initiées par l'utilisateur
+    // et les link clicks. C'est ici qu'on verra si Next.js fast-refresh
+    // déclenche un reload fantôme.
+    mainWindow.webContents.on('did-start-navigation', (_, url, isInPlace, isMainFrame) => {
+        if (!isMainFrame) return
+        log('[nav-start]', isInPlace ? '(in-place)' : '(new)', url)
+    })
+    mainWindow.webContents.on('did-frame-navigate', (_, url, httpCode, _desc, isMainFrame) => {
+        if (!isMainFrame) return
+        log('[nav-done]', httpCode, url)
+    })
     mainWindow.once('ready-to-show', () => {
         log('[window] ready-to-show, showing')
         mainWindow.show()
@@ -187,9 +217,21 @@ function createWindow() {
             .catch(e => log('[error.html after crash]', e.message))
     })
 
-    // Log les erreurs JS du renderer
+    // Log les erreurs JS du renderer — on filtre les warnings de sécurité
+    // d'Electron (webSecurity disabled, CSP, etc.) qui spamment le log.
     mainWindow.webContents.on('console-message', (_, level, message) => {
-        if (level >= 2) log('[renderer]', message) // warn / error seulement
+        if (level < 2) return
+        if (message.includes('Electron Security Warning')) return
+        if (message.includes('This warning will not show up')) return
+        if (message.includes('Fast Refresh')) return
+        log('[renderer]', level, message.slice(0, 400))
+    })
+
+    // Crash handlers plus verbeux
+    mainWindow.webContents.on('unresponsive', () => log('[unresponsive] renderer frozen'))
+    mainWindow.webContents.on('responsive',   () => log('[responsive] renderer back'))
+    mainWindow.webContents.on('preload-error', (_, preloadPath, err) => {
+        log('[preload-error]', preloadPath, err.message)
     })
 
     // Permissions (micro, notifications)
