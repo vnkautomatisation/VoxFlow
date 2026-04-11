@@ -46,17 +46,20 @@ html, body {
     background: var(--ink);
     font-family: var(--font);
     color: var(--txt);
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     min-height: 100vh;
     overflow: hidden;
 }
 
-/* Base popup : remplit la fenêtre (Electron, mobile, popup).
-   Surcharge par @media min-width:441 juste en dessous pour le
-   mode PC browser (phone-like centré). */
+/* Base popup : remplit TOUJOURS la fenêtre (Electron, mobile, popup).
+   Utilise position: fixed + inset: 0 pour garantir le remplissage
+   peu importe le parent chain. Surchargé par @media min-width:441
+   ci-dessous pour le mode PC browser (phone-like centré). */
 .popup {
-    width: 100%;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
     height: 100vh;
     background: var(--ink2);
     border-radius: 0;
@@ -65,7 +68,6 @@ html, body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    position: relative;
 }
 
 /* Mode PC browser (> 440px) — popup 360x700 centré en bas-droite
@@ -77,11 +79,14 @@ html, body {
         align-items: flex-end;
         justify-content: flex-end;
         padding: 16px;
+        width: 100vw;
+        height: 100vh;
         min-height: 100vh;
-        height: auto;
-        overflow: auto;
+        overflow: hidden;
     }
     .popup {
+        position: relative;
+        inset: auto;
         width: 360px;
         height: 700px;
         flex: 0 0 auto;
