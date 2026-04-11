@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 interface InvoiceLine { description: string; qty: number; unitPrice: number; total: number }
 interface Invoice {
@@ -290,55 +290,83 @@ function InvoicePreview({ inv, onClose, onPay, savedCard }: {
 }
 
 // ─── Page principale ─────────────────────────────────────────────────────────
-const MOCK: Invoice[] = [
-  {
-    id:'4', number:'VF-2026-004', period:'Mai 2026', date:'30 avril 2026', dueDate:'30 avril 2026', status:'overdue',
-    subtotal:156.00, tps:7.80, tvq:15.56, total:179.36,
-    lines:[
-      { description:'Forfait Basic — 4 sièges × 29 CAD', qty:4, unitPrice:29, total:116 },
-      { description:'Numéros DID — 2 locaux × 2.50 CAD', qty:2, unitPrice:2.50, total:5 },
-      { description:'Numéros DID — 1 sans frais × 5.00 CAD', qty:1, unitPrice:5, total:5 },
-      { description:'Minutes sortantes — 120 min × 0.25 CAD', qty:120, unitPrice:0.25, total:30 },
-    ],
-    org:{ name:'Mon Organisation Inc.', address:'456, rue Principale, Montréal (QC) H2X 1Y7', email:'admin@test.com' },
-  },
-  {
-    id:'3', number:'VF-2026-003', period:'Avril 2026', date:'30 mars 2026', dueDate:'30 mars 2026', status:'paid',
-    subtotal:156.00, tps:7.80, tvq:15.56, total:179.36,
-    lines:[
-      { description:'Forfait Basic — 4 sièges × 29 CAD', qty:4, unitPrice:29, total:116 },
-      { description:'Numéros DID — 2 locaux × 2.50 CAD', qty:2, unitPrice:2.50, total:5 },
-      { description:'Numéros DID — 1 sans frais × 5.00 CAD', qty:1, unitPrice:5, total:5 },
-      { description:'Minutes sortantes — 120 min × 0.25 CAD', qty:120, unitPrice:0.25, total:30 },
-    ],
-    org:{ name:'Mon Organisation Inc.', address:'456, rue Principale, Montréal (QC) H2X 1Y7', email:'admin@test.com' },
-  },
-  {
-    id:'2', number:'VF-2026-002', period:'Mars 2026', date:'27 février 2026', dueDate:'27 février 2026', status:'paid',
-    subtotal:156.00, tps:7.80, tvq:15.56, total:179.36,
-    lines:[
-      { description:'Forfait Basic — 4 sièges × 29 CAD', qty:4, unitPrice:29, total:116 },
-      { description:'Minutes sortantes — 120 min × 0.25 CAD', qty:120, unitPrice:0.25, total:30 },
-    ],
-    org:{ name:'Mon Organisation Inc.', address:'456, rue Principale, Montréal (QC) H2X 1Y7', email:'admin@test.com' },
-  },
-  {
-    id:'1', number:'VF-2026-001', period:'Février 2026', date:'30 janvier 2026', dueDate:'30 janvier 2026', status:'paid',
-    subtotal:134.00, tps:6.70, tvq:13.37, total:154.07,
-    lines:[
-      { description:'Forfait Basic — 4 sièges × 29 CAD', qty:4, unitPrice:29, total:116 },
-      { description:'Minutes sortantes — 52 min × 0.25 CAD', qty:52, unitPrice:0.25, total:13 },
-    ],
-    org:{ name:'Mon Organisation Inc.', address:'456, rue Principale, Montréal (QC) H2X 1Y7', email:'admin@test.com' },
-  },
-]
+// API helper — lit token + url depuis localStorage
+function useApi() {
+  const getUrl = () => typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
+  const getTok = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') : null
+  return async (path: string, opts: RequestInit = {}) => {
+    const r = await fetch(getUrl() + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...(getTok() ? { Authorization: 'Bearer ' + getTok() } : {}), ...(opts.headers || {}) },
+      body: opts.body,
+    })
+    return r.json()
+  }
+}
+
+// Mapper une row invoices Supabase (migration 013) → forme UI
+function mapInvoice(row: any): Invoice {
+  const items: any[] = Array.isArray(row.items) ? row.items : []
+  const subtotal = items.reduce((s, l) => s + Number(l.total || 0), 0)
+  const total    = Number(row.amount || subtotal)
+  const tax      = Number(row.amount_tax || 0)
+  // Taxes Quebec : TPS 5% + TVQ 9.975% ≈ 14.975%
+  const tps = tax * (5 / 14.975)
+  const tvq = tax - tps
+  return {
+    id:       row.id,
+    number:   row.number,
+    period:   row.period || '',
+    date:     row.date ? String(row.date).slice(0, 10) : '',
+    dueDate:  row.due_date ? String(row.due_date).slice(0, 10) : '',
+    status:   (row.status || 'pending').toLowerCase() as Invoice['status'],
+    subtotal,
+    tps,
+    tvq,
+    total,
+    lines:    items.map((l: any) => ({
+      description: String(l.description || ''),
+      qty:         Number(l.qty || 1),
+      unitPrice:   Number(l.unit_price || l.unitPrice || 0),
+      total:       Number(l.total || 0),
+    })),
+    org: {
+      name:    '',
+      address: '',
+      email:   '',
+    },
+  }
+}
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices]     = useState<Invoice[]>(MOCK)
+  const api = useApi()
+  const [invoices, setInvoices]     = useState<Invoice[]>([])
+  const [loading,  setLoading]      = useState(true)
+  const [error,    setError]        = useState<string | null>(null)
   const [selected, setSelected]     = useState<Invoice | null>(null)
   const [paying,   setPaying]       = useState<Invoice | null>(null)
   const [savedCard, setSavedCardSt] = useState<CardInfo | null>(null)
   const [toast,    setToast]        = useState<string | null>(null)
+
+  const loadInvoices = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await api('/api/v1/billing/invoices')
+      if (r.success && Array.isArray(r.data)) {
+        setInvoices(r.data.map(mapInvoice))
+      } else {
+        setInvoices([])
+        if (r.error || r.message) setError(r.error || r.message)
+      }
+    } catch (e: any) {
+      setError(e.message || 'Impossible de charger les factures')
+      setInvoices([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadInvoices() }, [loadInvoices])
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500) }
 
@@ -419,6 +447,18 @@ export default function InvoicesPage() {
 
       {/* Liste */}
       <div style={{ background:'#0e0e1c', border:'1px solid #1e1e3a', borderRadius:12, overflow:'hidden' }}>
+        {loading && (
+          <div style={{ padding:20, textAlign:'center', color:'#4a4a6a', fontSize:13 }}>Chargement des factures…</div>
+        )}
+        {!loading && error && (
+          <div style={{ padding:16, background:'#ff4d6d10', border:'1px solid #ff4d6d33', borderRadius:10, color:'#ff4d6d', fontSize:13 }}>{error}</div>
+        )}
+        {!loading && !error && invoices.length === 0 && (
+          <div style={{ padding:32, textAlign:'center', color:'#4a4a6a' }}>
+            <div style={{ fontSize:14, marginBottom:6 }}>Aucune facture</div>
+            <div style={{ fontSize:12, color:'#3a3a5a' }}>Vos factures Stripe apparaitront ici des la premiere periode.</div>
+          </div>
+        )}
         {invoices.map((inv, i) => (
           <div key={inv.id}
             style={{ display:'flex', alignItems:'center', gap:14, padding:'15px 20px', borderBottom: i<invoices.length-1?'1px solid #1a1a2e':'none', cursor:'pointer', transition:'background .12s' }}
