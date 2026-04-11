@@ -1,8 +1,7 @@
 'use client'
 import { useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { DIALER_CONFIG } from '@/lib/dialerConfig'
 
 /**
  * Hook de synchronisation auth portail ↔ dialer
@@ -25,7 +24,7 @@ export function useDialerAuthSync() {
             // Portail connecté → sync vers dialer
             try {
                 localStorage.setItem('vf_tok',  accessToken)
-                localStorage.setItem('vf_url',  API_URL)
+                localStorage.setItem('vf_url',  DIALER_CONFIG.API_URL)
                 localStorage.setItem('vf_role', user.role)
 
                 // Extension SIP (peut être null pour OWNER/ADMIN sans extension)

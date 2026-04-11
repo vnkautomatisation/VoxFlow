@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import { useDialer, fmtT, fmtD, ini, avatarGrad, ACP } from './hooks/useDialer'
 import TrialBanner from '@/components/shared/TrialBanner'
 import CallerIdPicker from '@/components/dialer/CallerIdPicker'
+import DTMFKeypad from '@/components/dialer/DTMFKeypad'
+import { DIALER_CONFIG } from '@/lib/dialerConfig'
 
 // ── SVG Icons ────────────────────────────────────────────────────
 const PhoneIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
@@ -15,6 +17,9 @@ const RecIcon = () => <svg fill="none" stroke="currentColor" strokeWidth="2" vie
 const NotesIcon = () => <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
 const KpadIcon = () => <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="3" width="3" height="3" rx="1" /><rect x="10" y="3" width="3" height="3" rx="1" /><rect x="16" y="3" width="3" height="3" rx="1" /><rect x="4" y="9" width="3" height="3" rx="1" /><rect x="10" y="9" width="3" height="3" rx="1" /><rect x="16" y="9" width="3" height="3" rx="1" /><rect x="7" y="15" width="9" height="3" rx="1" /></svg>
 const BackIcon = () => <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
+const ListenIcon = () => <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" /></svg>
+const WhisperIcon = () => <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
+const BargeIcon = () => <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
 
 export default function DialerPage() {
     const d = useDialer()
@@ -65,7 +70,6 @@ export default function DialerPage() {
                 if (!res?.success) try { res = await fetch(url + '/api/v1/telephony/token', { headers: { Authorization: 'Bearer ' + tok } }).then(r => r.json()) } catch { }
                 if (!res?.success || !res?.data?.token) return
                 const dev = new (window as any).Twilio.Device(res.data.token, { logLevel: 1, codecPreferences: ['opus', 'pcmu'] })
-                dev.on('registered', () => console.log('[VoxFlow] Twilio prêt ✓'))
                 dev.on('incoming', d.handleIncoming)
                 dev.on('error', (e: any) => d.showToast('Twilio: ' + e.message))
                 dev.register()
@@ -78,9 +82,9 @@ export default function DialerPage() {
 
     // ── Pilule statut appel ────────────────────────────────────
     const callPill = d.onHold
-        ? <div className="cpill hold">⏸ En attente</div>
+        ? <div className="cpill hold">En attente</div>
         : d.muted
-            ? <div className="cpill muted">🔇 Micro coupé</div>
+            ? <div className="cpill muted">Micro coupé</div>
             : <div className="cpill">En communication</div>
 
     const vmBadge = d.voicemails.filter(v => v.status === 'NEW').length
@@ -123,8 +127,8 @@ export default function DialerPage() {
                     <div className="cco">{d.incoming?.co?.company || ''}</div>
                     <div className="cnum">{d.incoming?.from || ''}</div>
                     <div className="inc-btns">
-                        <button className="btn-ref" onClick={d.doRefuse}>✕ Refuser</button>
-                        <button className="btn-ans" onClick={d.doAnswer}>✓ Décrocher</button>
+                        <button className="btn-ref" onClick={d.doRefuse}><HangupIcon />Refuser</button>
+                        <button className="btn-ans" onClick={d.doAnswer}><PhoneIcon />Décrocher</button>
                     </div>
                 </div>
             </div>
@@ -195,7 +199,7 @@ export default function DialerPage() {
                         </div>
                         <div className="prow">
                             <input type="tel" placeholder="+1 514 000-0000 ou poste" value={d.xferNum} onChange={e => d.setXferNum(e.target.value)} />
-                            <button className="pbtn" onClick={d.execTransfer}>→ OK</button>
+                            <button className="pbtn" onClick={d.execTransfer}>OK</button>
                         </div>
                         {d.qAgentsXfer.length > 0 && (
                             <div style={{ marginTop: '8px' }}>
@@ -203,7 +207,7 @@ export default function DialerPage() {
                                 {d.qAgentsXfer.map(a => (
                                     <div key={a.id} className="axfer-row">
                                         <div><span style={{ fontSize: '11px', fontWeight: 600 }}>{a.name || a.first_name + ' ' + a.last_name}</span><span className="aext" style={{ marginLeft: '6px' }}>{a.extension || a.ext || '—'}</span></div>
-                                        <button className="btn-take" onClick={() => d.xferToAgent(a.extension || a.ext || '')}>→ Transférer</button>
+                                        <button className="btn-take" onClick={() => d.xferToAgent(a.extension || a.ext || '')}>Transférer</button>
                                     </div>
                                 ))}
                             </div>
@@ -216,10 +220,10 @@ export default function DialerPage() {
                         <textarea rows={3} placeholder="Résumé, actions à faire, suivi..." value={d.notesVal} onChange={e => d.setNotesVal(e.target.value)} />
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             <select value={d.outcome} onChange={e => d.setOutcome(e.target.value)} style={{ flex: 1, background: 'var(--ink3)', border: '1px solid var(--line)', borderRadius: 'var(--rs)', color: 'var(--txt)', padding: '7px 9px', fontSize: '11px', fontFamily: 'var(--font)', outline: 'none' }}>
-                                <option>Résolu ✓</option><option>Rappel requis 📞</option><option>Escalade ⚠️</option>
-                                <option>Opportunité vente 💰</option><option>Support technique 🔧</option><option>Annulation ❌</option>
+                                <option>Résolu</option><option>Rappel requis</option><option>Escalade</option>
+                                <option>Opportunité vente</option><option>Support technique</option><option>Annulation</option>
                             </select>
-                            <button className="pbtn mint" onClick={d.saveNotes}>✓ Sauv.</button>
+                            <button className="pbtn mint" onClick={d.saveNotes}>Sauv.</button>
                         </div>
                     </div>
 
@@ -233,7 +237,7 @@ export default function DialerPage() {
                             {d.contact.pipeline_stage && <div className="ins-row"><span>Pipeline</span><span className="ins-val vi">{d.contact.pipeline_stage}</span></div>}
                             {d.contact.total_calls && <div className="ins-row"><span>Appels totaux</span><span className="ins-val mi">{d.contact.total_calls} appels</span></div>}
                             {d.contact.tags?.length ? <div className="ins-row"><span>Tags</span><span className="ins-val">{d.contact.tags.slice(0, 2).join(', ')}</span></div> : null}
-                            <button className="btn-crm" onClick={d.openCRM}>Voir la fiche complète →</button>
+                            <button className="btn-crm" onClick={d.openCRM}>Voir la fiche complète</button>
                         </div>
                     )}
                 </div>
@@ -300,20 +304,17 @@ export default function DialerPage() {
                             <input className="dinput" id="dinp" value={d.dialNum} placeholder="+1 (514) 000-0000" type="tel"
                                 onChange={e => d.setDialNum(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && d.callNum()} />
-                            <div className="kpad">
-                                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map(k => {
-                                    const sub: Record<string, string> = { '2': 'ABC', '3': 'DEF', '4': 'GHI', '5': 'JKL', '6': 'MNO', '7': 'PQRS', '8': 'TUV', '9': 'WXYZ', '0': '+' }
-                                    return (
-                                        <button key={k} className={`key ${['*', '#'].includes(k) ? 'sp' : ''}`}
-                                            onClick={() => k === '0' ? (!d.lpdoneRef.current && d.setDialNum(p => p + '0')) : d.setDialNum(p => p + k)}
-                                            onMouseDown={k === '0' ? (e) => d.startLong() : undefined}
-                                            onMouseUp={k === '0' ? () => d.endLong() : undefined}
-                                            onMouseLeave={k === '0' ? () => d.endLong() : undefined}>
-                                            {k}{sub[k] && <span className="ksub">{sub[k]}</span>}
-                                        </button>
-                                    )
-                                })}
-                            </div>
+                            <DTMFKeypad
+                                onKey={k => {
+                                    if (k === '0') {
+                                        if (!d.lpdoneRef.current) d.setDialNum(p => p + '0')
+                                    } else {
+                                        d.setDialNum(p => p + k)
+                                    }
+                                }}
+                                onLongPress={d.startLong}
+                                onLongRelease={d.endLong}
+                            />
                             <div className="dial-actions">
                                 <button className="btn-call" disabled={!d.dialNum} onClick={() => d.callNum()}><PhoneIcon />Appeler</button>
                                 {d.dialNum && <button className="btn-del visible" onClick={() => d.setDialNum(p => p.slice(0, -1))}>
@@ -354,7 +355,7 @@ export default function DialerPage() {
                                 <div className="qs-card"><div className="qs-val" style={{ color: 'var(--mint)' }}>{d.queue.filter(q => q.status === 'completed').length}</div><div className="qs-lbl">Traités auj.</div></div>
                             </div>
                             <div className="slbl">Appels en attente</div>
-                            {!waiting.length ? <div className="empty">File vide ✓</div> : waiting.map((q, i) => {
+                            {!waiting.length ? <div className="empty">File vide</div> : waiting.map((q, i) => {
                                 const w = q.wait_seconds || (i + 1) * 52; const hot = w > 120
                                 return (
                                     <div key={q.id} className={`qi ${hot ? 'hot' : ''}`} onClick={() => d.pickQ(q.from_number)}>
@@ -404,9 +405,9 @@ export default function DialerPage() {
                                             </div>
                                             {st === 'busy' && (
                                                 <div className="sup-btns">
-                                                    <button className="btn-sup listen" onClick={() => d.supListen(a.id)}>👂 Écouter</button>
-                                                    <button className="btn-sup whisper" onClick={() => d.supWhisper(a.id)}>🗣 Chuchoter</button>
-                                                    <button className="btn-sup barge" onClick={() => d.supBarge(a.id)}>⚡ Rejoindre</button>
+                                                    <button className="btn-sup listen" onClick={() => d.supListen(a.id)}><ListenIcon />Écouter</button>
+                                                    <button className="btn-sup whisper" onClick={() => d.supWhisper(a.id)}><WhisperIcon />Chuchoter</button>
+                                                    <button className="btn-sup barge" onClick={() => d.supBarge(a.id)}><BargeIcon />Rejoindre</button>
                                                 </div>
                                             )}
                                         </div>
@@ -473,7 +474,7 @@ export default function DialerPage() {
                                 {v.transcription && <div className="vmtr">"{v.transcription.substring(0, 160)}{v.transcription.length > 160 ? '…' : ''}"</div>}
                                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                                     {d.has('outbound_calls') && <button className="bsm" onClick={() => d.callNum(v.from_number)}>Rappeler</button>}
-                                    <button className="bsm vi" onClick={() => d.markRead(v.id)}>✓ Lu</button>
+                                    <button className="bsm vi" onClick={() => d.markRead(v.id)}>Lu</button>
                                 </div>
                             </div>
                         ))}
@@ -521,20 +522,13 @@ export default function DialerPage() {
             <div className="dtmf-overlay" ref={dtmfOverlayRef} id="dtmf-overlay">
                 <button className="dtmf-back" onClick={() => dtmfOverlayRef.current?.classList.remove('on')}><BackIcon />Retour</button>
                 <div className="dtmf-display" ref={dtmfDisplayRef} id="dtmf-display" />
-                <div className="dtmf-grid">
-                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map(k => {
-                        const sub: Record<string, string> = { '2': 'ABC', '3': 'DEF', '4': 'GHI', '5': 'JKL', '6': 'MNO', '7': 'PQRS', '8': 'TUV', '9': 'WXYZ', '0': '+' }
-                        return (
-                            <button key={k} className="dtmf-key" style={['*', '#'].includes(k) ? { color: 'var(--violet)' } : {}}
-                                onClick={() => {
-                                    d.dtmf(k)
-                                    if (dtmfDisplayRef.current) dtmfDisplayRef.current.textContent += k
-                                }}>
-                                {k}{sub[k] && <span className="ksub">{sub[k]}</span>}
-                            </button>
-                        )
-                    })}
-                </div>
+                <DTMFKeypad
+                    compact
+                    onKey={k => {
+                        d.dtmf(k)
+                        if (dtmfDisplayRef.current) dtmfDisplayRef.current.textContent += k
+                    }}
+                />
             </div>
 
         </div>
@@ -548,7 +542,7 @@ function LoginView({ err, onLogin }: { err: string; onLogin: (url: string, email
     const passRef = useRef<HTMLInputElement>(null)
 
     const submit = () => onLogin(
-        urlRef.current?.value || 'http://localhost:4000',
+        urlRef.current?.value || DIALER_CONFIG.API_URL,
         emailRef.current?.value || '',
         passRef.current?.value || '',
     )
@@ -560,7 +554,7 @@ function LoginView({ err, onLogin }: { err: string; onLogin: (url: string, email
                 <div className="sb">Plateforme Call Center Pro</div>
             </div>
             {err && <div className="lerr" style={{ display: 'block' }}>{err}</div>}
-            <div className="field"><label>URL Backend</label><input ref={urlRef} defaultValue="http://localhost:4000" /></div>
+            <div className="field"><label>URL Backend</label><input ref={urlRef} defaultValue={DIALER_CONFIG.API_URL} /></div>
             <div className="field"><label>Email</label><input ref={emailRef} type="email" placeholder="agent@company.com" /></div>
             <div className="field"><label>Mot de passe</label><input ref={passRef} type="password" placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && submit()} /></div>
             <button className="btn-login" onClick={submit}>Se connecter</button>
