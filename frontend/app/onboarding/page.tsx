@@ -94,7 +94,7 @@ export default function OnboardingPage() {
 
   if (!mounted || !token) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="h-screen overflow-y-auto bg-gray-950 flex items-center justify-center">
         <p className="text-gray-400 animate-pulse text-sm">Chargement...</p>
       </div>
     )
@@ -103,7 +103,7 @@ export default function OnboardingPage() {
   const progress = ((currentStep - 1) / 4) * 100
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+    <div className="h-screen overflow-y-auto bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
 
         <div className="text-center mb-8">

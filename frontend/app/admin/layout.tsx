@@ -104,7 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const userName = user?.name || user?.email?.split('@')[0] || 'Admin'
 
     return (
-        <div className="min-h-screen bg-[#111118] text-[#eeeef8]">
+        <div className="h-screen flex flex-col bg-[#111118] text-[#eeeef8] overflow-hidden">
             <nav ref={navRef} className="border-b border-[#2e2e44] bg-[#111118] sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-4 flex items-center gap-0.5 h-12">
 
@@ -343,7 +343,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <DialerFAB />
             <TrialBanner />
-            <main>{children}</main>
+            <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
     )
 }

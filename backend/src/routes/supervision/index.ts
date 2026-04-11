@@ -48,6 +48,44 @@ router.post("/call/:callId/join", async (req: AuthRequest, res: Response) => {
   } catch (err: any) { sendError(res, err.message) }
 })
 
+// ── Aliases utilisés par le dialer Electron ────────────────────
+// Le dialer (frontend/app/dialer/hooks/useDialer.ts) appelle
+// POST /supervision/:mode/:agentId au lieu de POST /call/:callId/join
+// { mode }. On expose 3 aliases sémantiques qui trouvent le call
+// actif courant de l'agent et appellent joinCall() avec le callId.
+import { supabaseAdmin } from "../../config/supabase"
+
+async function resolveActiveCallForAgent(agentId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("calls")
+    .select("id")
+    .eq("agent_id", agentId)
+    .in("status", ["RINGING", "IN_PROGRESS", "ANSWERED"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .single()
+  return data?.id || null
+}
+
+async function handleJoin(
+  req: AuthRequest,
+  res: Response,
+  mode: "listen" | "whisper" | "barge"
+) {
+  try {
+    const agentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    const callId  = await resolveActiveCallForAgent(agentId)
+    if (!callId) return sendError(res, "Aucun appel actif pour cet agent", 404)
+    sendSuccess(res, await supervisionService.joinCall(callId, req.user!.userId, mode))
+  } catch (err: any) {
+    sendError(res, err.message)
+  }
+}
+
+router.post("/listen/:id",  (req: AuthRequest, res: Response) => handleJoin(req, res, "listen"))
+router.post("/whisper/:id", (req: AuthRequest, res: Response) => handleJoin(req, res, "whisper"))
+router.post("/barge/:id",   (req: AuthRequest, res: Response) => handleJoin(req, res, "barge"))
+
 // GET /api/v1/supervision/log -- Historique
 router.get("/log", async (req: AuthRequest, res: Response) => {
   try {

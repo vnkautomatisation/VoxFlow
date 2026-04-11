@@ -14,9 +14,25 @@
   margin: 0;
 }
 
+/* ─ Shell racine des portails ─
+   height: 100vh (pas min-height) → la fenêtre occupe pile le viewport,
+   pas 1px de plus. Les pages qui ont besoin d'un scroll interne utilisent
+   le pattern flex-1 overflow-y-auto, ou h-screen overflow-y-auto pour
+   les pages hors portail (auth, onboarding). Body reste overflow: hidden
+   pour qu'il n'y ait JAMAIS de scroll externe (plus de double scrollbar
+   quand un enfant dépasse de 1-2px).
+
+   Le dialer page (/dialer) override ça via dialer.css qui arrive APRÈS
+   globals.css dans la cascade.
+
+   Pages top-level (auth, onboarding, profile, verify-email) doivent
+   wrapper leur contenu dans un div h-screen overflow-y-auto pour que
+   le scroll interne fonctionne — le layout (auth) le fait déjà. */
 html, body {
+  width: 100vw;
+  height: 100vh;
   max-width: 100vw;
-  min-height: 100vh;
+  overflow: hidden;
   background-color: #030712;
   color: #ffffff;
 }
@@ -28,6 +44,47 @@ html, body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ─ Thème scrollbar VoxFlow global ───────────────────────────
+   Une seule règle pour toutes les scrollbars du portail (admin,
+   owner, agent, client) pour qu'elles soient discrètes et
+   thématisées. On applique sur :
+     - ::-webkit-scrollbar (Chromium/WebKit)
+     - scrollbar-width / scrollbar-color (Firefox)
+   La scrollbar de dialog (.popup) n'est PAS touchée car dialer.css
+   a sa propre règle dans son scope.
+*/
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2e2e44;
+  border-radius: 3px;
+  transition: background .15s;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #7b61ff;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2e2e44 transparent;
+}
+
+/* .scrollbar-hide override (doit rester sans scrollbar visible) */
+.scrollbar-hide::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar-thumb,
+.scrollbar-hide::-webkit-scrollbar-track {
+  display: none !important;
+  background: transparent !important;
 }
 
 /* DialerFAB — bouton floating phone (responsive) */
