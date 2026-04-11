@@ -44,7 +44,7 @@ export default function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gray-950 p-6">
+    <div className="h-screen overflow-y-auto bg-gray-950 p-6">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button onClick={() => router.push(getDashboardRoute(user.role))}
