@@ -17,8 +17,16 @@ router.get('/voice/token', authenticate, async (req: AuthRequest, res: Response)
     const token    = await twilioService.generateToken(identity, getOrgId(req))
     sendSuccess(res, { token, identity, configured: true })
   } catch (err: any) {
-    // Fallback demo si Twilio pas configuré
-    sendSuccess(res, { token: 'demo_' + Date.now(), identity: req.user!.userId, configured: false })
+    // Ancien code retournait un faux token 'demo_<timestamp>' ici, ce qui
+    // faisait echouer le dialer silencieusement. Maintenant on renvoie une
+    // vraie erreur 503 : le client voit "Twilio non configure" au lieu
+    // d'essayer d'utiliser un token bidon.
+    console.error('[voice/token] Twilio generateToken failed:', err.message)
+    return res.status(503).json({
+      success: false,
+      error: 'Twilio non configure pour cette organisation',
+      details: err.message,
+    })
   }
 })
 

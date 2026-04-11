@@ -74,16 +74,24 @@ router.get('/plans', async (_req, res) => {
 // GET /subscription
 // ──────────────────────────────────────────────────────────
 router.get('/subscription', async (req, res) => {
-  const org_id = getOrgId(req)
   try {
-    const { data: org } = await supabase.from('organizations').select('*').eq('id', org_id).single()
-    if (!org) throw new Error('not found')
-    const plan = org.plan || 'basic'
-    const planData = PLANS[plan] || PLANS.basic
-    const seats = org.seats || 1
-    const renews_at = org.billing_cycle_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const org_id = getOrgId(req)
+    const { data: org, error } = await supabase
+      .from('organizations').select('*').eq('id', org_id).single()
+    if (error || !org) {
+      return res.status(404).json({
+        success: false,
+        error: 'Organisation introuvable',
+      })
+    }
 
-    // Récupérer statut Stripe si disponible
+    const planKey = String(org.plan || 'basic').toLowerCase()
+    const planData = PLANS[planKey] || PLANS.basic
+    const seats = org.seats || 1
+    const renews_at = org.billing_cycle_end ||
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    // Statut Stripe (vraie check si stripe_customer_id existe ET stripe configure)
     let stripe_customer = false
     if (stripe && org.stripe_customer_id) {
       stripe_customer = true
@@ -92,27 +100,25 @@ router.get('/subscription', async (req, res) => {
     res.json({
       success: true,
       data: {
-        plan, plan_name: planData.name, plan_price: planData.price,
-        status: org.subscription_status || 'active',
-        seats, renews_at, amount: seats * planData.price,
-        currency: 'CAD', limits: planData.limits,
+        plan: planKey,
+        plan_name:  planData.name,
+        plan_price: planData.price,
+        status:     org.subscription_status || 'active',
+        seats,
+        renews_at,
+        amount:     seats * planData.price,
+        currency:   'CAD',
+        limits:     planData.limits,
         stripe_customer,
         trial_ends_at: org.trial_ends_at || null,
       },
     })
-  } catch {
-    const plan = 'confort'
-    const planData = PLANS[plan]
-    res.json({
-      success: true,
-      data: {
-        plan, plan_name: planData.name, plan_price: planData.price,
-        status: 'active', seats: 3,
-        renews_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        amount: 177, currency: 'CAD', limits: planData.limits,
-        stripe_customer: false, trial_ends_at: null, _fallback: true,
-      },
-    })
+  } catch (err: any) {
+    // Retrait du fallback silencieux qui retournait { plan: 'confort', _fallback: true }.
+    // Maintenant on propage l'erreur — le client verra qu'il y a un probleme
+    // au lieu de croire qu'il a un plan confort fictif.
+    console.error('[billing/subscription]', err.message)
+    res.status(500).json({ success: false, error: err.message })
   }
 })
 

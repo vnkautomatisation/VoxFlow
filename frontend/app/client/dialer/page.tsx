@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 type CStatus = 'active' | 'paused' | 'done'
 
@@ -9,11 +9,43 @@ interface Campaign {
   created: string; scheduledAt?: string
 }
 
-const MOCK: Campaign[] = [
-  { id:'1', name:'Prospection Avril 2026', status:'active', agents:3, total:450, called:210, contacts:87, rate:41, created:'2026-03-31' },
-  { id:'2', name:'Suivi clients inactifs',  status:'paused', agents:2, total:180, called:95,  contacts:31, rate:33, created:'2026-03-14' },
-  { id:'3', name:'Renouvellements Q1',      status:'done',   agents:2, total:120, called:120, contacts:67, rate:56, created:'2026-01-09' },
-]
+// API helper — lit token + url depuis localStorage
+function useApi() {
+  const getUrl = () => typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
+  const getTok = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') : null
+  return async (path: string, opts: RequestInit = {}) => {
+    const r = await fetch(getUrl() + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...(getTok() ? { Authorization: 'Bearer ' + getTok() } : {}), ...(opts.headers || {}) },
+      body: opts.body,
+    })
+    return r.json()
+  }
+}
+
+// Mapper dialer_campaigns (migration 008) → forme du composant.
+// Le predictive/power dialer utilise dialer_campaigns alors que le robot
+// dialer (/client/robot) utilise robot_campaigns (migration 015). Les deux
+// sont exposes via le meme router /api/v1/billing/campaigns existant.
+function mapCampaign(row: any): Campaign {
+  const total  = Number(row.total_contacts || 0)
+  const called = Number(row.dialed_count   || row.called_count || 0)
+  const answered = Number(row.answered_count || 0)
+  const status: CStatus =
+    row.status === 'ACTIVE'    ? 'active' :
+    row.status === 'COMPLETED' ? 'done'   : 'paused'
+  return {
+    id:        row.id,
+    name:      row.name,
+    status,
+    agents:    0, // dialer_campaigns ne tracke pas un nombre d'agents fixe
+    total,
+    called,
+    contacts:  answered,
+    rate:      total > 0 ? Math.round((answered / total) * 100) : 0,
+    created:   row.created_at ? String(row.created_at).slice(0, 10) : '',
+  }
+}
 
 const IS: React.CSSProperties = {
   width: '100%', background: '#080810', border: '1px solid #2a2a4a', borderRadius: 9,
@@ -147,13 +179,64 @@ function ReportModal({ campaign, onClose }: { campaign: Campaign; onClose: () =>
 const scBar = (s: CStatus) => s === 'active' ? '#00d4aa' : s === 'paused' ? '#ffb547' : '#7b61ff'
 
 export default function DialerPage() {
-  const [campaigns,  setCampaigns]  = useState<Campaign[]>(MOCK)
+  const api = useApi()
+  const [campaigns,  setCampaigns]  = useState<Campaign[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState<string | null>(null)
   const [showNew,    setShowNew]    = useState(false)
   const [report,     setReport]     = useState<Campaign | null>(null)
   const [activeTab,  setActiveTab]  = useState<'list' | 'new'>('list')
 
-  const toggle = (id: string) => {
-    setCampaigns(prev => prev.map(c => c.id !== id ? c : { ...c, status: c.status === 'active' ? 'paused' : 'active' }))
+  const loadCampaigns = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await api('/api/v1/billing/campaigns')
+      if (r.success && Array.isArray(r.data)) {
+        setCampaigns(r.data.map(mapCampaign))
+      } else {
+        setCampaigns([])
+        if (r.error || r.message) setError(r.error || r.message)
+      }
+    } catch (e: any) {
+      setError(e.message || 'Impossible de charger les campagnes')
+      setCampaigns([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadCampaigns() }, [loadCampaigns])
+
+  const toggle = async (id: string) => {
+    const c = campaigns.find(x => x.id === id)
+    if (!c) return
+    const newStatus = c.status === 'active' ? 'PAUSED' : 'ACTIVE'
+    try {
+      const r = await api(`/api/v1/billing/campaigns/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (r.success) await loadCampaigns()
+    } catch (e: any) {
+      console.error('[toggle]', e)
+    }
+  }
+
+  const createCampaign = async (c: Campaign) => {
+    try {
+      const r = await api('/api/v1/billing/campaigns', {
+        method: 'POST',
+        body: JSON.stringify({
+          name:          c.name,
+          total_contacts: c.total,
+          type:          'POWER',
+          status:        'DRAFT',
+        }),
+      })
+      if (r.success) await loadCampaigns()
+    } catch (e: any) {
+      console.error('[createCampaign]', e)
+    }
   }
 
   const active   = campaigns.filter(c => c.status === 'active').length
@@ -188,6 +271,18 @@ export default function DialerPage() {
 
       {/* Campagnes */}
       <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {loading && (
+          <div style={{ padding:20, textAlign:'center', color:'#4a4a6a', fontSize:13 }}>Chargement des campagnes…</div>
+        )}
+        {!loading && error && (
+          <div style={{ padding:16, background:'#ff4d6d10', border:'1px solid #ff4d6d33', borderRadius:10, color:'#ff4d6d', fontSize:13 }}>{error}</div>
+        )}
+        {!loading && !error && campaigns.length === 0 && (
+          <div style={{ padding:32, textAlign:'center', background:'#0e0e1c', border:'1px dashed #2a2a4a', borderRadius:10, color:'#4a4a6a' }}>
+            <div style={{ fontSize:14, marginBottom:6 }}>Aucune campagne predictive dialer</div>
+            <div style={{ fontSize:12, color:'#3a3a5a' }}>Cliquez sur "Nouvelle campagne" pour en creer une.</div>
+          </div>
+        )}
         {campaigns.map(c => {
           const pct = c.total > 0 ? Math.round(c.called / c.total * 100) : 0
           return (
@@ -242,7 +337,7 @@ export default function DialerPage() {
         })}
       </div>
 
-      {showNew && <NewCampaignModal onClose={() => setShowNew(false)} onCreate={c => { setCampaigns(prev => [c, ...prev]); setShowNew(false) }} />}
+      {showNew && <NewCampaignModal onClose={() => setShowNew(false)} onCreate={async c => { await createCampaign(c); setShowNew(false) }} />}
       {report  && <ReportModal campaign={report} onClose={() => setReport(null)} />}
     </div>
   )
