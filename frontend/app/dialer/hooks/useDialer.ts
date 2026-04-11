@@ -1,6 +1,9 @@
 'use client'
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { DIALER_CONFIG } from '@/lib/dialerConfig'
+import { vfGlobals } from '@/lib/windowGlobals'
+import { playAudioFile } from '@/lib/playAudio'
 
 // ── Types ───────────────────────────────────────────────────────
 export type ViewId = 'login' | 'incoming' | 'calling' | 'main' | 'wrapup'
@@ -171,7 +174,7 @@ export function startWaveforms(call?: any) {
             const an = ac.createAnalyser(); an.fftSize = 512; an.smoothingTimeConstant = 0.8
             src.connect(an)
             _stopLocalWF = drawWave(cLocal, an, '#00d4aa')
-                ; (window as any).__wfLocalStream = stream
+            vfGlobals.setWfLocalStream(stream)
         }).catch(() => { })
 
         // ── Audio remote — plusieurs chemins selon version SDK ────
@@ -211,7 +214,7 @@ export function startWaveforms(call?: any) {
         } else {
             // Dernier recours : attendre 1.5s et retenter
             setTimeout(() => {
-                const c2 = (window as any).__VFCall
+                const c2 = vfGlobals.getCall()
                 const pc2 = getPc(c2)
                 if (pc2) tryRemote(pc2)
             }, 1500)
@@ -223,8 +226,11 @@ export function stopWaveforms() {
     document.getElementById('wf-wrap')?.classList.remove('on')
     _stopLocalWF?.(); _stopLocalWF = null
     _stopRemoteWF?.(); _stopRemoteWF = null
-    const stream = (window as any).__wfLocalStream
-    if (stream) { stream.getTracks().forEach((t: MediaStreamTrack) => t.stop()); (window as any).__wfLocalStream = null }
+    const stream = vfGlobals.getWfLocalStream()
+    if (stream) {
+        stream.getTracks().forEach((t: MediaStreamTrack) => t.stop())
+        vfGlobals.setWfLocalStream(undefined)
+    }
 }
 
 // ── Hook principal ──────────────────────────────────────────────
@@ -233,7 +239,7 @@ export function useDialer() {
 
     // ── Session ────────────────────────────────────────────────
     const S = useRef<any>({
-        url: 'http://localhost:4000', tok: null, role: 'AGENT',
+        url: DIALER_CONFIG.API_URL, tok: null, role: 'AGENT',
         ext: null, status: 'ONLINE', name: '',
         callId: null, twSid: null, contact: null, dir: 'OUTBOUND',
         muted: false, hold: false, rec: false,
@@ -254,7 +260,7 @@ export function useDialer() {
     const [xferType, setXferType] = useState<XferType>('blind')
     const [xferNum, setXferNum] = useState('')
     const [notesVal, setNotesVal] = useState('')
-    const [outcome, setOutcome] = useState('Résolu ✓')
+    const [outcome, setOutcome] = useState('Résolu')
     const [stars, setStars] = useState(0)
     const [toast, setToast] = useState('')
     const [histFilter, setHistFilter] = useState<HistFilter>('all')
@@ -293,9 +299,10 @@ export function useDialer() {
     // ── Features du forfait (lu depuis localStorage) ───────────
     // Source : vf_features (JSON) sync par le portail au login.
     // Fallback permissif si vide pour ne pas bloquer en dev.
+    // Note: trialInfo est consommé par TrialBanner via useAuthStore,
+    // pas ici — on n'expose rien sur trial depuis useDialer.
     const featuresRef = useRef<Record<string, boolean>>({})
     const [featuresVersion, setFeaturesVersion] = useState(0)
-    const [trialInfo, setTrialInfo] = useState<any>(null)
     const [planName, setPlanName] = useState<string>('')
 
     useEffect(() => {
@@ -304,10 +311,6 @@ export function useDialer() {
                 const raw = localStorage.getItem('vf_features')
                 featuresRef.current = raw ? JSON.parse(raw) : {}
             } catch { featuresRef.current = {} }
-            try {
-                const trialRaw = localStorage.getItem('vf_trial')
-                setTrialInfo(trialRaw ? JSON.parse(trialRaw) : null)
-            } catch {}
             setPlanName(localStorage.getItem('vf_plan_name') || localStorage.getItem('vf_plan_id') || '')
             setFeaturesVersion(v => v + 1)
         }
@@ -360,7 +363,7 @@ export function useDialer() {
     useEffect(() => {
         const tok  = localStorage.getItem('vf_tok')
         const role = localStorage.getItem('vf_role') || 'AGENT'
-        const url  = localStorage.getItem('vf_url')  || 'http://localhost:4000'
+        const url  = localStorage.getItem('vf_url')  || DIALER_CONFIG.API_URL
         const ext  = localStorage.getItem('vf_ext')  || ''
         const name = localStorage.getItem('vf_name') || ''
 
@@ -472,7 +475,7 @@ export function useDialer() {
             localStorage.setItem('vf_role', role)
             // Écrire les cookies session pour le middleware Next.js
             try {
-                await fetch('http://localhost:3001/api/auth/session', {
+                await fetch(DIALER_CONFIG.PORTAL_URL + '/api/auth/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token: tok, role }),
@@ -581,11 +584,11 @@ export function useDialer() {
         } catch { showToast('Erreur réseau') }
 
         // Twilio WebRTC si disponible
-        const dev = (window as any).__VFDevice
+        const dev = vfGlobals.getDevice()
         if (dev && dev.state === 'registered') {
             try {
                 const call = await dev.connect({ params: { To: to } })
-                    ; (window as any).__VFCall = call
+                vfGlobals.setCall(call)
                 call.on('accept', () => startCallUI(to))
                 call.on('disconnect', endCallCleanup)
                 call.on('error', (e: any) => showToast(e.message))
@@ -606,14 +609,14 @@ export function useDialer() {
             S.current.tsec++
             setCallTimer(S.current.tsec)
         }, 1000)
-        setTimeout(() => startWaveforms((window as any).__VFCall), 500)
+        setTimeout(() => startWaveforms(vfGlobals.getCall()), 500)
     }, [])
 
     // ── Appel entrant ──────────────────────────────────────────
     const handleIncoming = useCallback(async (call: any) => {
         const from = call.parameters?.From || 'Entrant'
         S.current._inNum = from
-            ; (window as any).__VFCall = call
+        vfGlobals.setCall(call)
         let co: Contact | undefined
         try {
             const r = await api('/api/v1/telephony/lookup/' + encodeURIComponent(from))
@@ -622,11 +625,11 @@ export function useDialer() {
         S.current._inCo = co || null
         setIncoming({ from, co })
         setView('incoming')
-        call.on('cancel', () => { ; (window as any).__VFCall = null; setView('main') })
+        call.on('cancel', () => { vfGlobals.clearCall(); setView('main') })
     }, [api])
 
     const doAnswer = useCallback(() => {
-        const call = (window as any).__VFCall
+        const call = vfGlobals.getCall()
         if (call) {
             call.accept()
             call.on('disconnect', endCallCleanup)
@@ -640,8 +643,8 @@ export function useDialer() {
     }, [incoming, startCallUI])
 
     const doRefuse = useCallback(() => {
-        const call = (window as any).__VFCall
-        if (call) { call.reject();; (window as any).__VFCall = null }
+        const call = vfGlobals.getCall()
+        if (call) { call.reject(); vfGlobals.clearCall() }
         setIncoming(null); setView('main')
     }, [])
 
@@ -651,8 +654,8 @@ export function useDialer() {
         stopWaveforms()
         clearInterval(timerRef.current)
         const dur = S.current.tsec
-        const call = (window as any).__VFCall
-        if (call) { try { call.disconnect() } catch { }; (window as any).__VFCall = null }
+        const call = vfGlobals.getCall()
+        if (call) { try { call.disconnect() } catch { }; vfGlobals.clearCall() }
         if (S.current.callId) {
             await api('/api/v1/telephony/call/' + S.current.callId + '/end', {
                 method: 'PATCH', body: { duration: dur, notes: notesVal, twilioSid: S.current.twSid || '' }
@@ -679,11 +682,11 @@ export function useDialer() {
     const doMute = useCallback(() => {
         const next = !muted
         setMuted(next); S.current.muted = next
-        const call = (window as any).__VFCall
+        const call = vfGlobals.getCall()
         if (call?.mute) call.mute(next)
         if (S.current.callId)
             api('/api/v1/telephony/call/' + S.current.callId + '/mute', { method: 'PATCH', body: { mute: next } }).catch(() => { })
-        showToast(next ? '🔇 Micro coupé' : '🎙️ Micro actif')
+        showToast(next ? 'Micro coupé' : 'Micro actif')
     }, [muted, api, showToast])
 
     const doHold = useCallback(() => {
@@ -691,14 +694,14 @@ export function useDialer() {
         setOnHold(next); S.current.hold = next
         if (S.current.callId)
             api('/api/v1/telephony/call/' + S.current.callId + '/hold', { method: 'PATCH', body: { hold: next } }).catch(() => { })
-        showToast(next ? '⏸ Appel en attente' : '▶ Appel repris')
+        showToast(next ? 'Appel en attente' : 'Appel repris')
     }, [onHold, api, showToast])
 
     const doRec = useCallback(() => {
-        if (!isAdmin()) { showToast('🔒 Réservé aux administrateurs'); return }
+        if (!isAdmin()) { showToast('Réservé aux administrateurs'); return }
         const next = !recording
         setRecording(next); S.current.rec = next
-        showToast(next ? '⏺ Enregistrement démarré' : '⏹ Enregistrement arrêté')
+        showToast(next ? 'Enregistrement démarré' : 'Enregistrement arrêté')
     }, [recording, isAdmin, showToast])
 
     // ── Transfert ──────────────────────────────────────────────
@@ -707,7 +710,7 @@ export function useDialer() {
         await api('/api/v1/telephony/call/' + S.current.callId + '/transfer', {
             method: 'POST', body: { to: xferNum, type: xferType }
         }).catch(() => { })
-        showToast('→ Transfert en cours…')
+        showToast('Transfert en cours…')
         if (xferType === 'blind') setTimeout(hangup, 900)
     }, [xferNum, xferType, api, showToast, hangup])
 
@@ -722,20 +725,20 @@ export function useDialer() {
             api('/api/v1/telephony/call/' + S.current.callId + '/notes', {
                 method: 'PATCH', body: { notes: notesVal }
             }).catch(() => { })
-        showToast('✓ Notes sauvegardées')
+        showToast('Notes sauvegardées')
     }, [notesVal, api, showToast])
 
     // ── DTMF ───────────────────────────────────────────────────
     const dtmf = useCallback((k: string) => {
         playDTMF(k)
-        const call = (window as any).__VFCall
+        const call = vfGlobals.getCall()
         if (call?.sendDigits) call.sendDigits(k)
     }, [])
 
     // ── Supervision ────────────────────────────────────────────
-    const supListen = useCallback((id: string) => { showToast('👂 Écoute activée'); api('/api/v1/supervision/listen/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
-    const supWhisper = useCallback((id: string) => { showToast('🗣 Chuchotement actif'); api('/api/v1/supervision/whisper/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
-    const supBarge = useCallback((id: string) => { showToast("⚡ Vous rejoignez l'appel"); api('/api/v1/supervision/barge/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
+    const supListen = useCallback((id: string) => { showToast('Écoute activée'); api('/api/v1/supervision/listen/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
+    const supWhisper = useCallback((id: string) => { showToast('Chuchotement actif'); api('/api/v1/supervision/whisper/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
+    const supBarge = useCallback((id: string) => { showToast("Vous rejoignez l'appel"); api('/api/v1/supervision/barge/' + id, { method: 'POST' }).catch(() => { }) }, [api, showToast])
 
     // ── Voicemails ─────────────────────────────────────────────
     const markRead = useCallback((id: string) => {
@@ -764,43 +767,7 @@ export function useDialer() {
     // ── Audio playback ─────────────────────────────────────────
     const playAudio = useCallback((url: string) => {
         if (!url) { showToast('Aucun enregistrement'); return }
-        const base = S.current.url
-        const tok = S.current.tok
-        const proxyUrl = url.includes('twilio.com') && tok
-            ? base + '/api/v1/telephony/recording-proxy?url=' + encodeURIComponent(url)
-            : url
-
-        // Créer modal audio
-        const old = document.getElementById('vf-audio-modal')
-        if (old) old.remove()
-        const m = document.createElement('div')
-        m.id = 'vf-audio-modal'
-        m.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;border-radius:20px'
-        m.innerHTML = `<div style="background:#18181f;border:1px solid #3a3a55;border-radius:16px;padding:20px;width:300px">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:#55557a;margin-bottom:12px">▶ Enregistrement</div>
-      <div id="vf-audio-status" style="font-size:12px;color:#9898b8;text-align:center;padding:8px 0">Chargement...</div>
-      <audio id="vf-audio-el" controls style="width:100%;border-radius:8px;display:none"></audio>
-      <button onclick="document.getElementById('vf-audio-modal').remove()"
-        style="margin-top:12px;width:100%;background:#1f1f2a;border:1px solid #2e2e44;border-radius:8px;color:#9898b8;padding:8px;font-size:12px;cursor:pointer;font-family:var(--font)">Fermer</button>
-    </div>`
-        document.getElementById('popup')?.appendChild(m)
-
-        const h: Record<string, string> = tok ? { Authorization: 'Bearer ' + tok } : {}
-        fetch(proxyUrl, { headers: h })
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob() })
-            .then(blob => {
-                const audio = document.getElementById('vf-audio-el') as HTMLAudioElement
-                const status = document.getElementById('vf-audio-status')
-                if (!audio || !status) return
-                audio.src = URL.createObjectURL(blob)
-                audio.style.display = 'block'
-                status.style.display = 'none'
-                audio.play().catch(() => { })
-            })
-            .catch(e => {
-                const status = document.getElementById('vf-audio-status')
-                if (status) { status.textContent = 'Erreur: ' + e.message; (status as any).style.color = '#ff4d6d' }
-            })
+        playAudioFile({ url, apiUrl: S.current.url, token: S.current.tok || undefined })
     }, [showToast])
 
     // ── CRM ────────────────────────────────────────────────────
@@ -888,7 +855,7 @@ export function useDialer() {
         // Helpers
         isAdmin, S,
         // Features gating
-        has, trialInfo, planName, featuresVersion,
+        has, planName, featuresVersion,
         // Caller ID picker (multi-pays)
         myNumbers, fromNumber, setFromNumber,
     }
