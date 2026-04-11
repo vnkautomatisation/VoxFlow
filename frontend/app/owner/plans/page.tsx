@@ -250,8 +250,12 @@ export default function OwnerPlansPage() {
                         <button
                           onClick={() => setDeleteConfirm(null)}
                           className="bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-3 py-2 rounded-lg text-xs font-bold"
+                          aria-label="Annuler"
                         >
-                          ✕
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
                         </button>
                       </>
                     ) : (
