@@ -41,7 +41,9 @@ function resolveFrontendUrl() {
     return 'http://localhost:3001'
 }
 const FRONTEND_URL = resolveFrontendUrl()
-const DIALER_PATH  = '/dialer?fromElectron=1'
+// Même URL exacte que le browser pour que le comportement soit identique.
+// Le flag Electron est détecté via window.electronAPI côté renderer.
+const DIALER_PATH  = '/dialer'
 const DIALER_URL   = FRONTEND_URL + DIALER_PATH
 const LOCAL_PORT   = 9876
 const MAX_BOOT_RETRIES = 6
@@ -225,12 +227,10 @@ function createWindow() {
         log('[window] shown')
     })
 
-    // ── Boot : afficher offline.html IMMÉDIATEMENT pour ne pas ──
-    // laisser l'utilisateur sur un écran noir pendant le DNS/TCP.
-    // Puis tenter de joindre le frontend. Si succès, on swap vers le
-    // vrai dialer. Si échec après N retries, on reste sur offline.
-    showLoadingPage()
-    setTimeout(() => loadWithRetry(), 150)
+    // ── Boot : charger directement le dialer ─────────────────
+    // Si le load échoue (did-fail-load), on bascule sur offline.html.
+    // Si le retry exceed MAX_BOOT_RETRIES, on reste sur offline.
+    loadWithRetry()
 
     // ── IPC handlers ───────────────────────────────────────────
     ipcMain.on(channels.callStarted,    () => { callActive = true;  log('[call] started') })
