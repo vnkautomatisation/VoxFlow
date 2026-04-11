@@ -358,26 +358,34 @@ export function useDialer() {
     // ── Auth — source de vérité = vf_tok dans localStorage ──────────
     // Ne pas se fier à useAuthStore (Zustand) en Electron — localStorage isolé
     useEffect(() => {
-        const tok = localStorage.getItem('vf_tok')
+        const tok  = localStorage.getItem('vf_tok')
         const role = localStorage.getItem('vf_role') || 'AGENT'
-        const url = localStorage.getItem('vf_url') || 'http://localhost:4000'
+        const url  = localStorage.getItem('vf_url')  || 'http://localhost:4000'
+        const ext  = localStorage.getItem('vf_ext')  || ''
+        const name = localStorage.getItem('vf_name') || ''
 
         if (tok) {
             // Token présent dans localStorage → connecté
-            S.current.tok = tok
+            S.current.tok  = tok
             S.current.role = role
-            S.current.url = url
+            S.current.url  = url
+            S.current.ext  = ext || null
+            S.current.name = name
             setView('main')
             loadData()
             startPoll()
         } else if (isAuth && accessToken && user) {
-            // Portail connecté (même contexte) → sync
-            S.current.tok = accessToken
-            S.current.url = url
+            // Portail connecté (même contexte) → sync complet depuis Zustand
+            S.current.tok  = accessToken
+            S.current.url  = url
             S.current.role = user.role
-            localStorage.setItem('vf_tok', accessToken)
-            localStorage.setItem('vf_url', url)
+            S.current.ext  = user.extension || null
+            S.current.name = user.name || ''
+            localStorage.setItem('vf_tok',  accessToken)
+            localStorage.setItem('vf_url',  url)
             localStorage.setItem('vf_role', user.role)
+            if (user.extension) localStorage.setItem('vf_ext', user.extension)
+            if (user.name)      localStorage.setItem('vf_name', user.name)
             setView('main')
             loadData()
             startPoll()

@@ -334,30 +334,48 @@ html, body {
     justify-content: center
 }
 
-/* ── SCROLL ── */
+/* ── SCROLL ──
+   Doit être bounded par un parent flex-column pour que l'overflow
+   s'active. Sans min-height:0, les contenus qui dépassent poussent
+   le conteneur et le scroll ne se déclenche pas. */
 .scroll {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden
 }
 
     .scroll::-webkit-scrollbar {
-        width: 3px
+        width: 5px
+    }
+
+    .scroll::-webkit-scrollbar-track {
+        background: transparent
     }
 
     .scroll::-webkit-scrollbar-thumb {
         background: var(--line2);
-        border-radius: 2px
+        border-radius: 3px
     }
 
-/* ── VIEW / PANE ── */
+    .scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--violet)
+    }
+
+/* ── VIEW / PANE ──
+   .view.on prend toute la hauteur disponible via flex:1 pour que le
+   .scroll enfant puisse s'ancrer (sinon le scroll n'est jamais bounded
+   et l'historique/search pousse la popup au lieu de scroller). */
 .view {
     display: none
 }
 
     .view.on {
         display: flex;
-        flex-direction: column
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%
     }
 
 .pane {
@@ -365,7 +383,8 @@ html, body {
 }
 
     .pane.on {
-        display: block
+        display: block;
+        min-height: 0
     }
 
 .p12 {
@@ -2180,33 +2199,166 @@ svg {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Caller ID picker (multi-pays)
+   Caller ID Picker — dropdown custom multi-pays pro
    ══════════════════════════════════════════════════════════════ */
 
-.caller-id-picker {
-    margin-bottom: 10px;
-    background: var(--ink3);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+.cid-wrap {
+    position: relative;
+    margin-bottom: 12px;
 }
 
-.caller-id-single {
-    margin-bottom: 10px;
+.cid-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--tx3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 5px;
+    padding-left: 2px;
+}
+
+/* Bouton principal — affichage compact */
+.cid-btn {
+    width: 100%;
     background: var(--ink3);
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 7px 11px;
+    border-radius: 12px;
+    padding: 9px 10px 9px 11px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 10px;
+    cursor: pointer;
+    font-family: var(--font);
+    text-align: left;
+    transition: all 0.15s;
+    outline: none;
 }
 
-.caller-id-label {
+.cid-btn:hover,
+.cid-btn.open {
+    border-color: var(--violet);
+    background: var(--ink4);
+    box-shadow: 0 0 0 3px rgba(123, 97, 255, 0.08);
+}
+
+.cid-flag {
+    flex-shrink: 0;
+    width: 20px;
+    height: 14px;
+    border-radius: 2px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+.cid-flag svg {
+    display: block;
+    border-radius: 1px;
+}
+
+.cid-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.cid-number {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cid-dial {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--tx3);
+    letter-spacing: 0.3px;
+}
+
+.cid-local {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--txt);
+    letter-spacing: 0.2px;
+}
+
+.cid-country {
+    font-size: 9px;
+    color: var(--tx3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cid-count {
+    color: var(--violet);
+    font-weight: 700;
+}
+
+.cid-chev {
+    flex-shrink: 0;
+    color: var(--tx3);
+    transition: transform 0.2s;
+}
+
+.cid-chev.on {
+    transform: rotate(180deg);
+    color: var(--violet);
+}
+
+/* Dropdown — liste groupée par pays */
+.cid-drop {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--ink2);
+    border: 1px solid var(--line2);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(123,97,255,0.1);
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 6px;
+    animation: cidFadeIn 0.15s ease-out;
+}
+
+@keyframes cidFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.cid-drop::-webkit-scrollbar {
+    width: 5px;
+}
+
+.cid-drop::-webkit-scrollbar-thumb {
+    background: var(--line2);
+    border-radius: 3px;
+}
+
+.cid-group {
+    margin-bottom: 4px;
+}
+
+.cid-group:last-child {
+    margin-bottom: 0;
+}
+
+.cid-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 4px;
     font-size: 9px;
     font-weight: 700;
     color: var(--tx3);
@@ -2214,35 +2366,107 @@ svg {
     letter-spacing: 0.8px;
 }
 
-.caller-id-select {
+.cid-group-label svg {
+    border-radius: 1px;
+}
+
+.cid-group-count {
+    margin-left: auto;
+    background: var(--ink4);
+    color: var(--tx2);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+/* Item dans le dropdown */
+.cid-item {
     width: 100%;
-    background: var(--ink2);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 6px 8px;
-    color: var(--txt);
-    font-size: 12px;
-    font-family: var(--font);
-    font-weight: 600;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     cursor: pointer;
+    font-family: var(--font);
+    text-align: left;
+    transition: all 0.12s;
     outline: none;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239898b8' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    padding-right: 28px;
-    transition: border-color 0.15s;
 }
 
-.caller-id-select:focus,
-.caller-id-select:hover {
-    border-color: var(--violet);
+.cid-item:hover {
+    background: var(--ink3);
+    border-color: var(--line);
 }
 
-.caller-id-value {
-    font-size: 12px;
+.cid-item.active {
+    background: rgba(123, 97, 255, 0.12);
+    border-color: rgba(123, 97, 255, 0.4);
+}
+
+.cid-item-num {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cid-item-friendly {
+    font-size: 9px;
+    color: var(--tx3);
+    font-weight: 600;
+    margin-left: auto;
+    padding-right: 4px;
+}
+
+.cid-check {
+    flex-shrink: 0;
+    color: var(--violet);
+}
+
+/* État vide — aucun numéro assigné */
+.cid-empty {
+    margin-bottom: 12px;
+    background: var(--ink3);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cid-empty-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 181, 71, 0.12);
+    border: 1px solid rgba(255, 181, 71, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--amber);
+}
+
+.cid-empty-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.cid-empty-title {
+    font-size: 11px;
     font-weight: 700;
     color: var(--txt);
-    font-variant-numeric: tabular-nums;
+    margin-bottom: 2px;
+}
+
+.cid-empty-sub {
+    font-size: 9px;
+    color: var(--tx3);
+    font-weight: 600;
 }
