@@ -1,5 +1,5 @@
 ﻿import { Router, Response } from "express"
-import { authenticate, authorize, AuthRequest } from "../../middleware/auth"
+import { authenticate, authorize, AuthRequest, resolveOrgId } from "../../middleware/auth"
 import { acdService } from "../../services/acd/acd.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
@@ -7,15 +7,21 @@ import { sendSuccess, sendError } from "../../utils/response"
 const router = Router()
 router.use(authenticate)
 
-const getOrgId = (req: AuthRequest) => req.user?.organizationId || ""
+const getOrgId = (req: AuthRequest) => resolveOrgId(req)
+const isStaff  = (req: AuthRequest) => req.user?.role === 'OWNER' || req.user?.role === 'OWNER_STAFF'
 
 // ── QUEUES ────────────────────────────────────────────────────
 
 // GET /api/v1/queues -- Toutes les files avec stats temps reel
+// OWNER/OWNER_STAFF sans orgId → renvoie liste vide (staff VNK peut
+// consulter le dialer sans être rattaché à une org spécifique)
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const orgId = getOrgId(req)
-    if (!orgId) return sendError(res, "Organisation requise", 400)
+    if (!orgId) {
+      if (isStaff(req)) return sendSuccess(res, [])
+      return sendError(res, "Organisation requise", 400)
+    }
     sendSuccess(res, await acdService.getQueuesWithStats(orgId))
   } catch (err: any) { sendError(res, err.message) }
 })

@@ -3,6 +3,7 @@ import './dialer.css'
 import { useEffect, useRef } from 'react'
 import { useDialer, fmtT, fmtD, ini, avatarGrad, ACP } from './hooks/useDialer'
 import TrialBanner from '@/components/shared/TrialBanner'
+import CallerIdPicker from '@/components/dialer/CallerIdPicker'
 
 // ── SVG Icons ────────────────────────────────────────────────────
 const PhoneIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
@@ -133,7 +134,7 @@ export default function DialerPage() {
                 <div className="hdr">
                     <div className="logo"><div className="logo-dot" /><span style={{ color: '#7b61ff' }}>Vox</span><span style={{ color: '#00d4aa' }}>Flow</span></div>
                     <div className={`rec-ind ${d.recording ? 'on' : ''}`}><div className="rec-dot" />REC</div>
-                    <div className="hdr-r"><div className="ext-chip">EXT {d.S.current.ext || '201'}</div></div>
+                    <div className="hdr-r">{d.S.current.ext ? <div className="ext-chip">EXT {d.S.current.ext}</div> : null}</div>
                 </div>
                 <div className="scroll">
                     <div className="ct">
@@ -243,8 +244,13 @@ export default function DialerPage() {
                 <div className="hdr">
                     <div className="logo"><div className="logo-dot" /><span style={{ color: '#7b61ff' }}>Vox</span><span style={{ color: '#00d4aa' }}>Flow</span></div>
                     <div className="hdr-mid">
-                        <div className="ext-chip">EXT {d.S.current.ext || '201'}</div>
-                        <div className={`role-badge ${d.isAdmin() ? 'admin' : 'agent'}`}>{d.S.current.role === 'OWNER' ? 'Owner' : d.isAdmin() ? 'Admin' : 'Agent'}</div>
+                        {d.S.current.ext && <div className="ext-chip">EXT {d.S.current.ext}</div>}
+                        <div className={`role-badge ${d.isAdmin() ? 'admin' : 'agent'}`}>
+                            {d.S.current.role === 'OWNER'       ? 'Owner' :
+                             d.S.current.role === 'OWNER_STAFF' ? 'Staff' :
+                             d.S.current.role === 'SUPERVISOR'  ? 'Superviseur' :
+                             d.isAdmin()                        ? 'Admin' : 'Agent'}
+                        </div>
                     </div>
                     <div className="hdr-r">
                         <div className="chip">
@@ -286,32 +292,11 @@ export default function DialerPage() {
                     {/* PANE DIALER */}
                     <div className={`pane ${d.tab === 'dialer' ? 'on' : ''}`} id="pane-dialer">
                         <div className="p12">
-                            {/* Caller ID picker — visible si multi-numéros */}
-                            {d.myNumbers.length > 1 && (
-                                <div className="caller-id-picker">
-                                    <label className="caller-id-label">Appeler depuis</label>
-                                    <select
-                                        className="caller-id-select"
-                                        value={d.fromNumber}
-                                        onChange={(e) => d.setFromNumber(e.target.value)}
-                                    >
-                                        {d.myNumbers.map((n: any) => (
-                                            <option key={n.number} value={n.number}>
-                                                {n.flag} {n.number} · {n.country_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-                            {/* Affichage compact si un seul numéro */}
-                            {d.myNumbers.length === 1 && (
-                                <div className="caller-id-single">
-                                    <span className="caller-id-label">Appeler depuis</span>
-                                    <span className="caller-id-value">
-                                        {d.myNumbers[0].flag} {d.myNumbers[0].number}
-                                    </span>
-                                </div>
-                            )}
+                            <CallerIdPicker
+                                numbers={d.myNumbers}
+                                value={d.fromNumber}
+                                onChange={d.setFromNumber}
+                            />
                             <input className="dinput" id="dinp" value={d.dialNum} placeholder="+1 (514) 000-0000" type="tel"
                                 onChange={e => d.setDialNum(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && d.callNum()} />
