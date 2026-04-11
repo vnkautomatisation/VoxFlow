@@ -41,43 +41,47 @@
 }
 
 html, body {
-    min-height: 100vh;
+    margin: 0;
+    padding: 0;
     background: var(--ink);
     font-family: var(--font);
     color: var(--txt);
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
-    padding: 16px;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    overflow: hidden;
 }
 
-/* ── Electron — fenêtre native 360x700 ── */
-@media screen and (max-width: 380px) {
+/* En mode PC (> 440px de large), on centre le popup comme une
+   fausse fenêtre phone-like pour le debug navigateur. */
+@media screen and (min-width: 441px) {
     html, body {
-        display: block !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-        width: 100% !important;
-        height: 100% !important;
-        min-height: unset !important;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        padding: 16px;
+        min-height: 100vh;
+        height: auto;
     }
-
     .popup {
-        width: 100% !important;
-        height: 100% !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        border: none !important;
+        width: 360px;
+        height: 700px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        box-shadow: 0 0 0 1px rgba(123,97,255,.08),0 40px 100px rgba(0,0,0,.9),0 12px 40px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);
     }
 }
 
+/* Sinon (≤ 440px — Electron window, mobile, popup web) :
+   le popup remplit la fenêtre pour ne jamais déborder ou laisser
+   un fond noir visible. */
 .popup {
-    width: 360px;
-    height: 700px;
+    width: 100%;
+    height: 100vh;
     background: var(--ink2);
-    border-radius: 20px;
-    border: 1px solid var(--line);
-    box-shadow: 0 0 0 1px rgba(123,97,255,.08),0 40px 100px rgba(0,0,0,.9),0 12px 40px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -335,37 +339,21 @@ html, body {
 }
 
 /* ── SCROLL ──
-   Doit être bounded par un parent flex-column pour que l'overflow
-   s'active. Sans min-height:0, les contenus qui dépassent poussent
-   le conteneur et le scroll ne se déclenche pas. */
+   .scroll est un wrapper flex-column sans overflow ; c'est chaque
+   .pane.on qui a son propre overflow-y: auto, permettant à .frow
+   d'utiliser position: sticky au sein du pane. */
 .scroll {
     flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-    .scroll::-webkit-scrollbar {
-        width: 5px
-    }
-
-    .scroll::-webkit-scrollbar-track {
-        background: transparent
-    }
-
-    .scroll::-webkit-scrollbar-thumb {
-        background: var(--line2);
-        border-radius: 3px
-    }
-
-    .scroll::-webkit-scrollbar-thumb:hover {
-        background: var(--violet)
-    }
-
 /* ── VIEW / PANE ──
-   .view.on prend toute la hauteur disponible via flex:1 pour que le
-   .scroll enfant puisse s'ancrer (sinon le scroll n'est jamais bounded
-   et l'historique/search pousse la popup au lieu de scroller). */
+   .view.on fill la hauteur de .popup (popup flex-column).
+   .pane.on a son propre overflow-y: auto pour que le sticky
+   filter row fonctionne par pane indépendamment. */
 .view {
     display: none
 }
@@ -382,9 +370,33 @@ html, body {
     display: none
 }
 
+    /* display: block + overflow-y: auto — chaque pane actif a son
+       propre scroll vertical, ce qui rend position: sticky fonctionnel
+       sur .frow (qui sticks au top du .pane.on). */
     .pane.on {
         display: block;
-        min-height: 0
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .pane.on::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .pane.on::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .pane.on::-webkit-scrollbar-thumb {
+        background: var(--line2);
+        border-radius: 3px;
+    }
+
+    .pane.on::-webkit-scrollbar-thumb:hover {
+        background: var(--violet);
     }
 
 .p12 {
@@ -1574,13 +1586,23 @@ html, body {
         box-shadow: 0 6px 22px rgba(0,212,170,.4)
     }
 
-/* ── HISTORY ── */
+/* ── HISTORY — filter row sticky ─────────────────────────────
+   Le filtre reste figé en haut de la .scroll pendant que la liste
+   défile en dessous. Padding augmenté + background solide pour que
+   les items scrollés ne transparaissent pas derrière. */
 .frow {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
     gap: 4px;
-    padding: 10px 12px 0;
+    padding: 12px 12px 10px;
     overflow-x: auto;
-    scrollbar-width: none
+    scrollbar-width: none;
+    background: var(--ink2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
 }
 
     .frow::-webkit-scrollbar {
