@@ -334,30 +334,48 @@ html, body {
     justify-content: center
 }
 
-/* ── SCROLL ── */
+/* ── SCROLL ──
+   Doit être bounded par un parent flex-column pour que l'overflow
+   s'active. Sans min-height:0, les contenus qui dépassent poussent
+   le conteneur et le scroll ne se déclenche pas. */
 .scroll {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden
 }
 
     .scroll::-webkit-scrollbar {
-        width: 3px
+        width: 5px
+    }
+
+    .scroll::-webkit-scrollbar-track {
+        background: transparent
     }
 
     .scroll::-webkit-scrollbar-thumb {
         background: var(--line2);
-        border-radius: 2px
+        border-radius: 3px
     }
 
-/* ── VIEW / PANE ── */
+    .scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--violet)
+    }
+
+/* ── VIEW / PANE ──
+   .view.on prend toute la hauteur disponible via flex:1 pour que le
+   .scroll enfant puisse s'ancrer (sinon le scroll n'est jamais bounded
+   et l'historique/search pousse la popup au lieu de scroller). */
 .view {
     display: none
 }
 
     .view.on {
         display: flex;
-        flex-direction: column
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%
     }
 
 .pane {
@@ -365,7 +383,8 @@ html, body {
 }
 
     .pane.on {
-        display: block
+        display: block;
+        min-height: 0
     }
 
 .p12 {
