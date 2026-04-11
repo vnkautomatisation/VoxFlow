@@ -34,16 +34,37 @@ function useApi() {
   }
 }
 
-const MOCK_NUMBERS: DIDNumber[] = [
-  { id: '1', number: '+1 (514) 000-0001', friendly_name: 'Ligne principale', country: 'CA', type: 'local', status: 'active', assigned_to: 'File principale', monthly_cost: 2.50, created_at: '2026-01-15', capabilities: { voice: true, sms: true, mms: false } },
-  { id: '2', number: '+1 (514) 000-0002', friendly_name: 'Support technique', country: 'CA', type: 'local', status: 'active', assigned_to: 'Équipe support', monthly_cost: 2.50, created_at: '2026-02-01', capabilities: { voice: true, sms: true, mms: false } },
-  { id: '3', number: '+1 (800) 000-0003', friendly_name: 'Numéro sans frais', country: 'CA', type: 'toll_free', status: 'active', assigned_to: null, monthly_cost: 5.00, created_at: '2026-02-15', capabilities: { voice: true, sms: false, mms: false } },
-]
+// Mapper la row phone_numbers retournee par /api/v1/client/numbers vers
+// la forme attendue par le composant. Le backend utilise capabilities JSONB
+// alors que l'ancien MOCK utilisait un objet plat.
+function mapPhoneToDID(row: any): DIDNumber {
+  const caps = row.capabilities || {}
+  return {
+    id:             row.id,
+    number:         row.number,
+    friendly_name:  row.friendly_name || row.number,
+    country:        row.country || 'CA',
+    type:           row.number_type === 'TOLLFREE' ? 'toll_free' :
+                    row.number_type === 'MOBILE'   ? 'mobile' : 'local',
+    status:         row.status === 'ACTIVE' ? 'active' : 'suspended',
+    assigned_to:    row.extension_id || null,
+    monthly_cost:   Number(row.price_monthly || 0) / 100, // cents → CAD
+    created_at:     row.created_at || row.purchased_at || '',
+    capabilities: {
+      voice: caps.voice !== false,
+      sms:   caps.sms   === true,
+      mms:   caps.mms   === true,
+    },
+    twilio_sid:     row.twilio_sid || undefined,
+  }
+}
 
 export default function NumbersPage() {
   const api = useApi()
   const [tab, setTab]               = useState<Tab>('my')
-  const [numbers, setNumbers]       = useState<DIDNumber[]>(MOCK_NUMBERS)
+  const [numbers, setNumbers]       = useState<DIDNumber[]>([])
+  const [loadingNums, setLoadingNums] = useState(true)
+  const [numsError, setNumsError]   = useState<string | null>(null)
   const [extensions, setExtensions] = useState<Extension[]>([])
   const [loadingExt, setLoadingExt] = useState(false)
   const [searchQ, setSearchQ]       = useState('')
@@ -59,12 +80,32 @@ export default function NumbersPage() {
   const [newExt, setNewExt]         = useState({ extension_number: '', label: '', did_number: '' })
   const [extMsg, setExtMsg]         = useState<string | null>(null)
 
+  // Load des numeros reels de l'org via /api/v1/client/numbers (Phase B)
+  const loadNumbers = useCallback(async () => {
+    setLoadingNums(true)
+    setNumsError(null)
+    try {
+      const r = await api('/api/v1/client/numbers')
+      if (r.success && Array.isArray(r.data)) {
+        setNumbers(r.data.map(mapPhoneToDID))
+      } else {
+        setNumbers([])
+        if (r.error) setNumsError(r.error)
+      }
+    } catch (e: any) {
+      setNumsError(e.message || 'Impossible de charger les numeros')
+      setNumbers([])
+    }
+    setLoadingNums(false)
+  }, [])
+
   const loadExtensions = useCallback(async () => {
     setLoadingExt(true)
     try {
-      const r = await api('/api/v1/billing/extensions')
-      if (r.success) setExtensions(r.data)
-    } catch {}
+      const r = await api('/api/v1/client/extensions')
+      if (r.success && Array.isArray(r.data)) setExtensions(r.data)
+      else setExtensions([])
+    } catch { setExtensions([]) }
     setLoadingExt(false)
   }, [])
 
@@ -79,9 +120,11 @@ export default function NumbersPage() {
     } catch {}
   }, [])
 
+  // Fetch initial des numeros + extensions (tab-triggered pour ext)
+  useEffect(() => { loadNumbers() }, [loadNumbers])
   useEffect(() => {
     if (tab === 'extensions') loadExtensions()
-  }, [tab])
+  }, [tab, loadExtensions])
 
   const openConfig = (num: DIDNumber) => {
     setConfigNum(num)
@@ -148,29 +191,49 @@ export default function NumbersPage() {
 
   const purchaseNumber = async (num: string) => {
     try {
-      const r = await api('/api/v1/telephony/numbers/purchase', { method: 'POST', body: JSON.stringify({ phoneNumber: num }) })
-      setNumbers(prev => [...prev, {
-        id: r.data?.sid || Date.now().toString(), number: num,
-        friendly_name: 'Nouveau numéro', country: 'CA', type: 'local',
-        status: 'active', assigned_to: null, monthly_cost: 2.50,
-        created_at: new Date().toISOString(), capabilities: { voice: true, sms: true, mms: false },
-      }])
-      setTab('my')
-    } catch {}
+      const r = await api('/api/v1/telephony/numbers/purchase', {
+        method: 'POST',
+        body: JSON.stringify({ phoneNumber: num }),
+      })
+      if (r.success) {
+        // Recharger la liste reelle au lieu de pusher une row fabriquee
+        await loadNumbers()
+        setTab('my')
+      }
+    } catch (e: any) {
+      console.error('[purchase]', e)
+    }
   }
 
   const createExtension = async () => {
-    if (!newExt.extension_number || !newExt.label) { setExtMsg('Numéro de poste et nom requis'); return }
+    if (!newExt.label) { setExtMsg('Nom du poste requis'); return }
     try {
-      const r = await api('/api/v1/billing/extensions', { method: 'POST', body: JSON.stringify(newExt) })
-      if (r.success) { setExtensions(prev => [...prev, r.data]); setShowNewExt(false); setNewExt({ extension_number: '', label: '', did_number: '' }) }
-      else setExtMsg(r.message || 'Erreur')
-    } catch { setExtMsg('Erreur réseau') }
+      const r = await api('/api/v1/client/extensions', {
+        method: 'POST',
+        body: JSON.stringify({
+          // extension_number optionnel : si vide, le backend appelle
+          // allocate_next_extension() (pool migration 029)
+          extension_number: newExt.extension_number || undefined,
+          label:            newExt.label,
+          did_number:       newExt.did_number || undefined,
+        }),
+      })
+      if (r.success && r.data) {
+        setExtensions(prev => [...prev, r.data])
+        setShowNewExt(false)
+        setNewExt({ extension_number: '', label: '', did_number: '' })
+        setExtMsg(null)
+      } else {
+        setExtMsg(r.error || r.message || 'Erreur')
+      }
+    } catch (e: any) {
+      setExtMsg(e.message || 'Erreur reseau')
+    }
   }
 
   const deleteExtension = async (id: string) => {
-    await api(`/api/v1/billing/extensions/${id}`, { method: 'DELETE' })
-    setExtensions(prev => prev.filter(e => e.id !== id))
+    const r = await api(`/api/v1/client/extensions/${id}`, { method: 'DELETE' })
+    if (r.success) setExtensions(prev => prev.filter(e => e.id !== id))
   }
 
   const totalCost = numbers.reduce((s, n) => s + n.monthly_cost, 0)
@@ -213,6 +276,20 @@ export default function NumbersPage() {
       {/* ── Mes numéros ── */}
       {tab === 'my' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {loadingNums && (
+            <div style={{ padding: 20, textAlign: 'center', color: '#4a4a6a', fontSize: 13 }}>Chargement des numeros…</div>
+          )}
+          {!loadingNums && numsError && (
+            <div style={{ padding: 16, background: '#ff4d6d10', border: '1px solid #ff4d6d33', borderRadius: 10, color: '#ff4d6d', fontSize: 13 }}>
+              {numsError}
+            </div>
+          )}
+          {!loadingNums && !numsError && numbers.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', background: '#0e0e1c', border: '1px dashed #2a2a4a', borderRadius: 10, color: '#4a4a6a' }}>
+              <div style={{ fontSize: 14, marginBottom: 6 }}>Aucun numero assigne a votre organisation</div>
+              <div style={{ fontSize: 12, color: '#3a3a5a' }}>Commandez un numero dans l'onglet "Commander un numero" ci-dessus.</div>
+            </div>
+          )}
           {numbers.map(n => (
             <div key={n.id} style={{ background: '#0e0e1c', border: '1px solid #1e1e3a', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 180 }}>
