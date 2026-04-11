@@ -1,15 +1,17 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.1 — diagnostic logs + extended tray menu + ready-to-show
+//  v1.2.2 — fix crash loop (preload sandbox) + always-on-top toggle
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
 //   - Charge http://localhost:3001/dialer
 //   - Handle voxflow:// protocole (click-to-call depuis le portail)
 //   - Serveur HTTP 127.0.0.1:9876 pour push auth/dial/supervision
-//   - Tray icon avec menu étendu (afficher, recharger, portail, logs, devtools)
+//   - Tray icon avec menu étendu : afficher/masquer, recharger,
+//     toujours au premier plan, portail, logs, devtools
 //   - Logs complets pour diagnostiquer load / dom-ready / render crash
-//   - Fallback error.html si frontend unreachable
+//   - Fallback error.html si frontend unreachable OU si le renderer crash
+//     (PAS de auto-reload → évite les boucles crash→load→crash)
 // ══════════════════════════════════════════════════════════════
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, shell } = require('electron')
@@ -164,12 +166,16 @@ function createWindow() {
             .catch(e => log('[error.html]', e.message))
     })
 
-    // Render process crash → recharge
+    // Render process crash — NO auto-reload.
+    // Un auto-reload silencieux masque les vrais bugs (preload cassé,
+    // JS fatal dans le renderer) et crée une boucle infinie crash→load
+    // →crash. On log le crash et on bascule sur error.html ; l'utilisateur
+    // peut cliquer "Recharger" dans la tray une fois le bug corrigé.
     mainWindow.webContents.on('render-process-gone', (_, details) => {
         log('[render-process-gone]', details.reason, details.exitCode)
-        if (details.reason !== 'clean-exit') {
-            setTimeout(() => mainWindow?.loadURL(DIALER_URL).catch(() => {}), 500)
-        }
+        if (details.reason === 'clean-exit') return
+        mainWindow?.loadFile(path.join(__dirname, 'src', 'error.html'))
+            .catch(e => log('[error.html after crash]', e.message))
     })
 
     // Log les erreurs JS du renderer
@@ -203,6 +209,37 @@ function createWindow() {
 }
 
 // ── Tray ────────────────────────────────────────────────────
+function buildTrayMenu() {
+    const alwaysOnTop = mainWindow ? mainWindow.isAlwaysOnTop() : false
+    return Menu.buildFromTemplate([
+        { label: 'VoxFlow Dialer — v' + app.getVersion(), enabled: false },
+        { type: 'separator' },
+        { label: 'Afficher le dialer', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } } },
+        { label: 'Masquer', click: () => mainWindow?.hide() },
+        { label: 'Recharger', accelerator: 'F5', click: () => mainWindow?.loadURL(DIALER_URL) },
+        {
+            label:   'Toujours au premier plan',
+            type:    'checkbox',
+            checked: alwaysOnTop,
+            click:   (item) => {
+                if (!mainWindow) return
+                mainWindow.setAlwaysOnTop(item.checked, 'floating')
+                log('[tray] alwaysOnTop', item.checked)
+                // Rebuild menu pour refléter le nouvel état
+                tray?.setContextMenu(buildTrayMenu())
+            },
+        },
+        { type: 'separator' },
+        { label: 'Ouvrir le portail VoxFlow', click: () => shell.openExternal(FRONTEND_URL) },
+        { label: 'Ouvrir les logs',          click: () => shell.openPath(LOG_FILE) },
+        { label: 'Ouvrir le dossier logs',   click: () => shell.openPath(LOG_DIR)  },
+        { type: 'separator' },
+        { label: 'DevTools', accelerator: 'F12', click: () => mainWindow?.webContents.openDevTools({ mode: 'detach' }) },
+        { type: 'separator' },
+        { label: 'Quitter', accelerator: 'Ctrl+Q', click: () => { if (mainWindow) mainWindow.destroy(); app.exit(0) } },
+    ])
+}
+
 function createTray() {
     const iconCandidate = ['src/tray.png', 'src/icon.png', 'src/icon.ico']
         .map(p => path.join(__dirname, p))
@@ -212,21 +249,7 @@ function createTray() {
     try {
         tray = new Tray(nativeImage.createFromPath(iconCandidate))
         tray.setToolTip('VoxFlow Dialer v' + app.getVersion())
-        tray.setContextMenu(Menu.buildFromTemplate([
-            { label: 'VoxFlow Dialer — v' + app.getVersion(), enabled: false },
-            { type: 'separator' },
-            { label: 'Afficher le dialer', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } } },
-            { label: 'Masquer', click: () => mainWindow?.hide() },
-            { label: 'Recharger', accelerator: 'F5', click: () => mainWindow?.loadURL(DIALER_URL) },
-            { type: 'separator' },
-            { label: 'Ouvrir le portail VoxFlow', click: () => shell.openExternal(FRONTEND_URL) },
-            { label: 'Ouvrir les logs',          click: () => shell.openPath(LOG_FILE) },
-            { label: 'Ouvrir le dossier logs',   click: () => shell.openPath(LOG_DIR)  },
-            { type: 'separator' },
-            { label: 'DevTools', accelerator: 'F12', click: () => mainWindow?.webContents.openDevTools({ mode: 'detach' }) },
-            { type: 'separator' },
-            { label: 'Quitter', accelerator: 'Ctrl+Q', click: () => { if (mainWindow) mainWindow.destroy(); app.exit(0) } },
-        ]))
+        tray.setContextMenu(buildTrayMenu())
         tray.on('click',        () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } })
         tray.on('double-click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } })
         log('[tray] created with', iconCandidate)
