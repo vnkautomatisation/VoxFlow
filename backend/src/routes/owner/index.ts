@@ -2,14 +2,22 @@
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth"
 import { ownerService } from "../../services/owner/owner.service"
 import { sendSuccess, sendError } from "../../utils/response"
-import plansRouter from "./plans"
+import plansRouter         from "./plans"
+import featuresRouter      from "./features"
+import extensionPoolRouter from "./extension-pool"
+import productsRouter      from "./products"
+import twilioConfigRouter  from "./twilio-config"
 
 const router = Router()
 router.use(authenticate)
 router.use(authorize("OWNER", "OWNER_STAFF" as any))
 
-// Sous-routeur /plans monté avant la catch-all
-router.use("/plans", plansRouter)
+// Sous-routeurs montés avant les catch-all — Phase B (migrations 028-033)
+router.use("/plans",           plansRouter)
+router.use("/features",        featuresRouter)
+router.use("/extension-pool",  extensionPoolRouter)
+router.use("/products",        productsRouter)
+router.use("/twilio-config",   twilioConfigRouter)
 
 router.get("/stats", async (req: AuthRequest, res: Response) => {
   try { sendSuccess(res, await ownerService.getGlobalStats()) }

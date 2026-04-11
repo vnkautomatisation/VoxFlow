@@ -225,15 +225,25 @@ router.get("/contacts/search", authenticate, async (req: AuthRequest, res: Respo
 
 router.get("/contacts/:id", authenticate, async (req: AuthRequest, res: Response) => {
     try {
+        const orgId = getOrgId(req)
+        // Org scoping CRITIQUE : sans .eq("organization_id", orgId) un user
+        // d'une org A pourrait lire les contacts d'une org B juste en
+        // connaissant l'UUID. Ajoute en P0 security fix.
         let contact: any = null
         try {
             const { data } = await supabaseAdmin
                 .from("contacts").select(`*, tags:contact_tags(tag:tags(id,name,color))`)
-                .eq("id", req.params.id).single()
+                .eq("id", req.params.id)
+                .eq("organization_id", orgId)
+                .single()
             if (!data) return sendError(res, "Contact introuvable", 404)
             contact = { ...data, tags: (data as any).tags?.map((t: any) => t.tag).filter(Boolean) || [] }
         } catch {
-            const { data } = await supabaseAdmin.from("contacts").select("*").eq("id", req.params.id).single()
+            const { data } = await supabaseAdmin
+                .from("contacts").select("*")
+                .eq("id", req.params.id)
+                .eq("organization_id", orgId)
+                .single()
             if (!data) return sendError(res, "Contact introuvable", 404)
             contact = { ...data, tags: [] }
         }
@@ -288,23 +298,41 @@ router.post("/contacts", authenticate, async (req: AuthRequest, res: Response) =
 
 router.patch("/contacts/:id", authenticate, async (req: AuthRequest, res: Response) => {
     try {
+        const orgId = getOrgId(req)
         const updates: any = {}
         const fields = ["first_name", "last_name", "email", "phone", "company", "position",
             "address", "city", "province", "postal_code", "country", "notes", "status"]
         fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
         updates.updated_at = new Date().toISOString()
 
+        // Org scoping CRITIQUE : le .eq("organization_id", orgId) empeche un
+        // user d'une autre org de modifier ce contact meme avec l'UUID.
         const { data, error } = await supabaseAdmin
-            .from("contacts").update(updates).eq("id", req.params.id).select().single()
+            .from("contacts").update(updates)
+            .eq("id", req.params.id)
+            .eq("organization_id", orgId)
+            .select().single()
         if (error) throw error
+        if (!data) return sendError(res, "Contact introuvable", 404)
         sendSuccess(res, data)
     } catch (err: any) { sendError(res, err.message) }
 })
 
 router.delete("/contacts/:id", authenticate, async (req: AuthRequest, res: Response) => {
     try {
+        const orgId = getOrgId(req)
+        // Verifie l'ownership AVANT de supprimer les tags puis le contact.
+        const { data: contact } = await supabaseAdmin
+            .from("contacts").select("id")
+            .eq("id", req.params.id)
+            .eq("organization_id", orgId)
+            .single()
+        if (!contact) return sendError(res, "Contact introuvable", 404)
+
         await supabaseAdmin.from("contact_tags").delete().eq("contact_id", req.params.id)
-        await supabaseAdmin.from("contacts").delete().eq("id", req.params.id)
+        await supabaseAdmin.from("contacts").delete()
+            .eq("id", req.params.id)
+            .eq("organization_id", orgId)
         sendSuccess(res, { deleted: true })
     } catch (err: any) { sendError(res, err.message) }
 })
