@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.4 — Chromium crash workarounds + did-start-navigation logging
+//  v1.2.5 — ROOT FIX : enable webSecurity + sandbox + disable Site Isolation
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
@@ -36,13 +36,17 @@ app.disableHardwareAcceleration()
 //    masquée/restaurée rapidement (tray → show)
 //  - HardwareMediaKeyHandling + MediaSessionService : crashs au moment
 //    de l'init d'AudioContext (qui arrive quand Twilio.Device se charge)
+//  - IsolateOrigins,site-per-process : Site Isolation de Chromium 120
+//    qui recrée le renderer process sur chaque in-place nav — c'est
+//    exactement la cause du crash -1073741819 qu'on observe dans les
+//    logs (nav-start (in-place) → render-process-gone 150ms plus tard).
 //  - disable-renderer-backgrounding + disable-background-timer-throttling :
-//    évite que Chromium suspende le renderer 43 ms après load, ce qui
-//    était notre symptôme observé dans les logs.
+//    évite que Chromium suspende le renderer 43 ms après load.
 app.commandLine.appendSwitch(
     'disable-features',
-    'CalculateNativeWinOcclusion,HardwareMediaKeyHandling,MediaSessionService'
+    'CalculateNativeWinOcclusion,HardwareMediaKeyHandling,MediaSessionService,IsolateOrigins,site-per-process'
 )
+app.commandLine.appendSwitch('disable-site-isolation-trials')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-background-timer-throttling')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
@@ -69,7 +73,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.4 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.2.5 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -164,7 +168,10 @@ function createWindow() {
             preload:          path.join(__dirname, 'src', 'preload.js'),
             contextIsolation: true,
             nodeIntegration:  false,
-            webSecurity:      false, // pour CORS loopback en dev
+            sandbox:          true,  // renderer sandboxé — évite les crashs Chromium 120 sur Windows
+            webSecurity:      true,  // RÉACTIVÉ — avec sécurité off, Chromium 120 crash sur les in-place nav.
+                                      // Le CORS backend autorise déjà localhost:3001, donc pas besoin de le désactiver.
+            allowRunningInsecureContent: false,
         },
     })
 
