@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.2 — fix crash loop (preload sandbox) + always-on-top toggle
+//  v1.2.3 — disableHardwareAcceleration + navigation URL logging
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
@@ -22,6 +22,13 @@ const http = require('http')
 const channels = require('./src/ipc-channels')
 
 app.commandLine.appendSwitch('high-dpi-support', '1')
+
+// Beaucoup de crashs renderer "Access Violation -1073741819" sur Windows
+// Electron 28 viennent du compositeur GPU (Chromium 120). On désactive
+// l'accélération matérielle — le dialer est UI-only, pas de perf GPU
+// nécessaire (pas de canvas lourd, pas de 3D). Résout aussi les crashs
+// liés à WebRTC/Twilio qui partagent le pipeline GPU.
+app.disableHardwareAcceleration()
 
 if (!app.requestSingleInstanceLock()) {
     app.quit()
@@ -45,7 +52,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.1 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.2.3 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -149,9 +156,11 @@ function createWindow() {
 
     // Events diagnostiques — sans ces logs on ne sait jamais si le
     // renderer a chargé, ce qui rend l'écran noir indébug-able.
-    mainWindow.webContents.on('did-start-loading', () => log('[load] started'))
-    mainWindow.webContents.on('did-finish-load',   () => log('[load] finish', mainWindow.webContents.getURL()))
-    mainWindow.webContents.on('dom-ready',         () => log('[load] dom-ready'))
+    mainWindow.webContents.on('did-start-loading', () => log('[load] started →', mainWindow.webContents.getURL()))
+    mainWindow.webContents.on('did-finish-load',   () => log('[load] finish  →', mainWindow.webContents.getURL()))
+    mainWindow.webContents.on('dom-ready',         () => log('[load] dom-ready →', mainWindow.webContents.getURL()))
+    mainWindow.webContents.on('will-navigate', (_, url) => log('[will-navigate]', url))
+    mainWindow.webContents.on('will-redirect', (_, url) => log('[will-redirect]', url))
     mainWindow.once('ready-to-show', () => {
         log('[window] ready-to-show, showing')
         mainWindow.show()
