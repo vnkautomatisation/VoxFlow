@@ -19,13 +19,21 @@ export default function OwnerDashboard() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [activeTab, setActiveTab]   = useState<"dashboard" | "admins" | "numbers" | "revenue">("dashboard")
+  const [mounted, setMounted]       = useState(false)
+
+  // Attendre la réhydratation de Zustand avant de vérifier isAuth.
+  // Sinon on a une race : isAuth=false au premier render → redirect
+  // /login → login voit isAuth=true → redirect /owner/dashboard → loop.
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
+    if (!mounted) return
     if (!isAuth || !user) { router.push("/login"); return }
     // OWNER + OWNER_STAFF partagent le portail owner
     if (user.role !== "OWNER" && user.role !== "OWNER_STAFF") { router.push("/login"); return }
     loadData()
-  }, [isAuth, user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, isAuth, user])
 
   const loadData = useCallback(async () => {
     if (!accessToken) return
