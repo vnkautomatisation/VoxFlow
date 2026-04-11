@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 type RStatus = 'active' | 'paused' | 'done' | 'scheduled'
 
@@ -9,10 +9,43 @@ interface RobotCampaign {
   created: string; scheduledAt?: string; ttsVoice: string
 }
 
-const MOCK: RobotCampaign[] = [
-  { id:'1', name:'Rappel rendez-vous Q2', status:'active', message:'Bonjour, nous vous rappelons votre rendez-vous du…', total:1200, sent:430, answered:312, duration:18, created:'2026-04-05', scheduledAt:'2026-04-06 09:00', ttsVoice:'fr-CA-Sylvie' },
-  { id:'2', name:'Promotion printemps',   status:'done',   message:'Enregistrement audio — 16 secondes', total:3500, sent:3500, answered:2100, duration:16, created:'2026-03-15', ttsVoice:'fr-CA-Antoine' },
-]
+// API helper — lit token + url depuis localStorage
+function useApi() {
+  const getUrl = () => typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
+  const getTok = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') : null
+  return async (path: string, opts: RequestInit = {}) => {
+    const r = await fetch(getUrl() + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...(getTok() ? { Authorization: 'Bearer ' + getTok() } : {}), ...(opts.headers || {}) },
+      body: opts.body,
+    })
+    return r.json()
+  }
+}
+
+// Mapper row robot_campaigns du backend → forme du composant
+function mapCampaign(row: any): RobotCampaign {
+  const total    = Number(row.total_contacts || 0)
+  const called   = Number(row.called_count    || 0)
+  const answered = Number(row.answered_count  || 0)
+  const status: RStatus =
+    row.status === 'ACTIVE'    ? 'active'    :
+    row.status === 'COMPLETED' ? 'done'      :
+    row.status === 'SCHEDULED' ? 'scheduled' : 'paused'
+  return {
+    id:          row.id,
+    name:        row.name,
+    status,
+    message:     row.tts_message || '',
+    total,
+    sent:        called,
+    answered,
+    duration:    Number(row.avg_duration || 0),
+    created:     row.created_at ? String(row.created_at).slice(0, 10) : '',
+    scheduledAt: row.schedule_start ? String(row.schedule_start) : undefined,
+    ttsVoice:    row.voice || 'fr-CA-Sylvie',
+  }
+}
 
 const VOICES = ['fr-CA-Sylvie', 'fr-CA-Antoine', 'fr-FR-Denise', 'en-CA-Clara', 'en-US-Jenny']
 
@@ -22,7 +55,11 @@ const IS: React.CSSProperties = {
   boxSizing:'border-box', fontFamily:'inherit',
 }
 
-function NewRobotModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c: RobotCampaign) => void }) {
+interface NewCampaignPayload {
+  name: string; message: string; voice: string; total: number; scheduledAt?: string
+}
+
+function NewRobotModal({ onClose, onCreate }: { onClose: () => void; onCreate: (p: NewCampaignPayload) => Promise<void> }) {
   const [name,    setName]    = useState('')
   const [message, setMessage] = useState('')
   const [total,   setTotal]   = useState('500')
@@ -36,12 +73,13 @@ function NewRobotModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
     if (!message.trim()) return setErr('Message TTS requis')
     if (!total || +total < 1) return setErr('Nombre de destinataires invalide')
     setSaving(true)
-    await new Promise(r => setTimeout(r, 600))
-    const wordCount = message.trim().split(/\s+/).length
-    const estDuration = Math.round(wordCount / 2.5)
-    onCreate({ id: Date.now().toString(), name, status: sched ? 'scheduled' : 'paused', message, total: +total, sent: 0, answered: 0, duration: estDuration, created: new Date().toISOString().slice(0,10), scheduledAt: sched || undefined, ttsVoice: voice })
+    try {
+      await onCreate({ name, message, voice, total: +total, scheduledAt: sched || undefined })
+      onClose()
+    } catch (e: any) {
+      setErr(e.message || 'Erreur lors de la creation')
+    }
     setSaving(false)
-    onClose()
   }
 
   const words = message.trim().split(/\s+/).filter(Boolean).length
@@ -160,11 +198,64 @@ function RobotReportModal({ campaign, onClose }: { campaign: RobotCampaign; onCl
 }
 
 export default function RobotPage() {
-  const [campaigns, setCampaigns] = useState<RobotCampaign[]>(MOCK)
+  const api = useApi()
+  const [campaigns, setCampaigns] = useState<RobotCampaign[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState<string | null>(null)
   const [showNew,   setShowNew]   = useState(false)
   const [report,    setReport]    = useState<RobotCampaign | null>(null)
 
-  const toggle = (id: string) => setCampaigns(prev => prev.map(c => c.id !== id ? c : { ...c, status: c.status === 'active' ? 'paused' : 'active' }))
+  const loadCampaigns = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await api('/api/v1/client/robot')
+      if (r.success && Array.isArray(r.data)) {
+        setCampaigns(r.data.map(mapCampaign))
+      } else {
+        setCampaigns([])
+        if (r.error) setError(r.error)
+      }
+    } catch (e: any) {
+      setError(e.message || 'Impossible de charger les campagnes')
+      setCampaigns([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadCampaigns() }, [loadCampaigns])
+
+  const toggle = async (id: string) => {
+    const c = campaigns.find(x => x.id === id)
+    if (!c) return
+    const action = c.status === 'active' ? 'pause' : 'launch'
+    try {
+      const r = await api(`/api/v1/client/robot/${id}/${action}`, { method: 'POST' })
+      if (r.success) await loadCampaigns()
+    } catch (e: any) {
+      console.error('[toggle]', e)
+    }
+  }
+
+  const createCampaign = async (payload: {
+    name: string; message: string; voice: string; total: number; scheduledAt?: string
+  }) => {
+    try {
+      const r = await api('/api/v1/client/robot', {
+        method: 'POST',
+        body: JSON.stringify({
+          name:        payload.name,
+          tts_message: payload.message,
+          voice:       payload.voice,
+          // schedule_start est une TIME (09:00:00), on l'extrait du datetime
+          schedule_start: payload.scheduledAt ? payload.scheduledAt.slice(-8) : undefined,
+        }),
+      })
+      if (r.success) await loadCampaigns()
+    } catch (e: any) {
+      console.error('[createCampaign]', e)
+    }
+  }
 
   const totalSent = campaigns.reduce((s,c) => s+c.sent, 0)
   const inProgress = campaigns.filter(c => c.status === 'active').length
@@ -203,6 +294,18 @@ export default function RobotPage() {
 
       {/* Campagnes */}
       <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {loading && (
+          <div style={{ padding:20, textAlign:'center', color:'#4a4a6a', fontSize:13 }}>Chargement des campagnes…</div>
+        )}
+        {!loading && error && (
+          <div style={{ padding:16, background:'#ff4d6d10', border:'1px solid #ff4d6d33', borderRadius:10, color:'#ff4d6d', fontSize:13 }}>{error}</div>
+        )}
+        {!loading && !error && campaigns.length === 0 && (
+          <div style={{ padding:32, textAlign:'center', background:'#0e0e1c', border:'1px dashed #2a2a4a', borderRadius:10, color:'#4a4a6a' }}>
+            <div style={{ fontSize:14, marginBottom:6 }}>Aucune campagne robot</div>
+            <div style={{ fontSize:12, color:'#3a3a5a' }}>Cliquez sur "Creer campagne" pour lancer votre premiere diffusion.</div>
+          </div>
+        )}
         {campaigns.map(c => {
           const pct = c.total > 0 ? Math.round(c.sent / c.total * 100) : 0
           return (
@@ -257,7 +360,7 @@ export default function RobotPage() {
         })}
       </div>
 
-      {showNew && <NewRobotModal onClose={() => setShowNew(false)} onCreate={c => { setCampaigns(prev => [c, ...prev]); setShowNew(false) }} />}
+      {showNew && <NewRobotModal onClose={() => setShowNew(false)} onCreate={createCampaign} />}
       {report  && <RobotReportModal campaign={report} onClose={() => setReport(null)} />}
     </div>
   )

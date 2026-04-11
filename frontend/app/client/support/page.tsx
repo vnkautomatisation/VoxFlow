@@ -1,5 +1,19 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+// API helper — lit token + url depuis localStorage
+function useApi() {
+  const getUrl = () => typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
+  const getTok = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') : null
+  return async (path: string, opts: RequestInit = {}) => {
+    const r = await fetch(getUrl() + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...(getTok() ? { Authorization: 'Bearer ' + getTok() } : {}), ...(opts.headers || {}) },
+      body: opts.body,
+    })
+    return r.json()
+  }
+}
 
 type Priority = 'low' | 'normal' | 'high' | 'urgent'
 type Status = 'open' | 'pending' | 'resolved'
@@ -18,16 +32,24 @@ const PRIOS: { id: Priority; label: string; color: string }[] = [
   { id: 'high',   label: 'Haute',   color: '#ffb547' },
   { id: 'urgent', label: 'Urgente', color: '#ff4d6d' },
 ]
-const MOCK: Ticket[] = [
-  {
-    id: '1', number: 'TK-2026-001', subject: 'Problème de connexion SIP', category: 'Technique',
-    priority: 'high', status: 'open', created: '2026-04-03', updated: '2026-04-04',
-    messages: [
-      { from: 'client',  text: 'Depuis ce matin nos agents ne peuvent plus se connecter. Erreur 403.', date: '2026-04-03 09:12' },
-      { from: 'support', text: 'Bonjour, nous avons bien reçu votre demande. Pouvez-vous fournir les logs de votre softphone ?', date: '2026-04-03 10:34' },
-    ],
-  },
-]
+// Mapper row support_tickets + support_messages du backend → forme UI
+function mapTicket(row: any): Ticket {
+  return {
+    id:       row.id,
+    number:   row.number || '',
+    subject:  row.subject || '',
+    category: row.category || 'Autre',
+    priority: (row.priority || 'normal').toLowerCase() as Priority,
+    status:   (row.status   || 'open').toLowerCase()   as Status,
+    created:  row.created_at ? String(row.created_at).slice(0, 10) : '',
+    updated:  row.updated_at ? String(row.updated_at).slice(0, 10) : '',
+    messages: Array.isArray(row.messages) ? row.messages.map((m: any) => ({
+      from: m.sender_type === 'AGENT' || m.from === 'support' ? 'support' : 'client',
+      text: String(m.content || m.text || ''),
+      date: m.created_at ? String(m.created_at).slice(0, 16).replace('T', ' ') : (m.date || ''),
+    })) : [],
+  }
+}
 
 const IS: React.CSSProperties = {
   width: '100%', background: '#080810', border: '1px solid #2a2a4a', borderRadius: 9,
@@ -173,17 +195,67 @@ function TicketModal({ ticket, onClose, onReply }: { ticket: Ticket; onClose: ()
 }
 
 export default function SupportPage() {
-  const [tickets,    setTickets]    = useState<Ticket[]>(MOCK)
+  const api = useApi()
+  const [tickets,    setTickets]    = useState<Ticket[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState<string | null>(null)
   const [showNew,    setShowNew]    = useState(false)
   const [selected,   setSelected]   = useState<Ticket | null>(null)
   const [filter,     setFilter]     = useState<Status | 'all'>('all')
+
+  const loadTickets = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await api('/api/v1/billing/tickets')
+      if (r.success && Array.isArray(r.data)) {
+        setTickets(r.data.map(mapTicket))
+      } else {
+        setTickets([])
+        if (r.error || r.message) setError(r.error || r.message)
+      }
+    } catch (e: any) {
+      setError(e.message || 'Impossible de charger les tickets')
+      setTickets([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadTickets() }, [loadTickets])
 
   const open    = tickets.filter(t => t.status === 'open').length
   const pending = tickets.filter(t => t.status === 'pending').length
   const resolved= tickets.filter(t => t.status === 'resolved').length
   const filtered= filter === 'all' ? tickets : tickets.filter(t => t.status === filter)
 
-  const addReply = (id: string, text: string) => {
+  const createTicket = async (t: Ticket) => {
+    try {
+      const r = await api('/api/v1/billing/tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          subject:  t.subject,
+          category: t.category,
+          priority: t.priority,
+          message:  t.messages[0]?.text || '',
+        }),
+      })
+      if (r.success) await loadTickets()
+    } catch (e: any) {
+      console.error('[createTicket]', e)
+    }
+  }
+
+  const addReply = async (id: string, text: string) => {
+    try {
+      const r = await api(`/api/v1/billing/tickets/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ content: text, sender_type: 'CLIENT' }),
+      })
+      if (r.success) await loadTickets()
+    } catch (e: any) {
+      console.error('[addReply]', e)
+    }
+    // Optimistic update pour l'UX
     setTickets(prev => prev.map(t => t.id !== id ? t : {
       ...t,
       messages: [...t.messages, { from: 'client', text, date: new Date().toLocaleString('fr-CA').slice(0, 16) }],
@@ -232,9 +304,13 @@ export default function SupportPage() {
 
       {/* Liste */}
       <div style={{ background: '#0e0e1c', border: '1px solid #1e1e3a', borderRadius: 12, overflow: 'hidden' }}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: 32, textAlign: 'center', color: '#4a4a6a', fontSize: 13 }}>Chargement des tickets…</div>
+        ) : error ? (
+          <div style={{ padding: 16, background: '#ff4d6d10', border: '1px solid #ff4d6d33', color: '#ff4d6d', fontSize: 13 }}>{error}</div>
+        ) : filtered.length === 0 ? (
           <div style={{ padding: 32, textAlign: 'center', color: '#3a3a5a', fontSize: 13 }}>
-            {filter === 'all' ? 'Aucun ticket — créez votre première demande.' : 'Aucun ticket dans cette catégorie.'}
+            {filter === 'all' ? 'Aucun ticket — creez votre premiere demande.' : 'Aucun ticket dans cette categorie.'}
           </div>
         ) : filtered.map((t, i) => {
           const pr = PRIOS.find(p => p.id === t.priority)!
@@ -261,7 +337,7 @@ export default function SupportPage() {
         })}
       </div>
 
-      {showNew  && <NewTicketModal onClose={() => setShowNew(false)} onCreate={t => { setTickets(prev => [t, ...prev]); setShowNew(false) }} />}
+      {showNew  && <NewTicketModal onClose={() => setShowNew(false)} onCreate={async t => { await createTicket(t); setShowNew(false) }} />}
       {selected && <TicketModal ticket={selected} onClose={() => setSelected(null)} onReply={addReply} />}
     </div>
   )
