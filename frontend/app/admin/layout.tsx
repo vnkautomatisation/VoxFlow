@@ -1,5 +1,6 @@
 'use client'
 import DialerFAB from '@/components/shared/DialerFAB'
+import TrialBanner from '@/components/shared/TrialBanner'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
@@ -337,6 +338,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </nav>
 
             <DialerFAB />
+            <TrialBanner />
             <main>{children}</main>
         </div>
     )

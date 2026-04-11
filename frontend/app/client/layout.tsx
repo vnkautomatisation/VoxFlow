@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { VoxFlowLogo } from '@/components/shared/VoxFlowLogo'
+import TrialBanner from '@/components/shared/TrialBanner'
 
 
 
@@ -140,6 +141,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
         {/* Main */}
         <main style={{ flex:1, overflowY:'auto', padding:24 }}>
+          <TrialBanner />
           {children}
         </main>
       </div>

@@ -40,6 +40,8 @@ export const telephonyApi = {
     apiRequest<any>(base + "/call/" + callId + "/recordings", { token }),
 
   getNumbers:  (token: string) => apiRequest<any>(base + "/numbers", { token }),
+  // Numéros actifs de l'org (lecture DB, avec pays + drapeaux enrichis)
+  getMyNumbers:(token: string) => apiRequest<any>(base + "/my-numbers", { token }),
   searchNumbers:(token: string, areaCode: string, country = "CA") =>
     apiRequest<any>(base + "/numbers/search?areaCode=" + areaCode + "&country=" + country, { token }),
   purchaseNumber:(token: string, phoneNumber: string) =>

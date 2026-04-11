@@ -2,6 +2,7 @@
 import './dialer.css'
 import { useEffect, useRef } from 'react'
 import { useDialer, fmtT, fmtD, ini, avatarGrad, ACP } from './hooks/useDialer'
+import TrialBanner from '@/components/shared/TrialBanner'
 
 // ── SVG Icons ────────────────────────────────────────────────────
 const PhoneIcon = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
@@ -18,6 +19,28 @@ export default function DialerPage() {
     const d = useDialer()
     const dtmfDisplayRef = useRef<HTMLDivElement>(null)
     const dtmfOverlayRef = useRef<HTMLDivElement>(null)
+
+    // ── Auto-switch de tab si le forfait masque l'onglet courant ──
+    // Ex: user STARTER -> upgradé CONFORT -> tab 'dialer' visible
+    //     user CONFORT -> downgradé STARTER sur 'dialer' -> fallback
+    useEffect(() => {
+        const featureMap: Record<string, string> = {
+            dialer:     'outbound_calls',
+            queue:      'queues',
+            agents:     'agents_supervision',
+            history:    'history',
+            voicemails: 'voicemails',
+            search:     'contacts_search',
+        }
+        const required = featureMap[d.tab]
+        if (required && !d.has(required)) {
+            // Trouver le premier tab disponible
+            const fallback = ['queue', 'history', 'search', 'voicemails', 'agents', 'dialer']
+                .find(t => d.has(featureMap[t]))
+            if (fallback) d.setTab(fallback as any)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [d.tab, d.featuresVersion])
 
     // ── Init Twilio au montage ─────────────────────────────────
     useEffect(() => {
@@ -65,6 +88,9 @@ export default function DialerPage() {
 
     return (
         <div className="popup" id="popup">
+
+            {/* ── Trial banner compact (si trial actif) ── */}
+            <TrialBanner variant="compact" />
 
             {/* ── TOAST ── */}
             <div className={`toast ${d.toast ? 'on' : ''}`}>{d.toast}</div>
@@ -142,7 +168,9 @@ export default function DialerPage() {
                         <button className={`abt ${d.muted ? 'm-mute' : ''}`} onClick={d.doMute}><MuteIcon />Muet</button>
                         <button className={`abt ${d.onHold ? 'm-hold' : ''}`} onClick={d.doHold}><HoldIcon />Attente</button>
                         <button className={`abt ${d.panel === 'xfer' ? 'm-panel' : ''}`} onClick={() => d.setPanel(d.panel === 'xfer' ? null : 'xfer')}><XferIcon />Transfert</button>
-                        <button className={`abt ${d.recording ? 'm-rec' : ''} ${!d.isAdmin() ? 'locked' : ''}`} onClick={d.doRec}><RecIcon />Enreg.</button>
+                        {d.has('call_recording') && (
+                            <button className={`abt ${d.recording ? 'm-rec' : ''} ${!d.isAdmin() ? 'locked' : ''}`} onClick={d.doRec}><RecIcon />Enreg.</button>
+                        )}
                         <button className={`abt ${d.panel === 'notes' ? 'm-panel' : ''}`} onClick={() => d.setPanel(d.panel === 'notes' ? null : 'notes')}><NotesIcon />Notes</button>
                         <button className={`abt ${d.panel === 'kpad' ? 'm-panel' : ''}`} onClick={() => {
                             if (dtmfOverlayRef.current) {
@@ -233,16 +261,18 @@ export default function DialerPage() {
                     </div>
                 </div>
 
-                {/* TABS */}
+                {/* TABS — filtrées selon les features du forfait */}
                 <div className="tabs">
                     {([
-                        ['dialer', 'dialer', 'Dialer', 'phone'],
-                        ['queue', 'queue', 'File d\'att.', 'list'],
-                        ...(d.isAdmin() ? [['agents', 'agents', 'Agents', 'users']] : []),
-                        ['history', 'history', 'Historique', 'clock'],
-                        ['voicemails', 'voicemails', 'Msgs', 'voicemail'],
-                        ['search', 'search', 'Contacts', 'search'],
-                    ] as [string, string, string, string][]).map(([id, , label]) => (
+                        // Chaque entrée : [id, label, featureKey?]
+                        // featureKey undefined → toujours visible
+                        d.has('outbound_calls') && ['dialer', 'Composer',  undefined],
+                        d.has('queues')         && ['queue',  'Files',     undefined],
+                        d.isAdmin() && d.has('agents_supervision') && ['agents', 'Agents', undefined],
+                        d.has('history')        && ['history','Historique',undefined],
+                        d.has('voicemails')     && ['voicemails','Msgs',   undefined],
+                        d.has('contacts_search')&& ['search', 'Contacts',  undefined],
+                    ].filter(Boolean) as [string, string, undefined][]).map(([id, label]) => (
                         <button key={id} className={`tab ${d.tab === id ? 'on' : ''}`} onClick={() => d.setTab(id as any)}>
                             {tabIcon(id)}{label}
                             {id === 'voicemails' && vmBadge > 0 && <span className="tbdg">{vmBadge}</span>}
@@ -256,6 +286,32 @@ export default function DialerPage() {
                     {/* PANE DIALER */}
                     <div className={`pane ${d.tab === 'dialer' ? 'on' : ''}`} id="pane-dialer">
                         <div className="p12">
+                            {/* Caller ID picker — visible si multi-numéros */}
+                            {d.myNumbers.length > 1 && (
+                                <div className="caller-id-picker">
+                                    <label className="caller-id-label">Appeler depuis</label>
+                                    <select
+                                        className="caller-id-select"
+                                        value={d.fromNumber}
+                                        onChange={(e) => d.setFromNumber(e.target.value)}
+                                    >
+                                        {d.myNumbers.map((n: any) => (
+                                            <option key={n.number} value={n.number}>
+                                                {n.flag} {n.number} · {n.country_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            {/* Affichage compact si un seul numéro */}
+                            {d.myNumbers.length === 1 && (
+                                <div className="caller-id-single">
+                                    <span className="caller-id-label">Appeler depuis</span>
+                                    <span className="caller-id-value">
+                                        {d.myNumbers[0].flag} {d.myNumbers[0].number}
+                                    </span>
+                                </div>
+                            )}
                             <input className="dinput" id="dinp" value={d.dialNum} placeholder="+1 (514) 000-0000" type="tel"
                                 onChange={e => d.setDialNum(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && d.callNum()} />
@@ -295,7 +351,7 @@ export default function DialerPage() {
                                                     <div style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
                                                     <div style={{ fontSize: '10px', color: 'var(--tx3)', marginTop: '1px' }}>{fmtD(c.started_at)}{c.duration ? ' · ' + fmtT(c.duration) : ''}</div>
                                                 </div>
-                                                <button className="bsm" onClick={() => d.callNum(num)}>Rappeler</button>
+                                                {d.has('outbound_calls') && <button className="bsm" onClick={() => d.callNum(num)}>Rappeler</button>}
                                             </div>
                                         )
                                     })}
@@ -378,7 +434,11 @@ export default function DialerPage() {
                     {/* PANE HISTORY */}
                     <div className={`pane ${d.tab === 'history' ? 'on' : ''}`} id="pane-history">
                         <div className="frow">
-                            {(['all', 'INBOUND', 'OUTBOUND', 'MISSED'] as const).map(f => (
+                            {(
+                                d.has('outbound_calls')
+                                    ? ['all', 'INBOUND', 'OUTBOUND', 'MISSED'] as const
+                                    : ['all', 'INBOUND', 'MISSED'] as const
+                            ).map(f => (
                                 <button key={f} className={`fc ${d.histFilter === f ? 'on' : ''}`} onClick={() => d.setHistFilter(f)}>
                                     {f === 'all' ? 'Tous' : f === 'INBOUND' ? 'Entrants' : f === 'OUTBOUND' ? 'Sortants' : 'Manqués'}
                                 </button>
@@ -404,8 +464,8 @@ export default function DialerPage() {
                                             {c.notes && <div style={{ fontSize: '10px', color: 'var(--tx3)', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>"{c.notes}"</div>}
                                         </div>
                                         <div className="hacts">
-                                            <button className="bsm" onClick={() => d.callNum(num)}>Rappeler</button>
-                                            {c.recording_url && <button className="bsm bl" onClick={() => d.playAudio(c.recording_url!)}>▶ Audio</button>}
+                                            {d.has('outbound_calls') && <button className="bsm" onClick={() => d.callNum(num)}>Rappeler</button>}
+                                            {c.recording_url && d.has('call_recording') && <button className="bsm bl" onClick={() => d.playAudio(c.recording_url!)}>▶ Audio</button>}
                                         </div>
                                     </div>
                                 )
@@ -427,7 +487,7 @@ export default function DialerPage() {
                                 <div style={{ fontSize: '10px', color: 'var(--tx3)', marginBottom: '4px' }}>{v.from_number}{v.duration ? ' · ' + fmtT(v.duration) : ''}</div>
                                 {v.transcription && <div className="vmtr">"{v.transcription.substring(0, 160)}{v.transcription.length > 160 ? '…' : ''}"</div>}
                                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                                    <button className="bsm" onClick={() => d.callNum(v.from_number)}>Rappeler</button>
+                                    {d.has('outbound_calls') && <button className="bsm" onClick={() => d.callNum(v.from_number)}>Rappeler</button>}
                                     <button className="bsm vi" onClick={() => d.markRead(v.id)}>✓ Lu</button>
                                 </div>
                             </div>
@@ -442,7 +502,7 @@ export default function DialerPage() {
                                 <div key={c.id || i} className="coi">
                                     <div className="coav" style={{ background: `linear-gradient(135deg,${ACP[i % ACP.length][0]},${ACP[i % ACP.length][1]})` }}>{ini((c.first_name || '') + ' ' + (c.last_name || ''))}</div>
                                     <div className="coinf"><div className="coname">{c.first_name} {c.last_name}</div><div className="cosub">{[c.company, c.phone, c.email].filter(Boolean).join(' · ')}</div></div>
-                                    {c.phone && <button className="bsm" onClick={() => d.callNum(c.phone!)}>Appeler</button>}
+                                    {c.phone && d.has('outbound_calls') && <button className="bsm" onClick={() => d.callNum(c.phone!)}>Appeler</button>}
                                 </div>
                             ))}
                         </div>
