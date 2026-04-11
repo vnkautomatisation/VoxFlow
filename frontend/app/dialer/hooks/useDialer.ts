@@ -234,7 +234,7 @@ export function useDialer() {
     // ── Session ────────────────────────────────────────────────
     const S = useRef<any>({
         url: 'http://localhost:4000', tok: null, role: 'AGENT',
-        ext: '201', status: 'ONLINE',
+        ext: null, status: 'ONLINE', name: '',
         callId: null, twSid: null, contact: null, dir: 'OUTBOUND',
         muted: false, hold: false, rec: false,
         tsec: 0, tint: null, panel: null, xt: 'blind',
@@ -464,7 +464,9 @@ export function useDialer() {
             const role = r.data.user?.role || 'AGENT'
             S.current.tok = tok
             S.current.role = role
-            S.current.ext = r.data.user?.extension || '201'
+            S.current.ext = r.data.user?.extension || null
+            if (r.data.user?.extension) localStorage.setItem('vf_ext', r.data.user.extension)
+            else localStorage.removeItem('vf_ext')
             // Écrire dans localStorage — source de vérité pour Electron
             localStorage.setItem('vf_tok', tok)
             localStorage.setItem('vf_role', role)
