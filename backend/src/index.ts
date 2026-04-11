@@ -25,6 +25,7 @@ import onboardingRoutes from './routes/onboarding/index'
 import agentRoutes   from './routes/agent/index'
 import webhookRoutes from './routes/webhooks/index'
 import billingRoutes from './routes/billing/index'
+import clientRoutes  from './routes/client/index'
 
 const app = express()
 
@@ -65,6 +66,7 @@ app.use('/api/v1/onboarding', onboardingRoutes)
 app.use('/api/v1/agent',    agentRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
 app.use('/api/v1/billing', billingRoutes)
+app.use('/api/v1/client',  clientRoutes)
 
 // Route racine
 app.get('/', (req, res) => {
