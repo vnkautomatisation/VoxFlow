@@ -50,7 +50,10 @@ router.get("/", async (_req: AuthRequest, res: Response) => {
 // Body : { enabled: boolean }
 router.put("/:planId/:feature", async (req: AuthRequest, res: Response) => {
   try {
-    const { planId, feature } = req.params
+    // Cast explicite : req.params est typé string | string[] | ParsedQs
+    // selon la version d'express, et le computed property name exige string.
+    const planId  = String(req.params.planId)
+    const feature = String(req.params.feature)
     const enabled = req.body?.enabled
     if (typeof enabled !== "boolean") {
       return sendError(res, "body.enabled doit etre un booleen", 400)
