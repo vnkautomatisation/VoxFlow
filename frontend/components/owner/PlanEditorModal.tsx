@@ -19,15 +19,36 @@ interface Props {
   onSave: (data: any) => Promise<void>
 }
 
+// Icônes SVG par groupe (remplace les emojis pour un rendu pro)
+const GroupIcon = ({ name }: { name: string }) => {
+  const common = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none' as const, stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  switch (name) {
+    case 'phone':
+      return <svg {...common}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    case 'users':
+      return <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    case 'chat':
+      return <svg {...common}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    case 'ai':
+      return <svg {...common}><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+    case 'automation':
+      return <svg {...common}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    case 'chart':
+      return <svg {...common}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    default:
+      return null
+  }
+}
+
 // Catégories de features pour l'UI
 const FEATURE_GROUPS: Array<{
   label:    string
-  icon:     string
+  iconName: string
   features: Array<{ key: string; label: string; description: string }>
 }> = [
   {
     label: 'Téléphonie',
-    icon:  '📞',
+    iconName: 'phone',
     features: [
       { key: 'outbound_calls',     label: 'Appels sortants',    description: 'Permet aux agents de composer des numéros sortants' },
       { key: 'inbound_calls',      label: 'Appels entrants',    description: 'Recevoir des appels sur les numéros assignés' },
@@ -39,7 +60,7 @@ const FEATURE_GROUPS: Array<{
   },
   {
     label: 'CRM & Contacts',
-    icon:  '👥',
+    iconName: 'users',
     features: [
       { key: 'contacts_search', label: 'Recherche de contacts', description: 'Base de contacts avec recherche' },
       { key: 'crm_basic',       label: 'CRM basique',           description: 'Fiches contact, notes, tags' },
@@ -48,14 +69,14 @@ const FEATURE_GROUPS: Array<{
   },
   {
     label: 'Multicanal',
-    icon:  '💬',
+    iconName: 'chat',
     features: [
       { key: 'messaging', label: 'Multicanal (SMS/Chat/Email/WhatsApp)', description: 'Boîte unifiée pour tous les canaux' },
     ],
   },
   {
     label: 'IA & Analyse',
-    icon:  '🤖',
+    iconName: 'ai',
     features: [
       { key: 'call_recording',   label: 'Enregistrement des appels',   description: 'Enregistrement audio + stockage' },
       { key: 'ai_transcription', label: 'Transcription IA',            description: 'Speech-to-text automatique' },
@@ -64,7 +85,7 @@ const FEATURE_GROUPS: Array<{
   },
   {
     label: 'Automation',
-    icon:  '⚡',
+    iconName: 'automation',
     features: [
       { key: 'robot_dialer', label: 'Robot dialer (Predictive)', description: 'Composition automatique de masse' },
       { key: 'api_access',   label: 'Accès API',                  description: 'API publique pour intégrations custom' },
@@ -72,7 +93,7 @@ const FEATURE_GROUPS: Array<{
   },
   {
     label: 'Reporting',
-    icon:  '📊',
+    iconName: 'chart',
     features: [
       { key: 'reports_basic',    label: 'Rapports basiques',  description: 'KPIs temps réel et export CSV' },
       { key: 'reports_advanced', label: 'Rapports avancés',   description: 'Analytics prédictifs, dashboards custom' },
@@ -297,7 +318,7 @@ export default function PlanEditorModal({ plan, onClose, onSave }: Props) {
               {FEATURE_GROUPS.map(group => (
                 <div key={group.label} className="bg-[#1f1f2a] border border-[#2e2e44] rounded-xl p-4">
                   <div className="text-[11px] font-bold text-[#eeeef8] mb-3 flex items-center gap-2">
-                    <span className="text-base">{group.icon}</span>
+                    <span className="text-[#7b61ff]"><GroupIcon name={group.iconName} /></span>
                     {group.label}
                   </div>
                   <div className="space-y-2">
