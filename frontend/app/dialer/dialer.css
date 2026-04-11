@@ -2178,3 +2178,71 @@ svg {
     display: inline-block;
     vertical-align: middle
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Caller ID picker (multi-pays)
+   ══════════════════════════════════════════════════════════════ */
+
+.caller-id-picker {
+    margin-bottom: 10px;
+    background: var(--ink3);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.caller-id-single {
+    margin-bottom: 10px;
+    background: var(--ink3);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 7px 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.caller-id-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--tx3);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.caller-id-select {
+    width: 100%;
+    background: var(--ink2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--txt);
+    font-size: 12px;
+    font-family: var(--font);
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239898b8' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+    transition: border-color 0.15s;
+}
+
+.caller-id-select:focus,
+.caller-id-select:hover {
+    border-color: var(--violet);
+}
+
+.caller-id-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--txt);
+    font-variant-numeric: tabular-nums;
+}

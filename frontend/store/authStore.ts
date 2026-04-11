@@ -3,6 +3,19 @@ import { persist } from "zustand/middleware"
 
 export type Role = "OWNER" | "OWNER_STAFF" | "ADMIN" | "SUPERVISOR" | "AGENT"
 
+export interface TrialInfo {
+  starts_at: string | null
+  ends_at:   string
+  days_left: number
+  expired:   boolean
+}
+
+export interface PlanLimits {
+  max_agents:      number | null
+  max_dids:        number | null
+  max_calls_month: number | null
+}
+
 export interface AuthUser {
   id:             string
   email:          string
@@ -14,7 +27,14 @@ export interface AuthUser {
   first_name?:    string
   last_name?:     string
   agent_status?:  string
+  // Plan dialer legacy 'FULL' | 'INBOUND_ONLY' (rétrocompat)
   plan?:          string
+  // Nouveau système : ID du plan + nom + features JSON + limites + trial
+  planId?:        string
+  planName?:      string
+  features?:      Record<string, boolean>
+  limits?:        PlanLimits
+  trial?:         TrialInfo | null
 }
 
 interface AuthState {
@@ -71,12 +91,26 @@ function syncToDialer(user: AuthUser, token: string) {
     if (user.extension) localStorage.setItem("vf_ext",  user.extension)
     else                localStorage.removeItem("vf_ext")
     if (user.plan)      localStorage.setItem("vf_plan", user.plan)
+    else                localStorage.removeItem("vf_plan")
+
+    // Nouveau : planId + features + trial en JSON
+    if (user.planId)    localStorage.setItem("vf_plan_id", user.planId)
+    else                localStorage.removeItem("vf_plan_id")
+    if (user.planName)  localStorage.setItem("vf_plan_name", user.planName)
+    else                localStorage.removeItem("vf_plan_name")
+    if (user.features)  localStorage.setItem("vf_features", JSON.stringify(user.features))
+    else                localStorage.removeItem("vf_features")
+    if (user.limits)    localStorage.setItem("vf_limits", JSON.stringify(user.limits))
+    else                localStorage.removeItem("vf_limits")
+    if (user.trial)     localStorage.setItem("vf_trial", JSON.stringify(user.trial))
+    else                localStorage.removeItem("vf_trial")
+
     const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.name || ''
     if (name)           localStorage.setItem("vf_name", name)
     // BroadcastChannel pour sync temps reel avec Electron
     try {
       const bc = new BroadcastChannel('voxflow_sync')
-      bc.postMessage({ type: 'AUTH_SYNC', token, role: user.role, url })
+      bc.postMessage({ type: 'AUTH_SYNC', token, role: user.role, url, features: user.features, trial: user.trial })
       bc.close()
     } catch {}
   } catch {}
@@ -85,7 +119,8 @@ function syncToDialer(user: AuthUser, token: string) {
 function clearDialerSync() {
   if (typeof window === "undefined") return
   try {
-    ['vf_tok','vf_role','vf_ext','vf_plan','vf_name'].forEach(k => localStorage.removeItem(k))
+    ['vf_tok','vf_role','vf_ext','vf_plan','vf_plan_id','vf_plan_name','vf_features','vf_limits','vf_trial','vf_name']
+      .forEach(k => localStorage.removeItem(k))
     try {
       const bc = new BroadcastChannel('voxflow_sync')
       bc.postMessage({ type: 'LOGOUT' })

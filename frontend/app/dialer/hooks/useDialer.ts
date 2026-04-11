@@ -271,11 +271,62 @@ export function useDialer() {
     const [searchRes, setSearchRes] = useState<Contact[]>([])
     const [loginErr, setLoginErr] = useState('')
 
+    // ── Caller ID picker (multi-pays) ──────────────────────────
+    // Liste des numéros actifs de l'org, groupés par pays, pour que
+    // l'agent puisse choisir lequel utiliser comme "from" avant de
+    // composer. Persisté dans localStorage.vf_from_num.
+    const [myNumbers, setMyNumbers] = useState<Array<{
+        number: string; flag: string; country_code: string; country_name: string; friendly_name: string;
+    }>>([])
+    const [fromNumber, setFromNumberState] = useState<string>('')
+    const setFromNumber = useCallback((n: string) => {
+        setFromNumberState(n)
+        try { if (n) localStorage.setItem('vf_from_num', n); else localStorage.removeItem('vf_from_num') } catch {}
+    }, [])
+
     // ── Refs ───────────────────────────────────────────────────
     const timerRef = useRef<any>(null)
     const pollRef = useRef<any>(null)
     const lpdoneRef = useRef(false)
     const lptRef = useRef<any>(null)
+
+    // ── Features du forfait (lu depuis localStorage) ───────────
+    // Source : vf_features (JSON) sync par le portail au login.
+    // Fallback permissif si vide pour ne pas bloquer en dev.
+    const featuresRef = useRef<Record<string, boolean>>({})
+    const [featuresVersion, setFeaturesVersion] = useState(0)
+    const [trialInfo, setTrialInfo] = useState<any>(null)
+    const [planName, setPlanName] = useState<string>('')
+
+    useEffect(() => {
+        const loadFeatures = () => {
+            try {
+                const raw = localStorage.getItem('vf_features')
+                featuresRef.current = raw ? JSON.parse(raw) : {}
+            } catch { featuresRef.current = {} }
+            try {
+                const trialRaw = localStorage.getItem('vf_trial')
+                setTrialInfo(trialRaw ? JSON.parse(trialRaw) : null)
+            } catch {}
+            setPlanName(localStorage.getItem('vf_plan_name') || localStorage.getItem('vf_plan_id') || '')
+            setFeaturesVersion(v => v + 1)
+        }
+        loadFeatures()
+        // Écouter les events storage (portail change les features)
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'vf_features' || e.key === 'vf_plan_id' || e.key === 'vf_trial') loadFeatures()
+        }
+        window.addEventListener('storage', onStorage)
+        return () => window.removeEventListener('storage', onStorage)
+    }, [])
+
+    // Helper : le forfait a-t-il cette feature activée ?
+    // Fallback permissif (true) si pas de features chargées
+    const has = useCallback((f: string): boolean => {
+        const feats = featuresRef.current
+        if (!feats || Object.keys(feats).length === 0) return true
+        return !!feats[f]
+    }, [featuresVersion])
 
     // ── isAdmin helper ─────────────────────────────────────────
     const isAdmin = useCallback(() =>
@@ -369,7 +420,21 @@ export function useDialer() {
                 setAgents(ags)
             }
         } catch { }
-    }, [api, isAdmin])
+        // Charger les numéros de l'org pour le Caller ID picker
+        try {
+            const nr = await api('/api/v1/telephony/my-numbers')
+            if (nr?.success && Array.isArray(nr.data?.numbers)) {
+                const nums = nr.data.numbers
+                setMyNumbers(nums)
+                // Sélectionner le numéro stocké ou le premier
+                if (!fromNumber) {
+                    const stored = localStorage.getItem('vf_from_num') || ''
+                    const preferred = stored && nums.find((n: any) => n.number === stored)
+                    setFromNumberState(preferred ? stored : (nums[0]?.number || ''))
+                }
+            }
+        } catch { }
+    }, [api, isAdmin, fromNumber])
 
     const startPoll = useCallback(() => {
         stopPoll()
@@ -457,9 +522,36 @@ export function useDialer() {
             }
         } catch { }
 
+        // Auto-match: si l'agent compose +33... et qu'on a un numéro FR,
+        // utiliser automatiquement le numéro FR comme caller ID. Sinon,
+        // utiliser le fromNumber sélectionné manuellement, ou défaut.
+        let callerId = fromNumber
+        try {
+            if (myNumbers.length > 0) {
+                const digits = to.replace(/\D/g, '')
+                // Essayer de matcher le préfixe international (33, 32, 1, etc.)
+                // avec un numéro de l'org du même pays
+                const prefixes: Record<string, string> = {
+                    '1': 'CA_US', '33': 'FR', '32': 'BE', '41': 'CH', '44': 'GB',
+                    '49': 'DE', '34': 'ES', '39': 'IT', '31': 'NL', '351': 'PT',
+                }
+                let matched: any = null
+                for (const [pfx, code] of Object.entries(prefixes)) {
+                    if (digits.startsWith(pfx)) {
+                        matched = myNumbers.find((m: any) => m.country_code === code)
+                        if (matched) break
+                    }
+                }
+                if (matched) callerId = matched.number
+            }
+        } catch { }
+
         S.current.contact = null; setContact(null)
         try {
-            const r = await api('/api/v1/telephony/call/outbound', { method: 'POST', body: { to } })
+            const r = await api('/api/v1/telephony/call/outbound', {
+                method: 'POST',
+                body: { to, fromNumber: callerId || undefined },
+            })
             if (r.success) {
                 S.current.callId = r.data.call?.id || null
                 S.current.twSid = r.data.call?.twilio_sid || null
@@ -491,7 +583,7 @@ export function useDialer() {
         }
 
         if ((window as any).electronAPI?.callStarted) (window as any).electronAPI.callStarted()
-    }, [dialNum, api, showToast])
+    }, [dialNum, api, showToast, fromNumber, myNumbers])
 
     const startCallUI = useCallback((num: string) => {
         playConnect()
@@ -785,5 +877,9 @@ export function useDialer() {
         startLong, endLong, lpdoneRef,
         // Helpers
         isAdmin, S,
+        // Features gating
+        has, trialInfo, planName, featuresVersion,
+        // Caller ID picker (multi-pays)
+        myNumbers, fromNumber, setFromNumber,
     }
 }

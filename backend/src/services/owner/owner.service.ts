@@ -98,6 +98,31 @@ export class OwnerService {
     return data
   }
 
+  // Change le forfait d'une organisation — vérifie que le plan existe
+  // dans plan_definitions. Invalide le cache auth pour que les users
+  // concernés voient le nouveau forfait au prochain /me.
+  async updateOrgPlan(orgId: string, planId: string) {
+    // Vérifier que le plan existe
+    const { data: plan, error: planErr } = await supabaseAdmin
+      .from("plan_definitions")
+      .select("id, name")
+      .eq("id", planId)
+      .maybeSingle()
+
+    if (planErr) throw new Error(planErr.message)
+    if (!plan) throw new Error(`Forfait "${planId}" introuvable`)
+
+    const { data, error } = await supabaseAdmin
+      .from("organizations")
+      .update({ plan: planId, updated_at: new Date().toISOString() })
+      .eq("id", orgId)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+
+    return { organization: data, plan }
+  }
+
   async assignNumber(phoneNumber: string, organizationId: string) {
     const twilioNum = await twilioService.purchasePhoneNumber(phoneNumber, organizationId)
     const { data, error } = await supabaseAdmin
