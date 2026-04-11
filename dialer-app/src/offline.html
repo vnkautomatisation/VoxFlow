@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>VoxFlow Dialer — Hors ligne</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #111118;
+      color: #eeeef8;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+    .drag-bar {
+      height: 28px;
+      width: 100%;
+      -webkit-app-region: drag;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 6px;
+      background: transparent;
+    }
+    .close-btn {
+      -webkit-app-region: no-drag;
+      width: 22px; height: 22px;
+      border: none;
+      background: transparent;
+      color: #55557a;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .close-btn:hover {
+      background: rgba(255,77,109,.15);
+      color: #ff4d6d;
+    }
+    .container {
+      width: 100%;
+      height: calc(100% - 28px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      -webkit-app-region: no-drag;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 36px;
+    }
+    .logo-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #7b61ff;
+      box-shadow: 0 0 14px #7b61ff;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.1); }
+    }
+    .logo-text {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .vox { color: #7b61ff; }
+    .flow { color: #00d4aa; }
+
+    .icon-wrap {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(255, 77, 109, 0.1);
+      border: 2px solid rgba(255, 77, 109, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .icon-wrap svg {
+      color: #ff4d6d;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #eeeef8;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 12px;
+      color: #9898b8;
+      line-height: 1.5;
+      max-width: 280px;
+      margin-bottom: 24px;
+    }
+
+    .status {
+      background: #1f1f2a;
+      border: 1px solid #2e2e44;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 280px;
+      font-size: 11px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .status-row:last-child { margin-bottom: 0; }
+    .status-label {
+      color: #55557a;
+      font-weight: 600;
+    }
+    .status-value {
+      color: #eeeef8;
+      font-family: 'DM Sans', monospace;
+      font-weight: 600;
+    }
+    .status-value.ok    { color: #00d4aa; }
+    .status-value.error { color: #ff4d6d; }
+    .status-value.warn  { color: #ffb547; }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
+    }
+    button.action {
+      flex: 1;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      transition: all 0.15s;
+      -webkit-app-region: no-drag;
+    }
+    .btn-primary {
+      background: #7b61ff;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #6145ff;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: #1f1f2a;
+      color: #9898b8;
+      border: 1px solid #2e2e44;
+    }
+    .btn-secondary:hover {
+      color: #eeeef8;
+      border-color: #3a3a55;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 12px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 9px;
+      color: #35355a;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .spin {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #2e2e44;
+      border-top-color: #7b61ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="drag-bar">
+    <button class="close-btn" id="closeBtn" title="Fermer">✕</button>
+  </div>
+
+  <div class="container">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <span class="logo-text"><span class="vox">Vox</span><span class="flow">Flow</span></span>
+    </div>
+
+    <div class="icon-wrap">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <line x1="12" y1="20" x2="12.01" y2="20"/>
+      </svg>
+    </div>
+
+    <h1>Serveur VoxFlow inaccessible</h1>
+    <p id="message">Impossible de joindre le serveur. Vérifiez que le backend VoxFlow est démarré.</p>
+
+    <div class="status">
+      <div class="status-row">
+        <span class="status-label">URL</span>
+        <span class="status-value" id="url">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Tentatives</span>
+        <span class="status-value" id="retries">0</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Statut</span>
+        <span class="status-value error" id="status">Hors ligne</span>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="action btn-secondary" id="quitBtn">Quitter</button>
+      <button class="action btn-primary" id="retryBtn">
+        <span id="retryLabel">Réessayer</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="footer">VNK Automatisation Inc. · VoxFlow v1.1.0</div>
+
+  <script>
+    // On reçoit l'URL + retries depuis le main via hash
+    // (IPC n'est pas disponible dans cette page car loadFile)
+    const params = new URLSearchParams(location.hash.slice(1))
+    const url     = params.get('url') || 'http://localhost:3001/dialer'
+    const retries = params.get('retries') || '0'
+    document.getElementById('url').textContent = url.replace(/^https?:\/\//, '').slice(0, 30)
+    document.getElementById('retries').textContent = retries
+
+    let retrying = false
+    document.getElementById('retryBtn').addEventListener('click', () => {
+      if (retrying) return
+      retrying = true
+      document.getElementById('retryLabel').innerHTML = '<span class="spin"></span>Connexion...'
+      document.getElementById('status').textContent = 'Reconnexion...'
+      document.getElementById('status').className = 'status-value warn'
+      // Relance la page /dialer après un court délai
+      setTimeout(() => {
+        location.href = url
+      }, 400)
+    })
+
+    document.getElementById('quitBtn').addEventListener('click', () => {
+      window.close()
+    })
+
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      window.close()
+    })
+  </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 'use client'
 import DialerFAB from '@/components/shared/DialerFAB'
+import TrialBanner from '@/components/shared/TrialBanner'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { usePlanPoller } from '@/hooks/usePlanPoller'
 
 const NAV_GROUPS = [
     {
@@ -49,6 +51,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const router = useRouter()
     const pathname = usePathname()
     const { isAuth, user } = useAuthStore()
+    // Poll /auth/me toutes les 2 min pour détecter les changements de plan
+    // faits par le OWNER (upgrade/downgrade du forfait de l'org).
+    usePlanPoller()
     const [mounted, setMounted] = useState(false)
     const [openGroup, setOpenGroup] = useState<string | null>(null)
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -337,6 +342,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </nav>
 
             <DialerFAB />
+            <TrialBanner />
             <main>{children}</main>
         </div>
     )
