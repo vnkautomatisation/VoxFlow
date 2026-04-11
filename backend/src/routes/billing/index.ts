@@ -1,5 +1,6 @@
-import { Router, Request, Response } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { authenticate, AuthRequest } from '../../middleware/auth'
 
 const router = Router()
 
@@ -7,6 +8,16 @@ const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 )
+
+// ── Auth middleware selectif ───────────────────────────────
+// Toutes les routes /billing/* requierent authenticate SAUF :
+//  - GET /plans  (catalogue public)
+//  - POST /webhook (Stripe, authentifie par signature verification)
+const PUBLIC_PATHS = new Set(['/plans', '/webhook'])
+router.use((req, res, next) => {
+  if (PUBLIC_PATHS.has(req.path)) return next()
+  return authenticate(req as AuthRequest, res, next)
+})
 
 // Stripe optionnel — fonctionne sans clé (mode démo)
 let stripe: any = null
@@ -23,11 +34,21 @@ const PLANS: Record<string, { name: string; price: number; stripe_price_id?: str
   premium: { name: 'Premium', price: 99, stripe_price_id: process.env.STRIPE_PRICE_PREMIUM, limits: { agents: -1, did: -1, recording_days: -1,  ai: true,  robot: true  } },
 }
 
+// getOrgId / getUserId : sources de verite = JWT decode par authenticate.
+// Les fallbacks hardcodes (org_test_001, user_test_001) ont ete retires —
+// ils causaient un data leak critique : un attaquant non authentifie se
+// faisait passer pour l'org de test et accedait a toutes ses donnees.
+// Les routes publiques (plans, webhook) n'appellent PAS ces helpers,
+// donc elles ne sont pas affectees.
 function getOrgId(req: Request): string {
-  return (req as any).user?.organization_id || 'org_test_001'
+  const orgId = (req as any).user?.organizationId || (req as any).user?.organization_id
+  if (!orgId) throw new Error('Organisation introuvable (auth requise)')
+  return String(orgId)
 }
 function getUserId(req: Request): string {
-  return (req as any).user?.id || 'user_test_001'
+  const userId = (req as any).user?.userId || (req as any).user?.id
+  if (!userId) throw new Error('Utilisateur introuvable (auth requise)')
+  return String(userId)
 }
 
 // ──────────────────────────────────────────────────────────
