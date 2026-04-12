@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.5 — ROOT FIX : enable webSecurity + sandbox + disable Site Isolation
+//  v1.2.6 — block same-URL in-place nav (Chromium 120 crash fix)
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
@@ -73,7 +73,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.5 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.2.6 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -175,6 +175,26 @@ function createWindow() {
         },
     })
 
+    // ── ANTI-CRASH : bloquer les in-place navigations ──────────
+    // Next.js dev mode fait un history.pushState() immédiatement après
+    // le did-finish-load (HMR fast-refresh). Ce pushState déclenche un
+    // "in-place" navigation dans Chromium 120 qui CRASH le renderer
+    // avec Access Violation -1073741819 (bug Chromium + Electron 28).
+    //
+    // Fix : on intercepte will-navigate et on bloque toute navigation
+    // vers la MEME URL que celle déjà chargée. Ça n'affecte PAS les
+    // navigations légitimes (login → dialer, etc.) parce qu'elles vont
+    // vers une URL différente.
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        const current = mainWindow.webContents.getURL()
+        if (url === current || url + '/' === current || current + '/' === url) {
+            log('[will-navigate] BLOCKED same-URL in-place nav:', url)
+            event.preventDefault()
+            return
+        }
+        log('[will-navigate]', url)
+    })
+
     log('[createWindow] loading', DIALER_URL)
     mainWindow.loadURL(DIALER_URL).catch(err => log('[loadURL error]', err.message))
 
@@ -183,7 +203,6 @@ function createWindow() {
     mainWindow.webContents.on('did-start-loading', () => log('[load] started →', mainWindow.webContents.getURL()))
     mainWindow.webContents.on('did-finish-load',   () => log('[load] finish  →', mainWindow.webContents.getURL()))
     mainWindow.webContents.on('dom-ready',         () => log('[load] dom-ready →', mainWindow.webContents.getURL()))
-    mainWindow.webContents.on('will-navigate', (_, url) => log('[will-navigate]', url))
     mainWindow.webContents.on('will-redirect', (_, url) => log('[will-redirect]', url))
     // did-start-navigation catche aussi les location.reload() et les
     // client-side router transitions (Next.js App Router), contrairement
