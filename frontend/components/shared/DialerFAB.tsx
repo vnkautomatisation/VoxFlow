@@ -73,31 +73,39 @@ export default function DialerFAB() {
     // dialer. Si Electron ne tourne pas, le fetch échoue silencieusement
     // et on tente le protocol handler en fallback.
     const syncAndLaunch = async () => {
+      // 1. Essayer le sync HTTP vers Electron déjà ouvert (port 9876)
+      let electronRunning = false
       try {
-        // 1. D'abord essayer le sync HTTP (Electron déjà ouvert)
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 1500)
         const res = await fetch('http://127.0.0.1:9876/auth-sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'login', token: tok, role: 'ADMIN', url }),
+          signal: controller.signal,
         })
-        if (res.ok) {
-          // Electron est ouvert et a reçu le token → focus
-          await fetch('http://127.0.0.1:9876/ping').catch(() => {})
-          return
-        }
+        clearTimeout(timeout)
+        electronRunning = res.ok
       } catch {
-        // Electron pas lancé → fallback protocol handler
+        // Electron pas lancé ou timeout → fallback protocol
       }
 
-      // 2. Protocol handler pour lancer Electron (s'il est installé)
-      try {
-        window.location.href = `voxflow://open?tok=${encodeURIComponent(tok)}&url=${encodeURIComponent(url)}`
-      } catch {}
+      if (electronRunning) return // Electron a recu le token, rien d'autre a faire
+
+      // 2. Lancer Electron via voxflow:// protocol handler.
+      // On utilise un iframe caché (méthode standard pour custom protocols)
+      // au lieu de window.location.href pour ne pas affecter la navigation
+      // du portail. L'iframe tente de charger voxflow://... — si le handler
+      // est enregistré (Electron installé), l'OS lance l'app. Sinon, silence.
+      const protoUrl = `voxflow://open?tok=${encodeURIComponent(tok)}&url=${encodeURIComponent(url)}`
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = protoUrl
+      document.body.appendChild(iframe)
+      setTimeout(() => iframe.remove(), 2000)
     }
 
     syncAndLaunch()
-    // NE PAS setIsOpen(true) ici — on ne contrôle pas si Electron
-    // s'est réellement ouvert. Le FAB garde sa couleur violette.
   }, [isAuth, accessToken, isTrialExpired, canUseDialer, router])
 
   // Détecter si Electron tourne (ping :9876) pour afficher le badge live
