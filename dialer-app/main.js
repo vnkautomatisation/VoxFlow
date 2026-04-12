@@ -73,7 +73,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.7 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.2.8 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -204,19 +204,34 @@ function createWindow() {
     // La seule solution : injecter un JS qui remplace temporairement
     // history.pushState par un no-op pendant les 3 premières secondes.
     // Après ça, Next.js HMR est stabilisé et les pushState sont safe.
-    mainWindow.webContents.on('did-finish-load', () => {
+    // Injecté à dom-ready (PAS did-finish-load) car le pushState de
+    // Next.js HMR arrive 43ms APRÈS did-finish-load — trop tard pour
+    // patcher. dom-ready fire 200ms AVANT, donc le patch est en place.
+    mainWindow.webContents.on('dom-ready', () => {
         mainWindow.webContents.executeJavaScript(`
             (function() {
-                var _real = history.pushState.bind(history);
+                var _realPush = history.pushState.bind(history);
+                var _realReplace = history.replaceState.bind(history);
                 var _blocked = true;
                 history.pushState = function(state, title, url) {
-                    if (_blocked && url === location.pathname) {
-                        console.log('[VoxFlow] blocked same-URL pushState during init:', url);
+                    if (_blocked && (!url || url === location.pathname || url === location.href)) {
+                        console.log('[VoxFlow] blocked same-URL pushState during init');
                         return;
                     }
-                    return _real(state, title, url);
+                    return _realPush(state, title, url);
                 };
-                setTimeout(function() { _blocked = false; history.pushState = _real; }, 3000);
+                history.replaceState = function(state, title, url) {
+                    if (_blocked && (!url || url === location.pathname || url === location.href)) {
+                        console.log('[VoxFlow] blocked same-URL replaceState during init');
+                        return;
+                    }
+                    return _realReplace(state, title, url);
+                };
+                setTimeout(function() {
+                    _blocked = false;
+                    history.pushState = _realPush;
+                    history.replaceState = _realReplace;
+                }, 5000);
             })();
         `).catch(() => {})
     })
