@@ -1,17 +1,12 @@
 "use client"
-import { useEffect, useCallback, useState, useRef } from "react"
+import { useEffect, useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
 import { useFeatures } from "@/hooks/useFeatures"
 
-const W = 360
-const H = 700
-
 export default function DialerFAB() {
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
   const [tip,    setTip   ] = useState(false)
-  const winRef              = useRef<Window | null>(null)
   const { isAuth, accessToken } = useAuthStore()
   const { has, isTrialExpired, trialDaysLeft, planName } = useFeatures()
 
@@ -19,25 +14,27 @@ export default function DialerFAB() {
     try { return localStorage.getItem("vf_url") || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000" } catch { return "http://localhost:4000" }
   }
 
-  // Quand déconnexion dans Chrome → fermer le dialer
+  // Quand déconnexion dans le portail → sync logout vers Electron
   useEffect(() => {
     if (!isAuth) {
-      if (winRef.current && !winRef.current.closed) {
-        try { winRef.current.postMessage({ type: "VOXFLOW_LOGOUT" }, "*") } catch {}
-        setTimeout(() => {
-          if (winRef.current && !winRef.current.closed) winRef.current.close()
-          setIsOpen(false); winRef.current = null
-        }, 400)
-      }
+      setIsOpen(false)
+      // Notifier Electron via HTTP local (s'il tourne)
+      fetch('http://127.0.0.1:9876/auth-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      }).catch(() => {}) // ignore si Electron pas lancé
     }
   }, [isAuth])
 
-  // Quand token change → mettre à jour le dialer
+  // Quand token change → mettre à jour Electron via HTTP local
   useEffect(() => {
-    if (isAuth && accessToken && winRef.current && !winRef.current.closed) {
-      try {
-        winRef.current.postMessage({ type: "VOXFLOW_TOKEN", tok: accessToken, url: getUrl() }, "*")
-      } catch {}
+    if (isAuth && accessToken) {
+      fetch('http://127.0.0.1:9876/auth-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', token: accessToken, url: getUrl() }),
+      }).catch(() => {}) // ignore si Electron pas lancé
     }
   }, [isAuth, accessToken])
 
@@ -64,50 +61,59 @@ export default function DialerFAB() {
     const tok = accessToken
     const url = getUrl()
 
-    // Si déjà ouvert → focus + refresh token
-    if (winRef.current && !winRef.current.closed) {
-      winRef.current.focus()
-      try { winRef.current.postMessage({ type: "VOXFLOW_TOKEN", tok, url }, "*") } catch {}
-      return
+    // ── Toujours lancer Electron via protocole custom ──────────
+    // On n'ouvre JAMAIS de popup web. Le dialer doit apparaître dans
+    // Electron, pas dans un onglet navigateur. Si Electron n'est pas
+    // installé, le protocol handler échoue silencieusement et c'est
+    // normal — l'utilisateur doit installer l'app Electron.
+    //
+    // Sync du token vers Electron via HTTP local :9876 (le serveur
+    // HTTP interne d'Electron créé dans main.js:startLocalServer).
+    // Si Electron tourne, /auth-sync accepte le token et reload le
+    // dialer. Si Electron ne tourne pas, le fetch échoue silencieusement
+    // et on tente le protocol handler en fallback.
+    const syncAndLaunch = async () => {
+      try {
+        // 1. D'abord essayer le sync HTTP (Electron déjà ouvert)
+        const res = await fetch('http://127.0.0.1:9876/auth-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'login', token: tok, role: 'ADMIN', url }),
+        })
+        if (res.ok) {
+          // Electron est ouvert et a reçu le token → focus
+          await fetch('http://127.0.0.1:9876/ping').catch(() => {})
+          return
+        }
+      } catch {
+        // Electron pas lancé → fallback protocol handler
+      }
+
+      // 2. Protocol handler pour lancer Electron (s'il est installé)
+      try {
+        window.location.href = `voxflow://open?tok=${encodeURIComponent(tok)}&url=${encodeURIComponent(url)}`
+      } catch {}
     }
 
-    // Lancer Electron via protocole custom en priorité
-    try {
-      window.location.href = `voxflow://open?tok=${encodeURIComponent(tok)}&url=${encodeURIComponent(url)}`
-    } catch {}
-
-    // Fallback : ouvrir une popup web si l'Electron n'est pas installé
-    // (délai court pour laisser le protocole custom tenter d'ouvrir)
-    setTimeout(() => {
-      try {
-        const left = window.screen.availWidth  - W - 20
-        const top  = window.screen.availHeight - H - 20
-        const win  = window.open(
-          `/dialer?fromPortal=1`,
-          'voxflow-dialer',
-          `width=${W},height=${H},left=${left},top=${top},resizable=no,scrollbars=no`
-        )
-        if (win) {
-          winRef.current = win
-          setIsOpen(true)
-          // Envoyer le token via postMessage après load
-          setTimeout(() => {
-            try { win.postMessage({ type: "VOXFLOW_TOKEN", tok, url }, "*") } catch {}
-          }, 800)
-        }
-      } catch {}
-    }, 500)
-
-    setIsOpen(true)
+    syncAndLaunch()
+    // NE PAS setIsOpen(true) ici — on ne contrôle pas si Electron
+    // s'est réellement ouvert. Le FAB garde sa couleur violette.
   }, [isAuth, accessToken, isTrialExpired, canUseDialer, router])
 
-  // Détecter fermeture popup
+  // Détecter si Electron tourne (ping :9876) pour afficher le badge live
+  const [isOpen, setIsOpen] = useState(false)
   useEffect(() => {
-    const id = setInterval(() => {
-      if (winRef.current?.closed) { setIsOpen(false); winRef.current = null }
-    }, 800)
+    if (!isAuth) return
+    const check = () => {
+      fetch('http://127.0.0.1:9876/ping', { mode: 'cors' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setIsOpen(!!d?.ok))
+        .catch(() => setIsOpen(false))
+    }
+    check()
+    const id = setInterval(check, 5000) // poll toutes les 5s
     return () => clearInterval(id)
-  }, [])
+  }, [isAuth])
 
   // Shift+D
   useEffect(() => {
