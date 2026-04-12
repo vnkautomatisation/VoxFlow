@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.6 — block same-URL in-place nav (Chromium 120 crash fix)
+//  v1.2.7 — monkey-patch pushState to prevent Chromium 120 crash
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
@@ -73,7 +73,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.6 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.2.7 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -168,10 +168,10 @@ function createWindow() {
             preload:          path.join(__dirname, 'src', 'preload.js'),
             contextIsolation: true,
             nodeIntegration:  false,
-            sandbox:          true,  // renderer sandboxé — évite les crashs Chromium 120 sur Windows
-            webSecurity:      true,  // RÉACTIVÉ — avec sécurité off, Chromium 120 crash sur les in-place nav.
-                                      // Le CORS backend autorise déjà localhost:3001, donc pas besoin de le désactiver.
-            allowRunningInsecureContent: false,
+            sandbox:          false, // sandbox OFF — sandbox:true + Chromium 120 crash sur les
+                                      // in-place pushState navs (Access Violation -1073741819).
+                                      // Le preload est safe (only contextBridge + ipcRenderer).
+            webSecurity:      true,
         },
     })
 
@@ -193,6 +193,32 @@ function createWindow() {
             return
         }
         log('[will-navigate]', url)
+    })
+
+    // ── ANTI-CRASH : monkey-patch history.pushState dans le renderer ──
+    // Next.js dev mode fait history.pushState('/dialer', '', '/dialer')
+    // 30-50ms après did-finish-load. Chromium 120 + Electron 28 crash
+    // le renderer process sur ce pushState (Access Violation 0xC0000005).
+    //
+    // will-navigate ne catche PAS les pushState (c'est une in-page nav).
+    // La seule solution : injecter un JS qui remplace temporairement
+    // history.pushState par un no-op pendant les 3 premières secondes.
+    // Après ça, Next.js HMR est stabilisé et les pushState sont safe.
+    mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.executeJavaScript(`
+            (function() {
+                var _real = history.pushState.bind(history);
+                var _blocked = true;
+                history.pushState = function(state, title, url) {
+                    if (_blocked && url === location.pathname) {
+                        console.log('[VoxFlow] blocked same-URL pushState during init:', url);
+                        return;
+                    }
+                    return _real(state, title, url);
+                };
+                setTimeout(function() { _blocked = false; history.pushState = _real; }, 3000);
+            })();
+        `).catch(() => {})
     })
 
     log('[createWindow] loading', DIALER_URL)
