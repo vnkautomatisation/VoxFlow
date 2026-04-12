@@ -1,6 +1,6 @@
 {
   "name": "voxflow-dialer",
-  "version": "1.2.8",
+  "version": "1.3.0",
   "description": "VoxFlow Dialer — Minimal Electron shell loading the Next.js dialer page. By VNK Automatisation Inc.",
   "main": "main.js",
   "author": "VNK Automatisation Inc.",

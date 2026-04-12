@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  VoxFlow Dialer — Minimal Electron Shell
-//  v1.2.7 — monkey-patch pushState to prevent Chromium 120 crash
+//  v1.3.0 — splash page delayed navigation (Chromium 120 crash fix)
 //
 //  Rôle minimal :
 //   - Crée une fenêtre frameless 380x720 (show: false → évite écran noir)
@@ -73,7 +73,7 @@ function log(...args) {
     try { fs.appendFileSync(LOG_FILE, line + '\n') } catch {}
 }
 
-log('[boot] VoxFlow Dialer v1.2.8 — loading', DIALER_URL)
+log('[boot] VoxFlow Dialer v1.3.0 — loading', DIALER_URL)
 
 // ── Protocole voxflow:// ────────────────────────────────────
 if (process.defaultApp && process.argv.length >= 2) {
@@ -175,69 +175,34 @@ function createWindow() {
         },
     })
 
-    // ── ANTI-CRASH : bloquer les in-place navigations ──────────
-    // Next.js dev mode fait un history.pushState() immédiatement après
-    // le did-finish-load (HMR fast-refresh). Ce pushState déclenche un
-    // "in-place" navigation dans Chromium 120 qui CRASH le renderer
-    // avec Access Violation -1073741819 (bug Chromium + Electron 28).
+    // ── ANTI-CRASH : splash → delayed navigation ──────────────
+    // Chromium 120 + Electron 28 crash le renderer process (Access
+    // Violation -1073741819) quand Next.js + Twilio SDK (WebSocket +
+    // AudioContext) initialisent immédiatement au load.
     //
-    // Fix : on intercepte will-navigate et on bloque toute navigation
-    // vers la MEME URL que celle déjà chargée. Ça n'affecte PAS les
-    // navigations légitimes (login → dialer, etc.) parce qu'elles vont
-    // vers une URL différente.
-    mainWindow.webContents.on('will-navigate', (event, url) => {
-        const current = mainWindow.webContents.getURL()
-        if (url === current || url + '/' === current || current + '/' === url) {
-            log('[will-navigate] BLOCKED same-URL in-place nav:', url)
-            event.preventDefault()
-            return
-        }
-        log('[will-navigate]', url)
-    })
-
-    // ── ANTI-CRASH : monkey-patch history.pushState dans le renderer ──
-    // Next.js dev mode fait history.pushState('/dialer', '', '/dialer')
-    // 30-50ms après did-finish-load. Chromium 120 + Electron 28 crash
-    // le renderer process sur ce pushState (Access Violation 0xC0000005).
+    // Les patchs précédents (pushState block, will-navigate, sandbox,
+    // site isolation, hardware accel) n'ont RIEN résolu parce que la
+    // vraie cause est Twilio SDK qui crée des WebSocket 150ms après
+    // did-finish-load — ce qui crash le networking stack de Chromium.
     //
-    // will-navigate ne catche PAS les pushState (c'est une in-page nav).
-    // La seule solution : injecter un JS qui remplace temporairement
-    // history.pushState par un no-op pendant les 3 premières secondes.
-    // Après ça, Next.js HMR est stabilisé et les pushState sont safe.
-    // Injecté à dom-ready (PAS did-finish-load) car le pushState de
-    // Next.js HMR arrive 43ms APRÈS did-finish-load — trop tard pour
-    // patcher. dom-ready fire 200ms AVANT, donc le patch est en place.
-    mainWindow.webContents.on('dom-ready', () => {
-        mainWindow.webContents.executeJavaScript(`
-            (function() {
-                var _realPush = history.pushState.bind(history);
-                var _realReplace = history.replaceState.bind(history);
-                var _blocked = true;
-                history.pushState = function(state, title, url) {
-                    if (_blocked && (!url || url === location.pathname || url === location.href)) {
-                        console.log('[VoxFlow] blocked same-URL pushState during init');
-                        return;
-                    }
-                    return _realPush(state, title, url);
-                };
-                history.replaceState = function(state, title, url) {
-                    if (_blocked && (!url || url === location.pathname || url === location.href)) {
-                        console.log('[VoxFlow] blocked same-URL replaceState during init');
-                        return;
-                    }
-                    return _realReplace(state, title, url);
-                };
-                setTimeout(function() {
-                    _blocked = false;
-                    history.pushState = _realPush;
-                    history.replaceState = _realReplace;
-                }, 5000);
-            })();
-        `).catch(() => {})
-    })
-
-    log('[createWindow] loading', DIALER_URL)
-    mainWindow.loadURL(DIALER_URL).catch(err => log('[loadURL error]', err.message))
+    // Fix définitif : charger d'abord splash.html (page locale, 0 JS).
+    // Le renderer se stabilise pendant 2 secondes. Puis on navigue vers
+    // le frontend Next.js. À ce stade, Chromium est prêt et ne crash
+    // plus sur les WebSocket rapides.
+    log('[createWindow] loading splash, will navigate to', DIALER_URL, 'in 2s')
+    mainWindow.loadFile(path.join(__dirname, 'src', 'splash.html'))
+        .then(() => {
+            setTimeout(() => {
+                if (!mainWindow || mainWindow.isDestroyed()) return
+                log('[splash] navigating to', DIALER_URL)
+                mainWindow.loadURL(DIALER_URL).catch(err => {
+                    log('[loadURL error]', err.message)
+                    mainWindow.loadFile(path.join(__dirname, 'src', 'error.html'))
+                        .catch(() => {})
+                })
+            }, 2000)
+        })
+        .catch(err => log('[splash error]', err.message))
 
     // Events diagnostiques — sans ces logs on ne sait jamais si le
     // renderer a chargé, ce qui rend l'écran noir indébug-able.
