@@ -42,12 +42,13 @@ export default function LoginPage() {
 
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault()
+        if (!email.trim()) return setError('Veuillez entrer votre adresse email')
+        if (!password)     return setError('Veuillez entrer votre mot de passe')
         setLoading(true)
         setError('')
         try {
             const res = await authApi.login(email, password)
             if (res.success && res.data?.accessToken) {
-                // Sauvegarder ou effacer les credentials
                 if (remember) {
                     localStorage.setItem('vf_remember', JSON.stringify({ email, password }))
                 } else {
@@ -56,17 +57,26 @@ export default function LoginPage() {
                 setAuth(res.data.user, res.data.accessToken)
                 const redirect = searchParams.get('redirect')
                 const target = redirect || getDashboardRoute(res.data.user.role)
-                // Attendre que la cookie HTTP-only soit écrite avant la nav
-                // (sinon race condition : middleware voit pas encore le token
-                // et bounce vers /login). Un micro-délai suffit.
                 await new Promise(r => setTimeout(r, 150))
-                // Hard navigation pour garantir un fresh middleware check
                 window.location.href = target
             } else {
-                setError(res.message || 'Identifiants incorrects')
+                // Messages clairs selon la reponse backend
+                const msg = res.message || res.error || ''
+                if (msg.includes('incorrect') || msg.includes('invalide'))
+                    setError('Email ou mot de passe incorrect')
+                else if (msg.includes('introuvable') || msg.includes('not found'))
+                    setError('Aucun compte avec cet email')
+                else if (msg.includes('desactiv') || msg.includes('suspendu') || msg.includes('bloque'))
+                    setError('Compte desactive — contactez votre administrateur')
+                else
+                    setError(msg || 'Identifiants incorrects')
             }
-        } catch {
-            setError('Erreur de connexion au serveur')
+        } catch (err: any) {
+            // Distinguer erreur reseau vs erreur serveur
+            if (err?.message?.includes('fetch') || err?.message?.includes('network') || err?.name === 'TypeError')
+                setError('Le serveur VoxFlow ne repond pas. Verifiez que le backend est demarre sur ' + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'))
+            else
+                setError('Erreur inattendue : ' + (err?.message || 'Reessayez'))
         } finally {
             setLoading(false)
         }
