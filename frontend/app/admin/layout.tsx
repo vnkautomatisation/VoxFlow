@@ -16,42 +16,47 @@ const NAV_GROUPS = [
         single: true,
     },
     {
-        label: 'Téléphonie',
+        label: 'Equipe',
         items: [
-            { label: 'Agents', href: '/admin/agents', desc: 'Gérer les agents et extensions' },
-            { label: "Files d'attente", href: '/admin/queues', desc: 'Stratégies de routage ACD' },
+            { label: 'Agents', href: '/admin/agents', desc: 'Agents, extensions et roles' },
+            { label: 'Scripts', href: '/admin/scripts', desc: 'Scripts d\'appel pour agents' },
+            { label: 'Horaires', href: '/admin/schedules', desc: 'Heures ouverture et feries' },
+        ],
+    },
+    {
+        label: 'Telephonie',
+        items: [
+            { label: "Files d'attente", href: '/admin/queues', desc: 'Routage ACD et strategies' },
             { label: 'IVR', href: '/admin/ivr', desc: 'Menus vocaux interactifs' },
-            { label: 'Médias', href: '/admin/media', desc: 'Musiques et messages audio' },
-            { label: 'Numéros DID',   href: '/admin/numbers',   desc: 'Numéros Twilio et assignations' },
+            { label: 'Numeros DID', href: '/admin/numbers', desc: 'Numeros Twilio et bloques' },
+            { label: 'Medias', href: '/admin/media', desc: 'Musiques et messages audio' },
             { label: 'Voicemails', href: '/admin/voicemails', desc: 'Messagerie vocale' },
-            { label: 'Enregistrements', href: '/admin/recordings', desc: 'Ecoute et recherche des appels' },
-            { label: 'Horaires',      href: '/admin/schedules', desc: 'Heures ouverture et feries' },
-            { label: 'Scripts',       href: '/admin/scripts',   desc: 'Scripts appel pour agents' },
-            { label: 'Tags',         href: '/admin/tags',      desc: 'Tags pour appels et contacts' },
+            { label: 'Enregistrements', href: '/admin/recordings', desc: 'Ecoute et recherche' },
         ],
     },
     {
         label: 'Supervision',
         items: [
-            { label: 'Live', href: '/admin/supervision', desc: 'Appels en temps réel' },
-            { label: 'Rapports', href: '/admin/reports', desc: 'Graphiques, export CSV, par agent' },
-            { label: 'Analytics', href: '/admin/analytics', desc: 'Heatmap et tendances' },
-            { label: 'IA', href: '/admin/ia', desc: 'Coaching, quality scores' },
-            { label: 'Campagnes', href: '/admin/campaigns', desc: 'Robot dialer, prospection' },
+            { label: 'Live', href: '/admin/supervision', desc: 'Appels en temps reel' },
             { label: 'Wallboard', href: '/admin/wallboard', desc: 'KPIs plein ecran TV' },
+            { label: 'Rapports', href: '/admin/reports', desc: 'Graphiques et export CSV' },
+            { label: 'Analytics', href: '/admin/analytics', desc: 'Heatmap et tendances' },
+            { label: 'IA', href: '/admin/ia', desc: 'Coaching et quality scores' },
+            { label: 'Campagnes', href: '/admin/campaigns', desc: 'Robot dialer' },
         ],
     },
     {
         label: 'Clients',
         items: [
-            { label: 'CRM', href: '/admin/crm', desc: 'Contacts et pipeline' },
+            { label: 'CRM', href: '/admin/crm', desc: 'Contacts, devis, calendrier' },
             { label: 'Omnicanal', href: '/admin/inbox', desc: 'Chat, SMS, email' },
         ],
     },
     {
         label: 'Config',
         items: [
-            { label: 'Intégrations', href: '/admin/integrations', desc: 'CRM, webhooks, API' },
+            { label: 'Integrations', href: '/admin/integrations', desc: 'CRM, webhooks, API' },
+            { label: 'Tags', href: '/admin/tags', desc: 'Tags appels et contacts' },
         ],
     },
 ]
