@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import ImpersonationBanner from '@/components/shared/ImpersonationBanner'
 
 export const metadata: Metadata = {
   title: 'VoxFlow — Plateforme SaaS Call Center',
@@ -40,7 +41,10 @@ export const viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className="dark">
-      <body>{children}</body>
+      <body>
+        <ImpersonationBanner />
+        {children}
+      </body>
     </html>
   )
 }

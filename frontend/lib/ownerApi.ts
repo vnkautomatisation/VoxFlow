@@ -59,4 +59,36 @@ export const ownerApi = {
     apiRequest<any>("/api/v1/owner/organizations/" + orgId + "/plan", {
       method: "PATCH", body: { plan }, token
     }),
+
+  // ── Admins (gestion clients) ────────────────────────────────
+  getAdmins: (token: string, search = '', status = '', page = 1) =>
+    apiRequest<any>(`/api/v1/owner/admins?search=${encodeURIComponent(search)}&status=${status}&page=${page}`, { token }),
+
+  impersonate: (token: string, orgId: string) =>
+    apiRequest<any>(`/api/v1/owner/admins/${orgId}/impersonate`, { method: "POST", token }),
+
+  suspendOrg: (token: string, orgId: string) =>
+    apiRequest<any>(`/api/v1/owner/admins/${orgId}/suspend`, { method: "POST", token }),
+
+  reactivateOrg: (token: string, orgId: string) =>
+    apiRequest<any>(`/api/v1/owner/admins/${orgId}/reactivate`, { method: "POST", token }),
+
+  // ── Billing stats ───────────────────────────────────────────
+  getBillingStats: (token: string) =>
+    apiRequest<any>("/api/v1/owner/billing-stats", { token }),
+
+  getTopClients: (token: string) =>
+    apiRequest<any>("/api/v1/owner/billing-stats/top-clients", { token }),
+
+  getTransactions: (token: string, limit = 50) =>
+    apiRequest<any>(`/api/v1/owner/billing-stats/transactions?limit=${limit}`, { token }),
+
+  getPromoCodes: (token: string) =>
+    apiRequest<any>("/api/v1/owner/billing-stats/promo-codes", { token }),
+
+  createPromoCode: (token: string, body: any) =>
+    apiRequest<any>("/api/v1/owner/billing-stats/promo-codes", { method: "POST", body, token }),
+
+  deactivatePromoCode: (token: string, id: string) =>
+    apiRequest<any>(`/api/v1/owner/billing-stats/promo-codes/${id}`, { method: "PATCH", body: { is_active: false }, token }),
 }

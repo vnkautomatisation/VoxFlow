@@ -23,7 +23,7 @@ const DASHBOARD: Record<string, string> = {
   AGENT:       '/agent/dashboard',
 }
 
-const PUBLIC = /^\/(login|register|forgot-password|reset-password|verify-email|onboarding|callback)/
+const PUBLIC = /^\/(login|register|forgot-password|reset-password|verify-email|onboarding|callback|commander|tarifs)/
 
 function decodeJwt(token: string): Record<string, any> | null {
   try {
@@ -53,7 +53,8 @@ export function middleware(request: NextRequest) {
 
   // Non connecte
   if (!token) {
-    if (pathname === '/') return NextResponse.redirect(new URL('/login', request.url))
+    // Landing page publique
+    if (pathname === '/') return NextResponse.next()
     const url = new URL('/login', request.url)
     url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)

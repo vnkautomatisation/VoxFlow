@@ -7,6 +7,8 @@ import featuresRouter      from "./features"
 import extensionPoolRouter from "./extension-pool"
 import productsRouter      from "./products"
 import twilioConfigRouter  from "./twilio-config"
+import adminsRouter        from "./admins"
+import billingStatsRouter  from "./billing-stats"
 
 const router = Router()
 router.use(authenticate)
@@ -18,6 +20,8 @@ router.use("/features",        featuresRouter)
 router.use("/extension-pool",  extensionPoolRouter)
 router.use("/products",        productsRouter)
 router.use("/twilio-config",   twilioConfigRouter)
+router.use("/admins",          adminsRouter)
+router.use("/billing-stats",   billingStatsRouter)
 
 router.get("/stats", async (req: AuthRequest, res: Response) => {
   try { sendSuccess(res, await ownerService.getGlobalStats()) }
