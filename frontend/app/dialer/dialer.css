@@ -4,7 +4,18 @@
 * {
     box-sizing: border-box;
     margin: 0;
-    padding: 0
+    padding: 0;
+    scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+    display: none;
+}
+html, body {
+    overflow: hidden;
+    scrollbar-width: none;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+    display: none;
 }
 
 :root {
