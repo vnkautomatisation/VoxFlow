@@ -561,4 +561,147 @@ router.get("/stats", authenticate, async (req: AuthRequest, res: Response) => {
     } catch (err: any) { sendError(res, err.message) }
 })
 
+// ════════════════════════════════════════════════════════════
+//  CALENDRIER (appointments — migration 038)
+// ════════════════════════════════════════════════════════════
+
+router.get("/appointments", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { start, end } = req.query as { start?: string; end?: string }
+        let query = supabaseAdmin.from("appointments")
+            .select("id, title, description, starts_at, ends_at, status, location, contact_id, agent_id, reminder_minutes")
+            .eq("organization_id", orgId)
+            .order("starts_at")
+        if (start) query = query.gte("starts_at", start)
+        if (end)   query = query.lte("starts_at", end)
+        const { data, error } = await query
+        if (error) throw error
+        sendSuccess(res, data || [])
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.post("/appointments", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { title, description, starts_at, ends_at, contact_id, agent_id, location, reminder_minutes, status } = req.body
+        if (!title || !starts_at || !ends_at) return sendError(res, "Titre et dates requis", 400)
+        const { data, error } = await supabaseAdmin.from("appointments").insert({
+            organization_id: orgId, title, description, starts_at, ends_at, status: status || 'SCHEDULED',
+            contact_id: contact_id || null, agent_id: agent_id || req.user?.userId || null,
+            location: location || null, reminder_minutes: reminder_minutes ?? 15,
+        }).select().single()
+        if (error) throw error
+        sendSuccess(res, data, 201)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.patch("/appointments/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const fields = ["title","description","starts_at","ends_at","status","location","contact_id","agent_id","reminder_minutes"]
+        const updates: any = {}
+        fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+        const { data, error } = await supabaseAdmin.from("appointments")
+            .update(updates).eq("id", req.params.id).eq("organization_id", orgId).select().single()
+        if (error) throw error
+        sendSuccess(res, data)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.delete("/appointments/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        await supabaseAdmin.from("appointments").delete().eq("id", req.params.id).eq("organization_id", orgId)
+        sendSuccess(res, { deleted: true })
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+// ════════════════════════════════════════════════════════════
+//  DEVIS / QUOTES (migration 038)
+// ════════════════════════════════════════════════════════════
+
+router.get("/quotes", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const { data, error } = await supabaseAdmin.from("quotes")
+            .select("*").eq("organization_id", getOrgId(req)).order("created_at", { ascending: false })
+        if (error) throw error
+        sendSuccess(res, data || [])
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.post("/quotes", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { contact_id, items, notes, valid_until, tax_rate } = req.body
+        const parsedItems = Array.isArray(items) ? items : []
+        const subtotal = parsedItems.reduce((s: number, i: any) => s + (Number(i.qty || 1) * Number(i.unit_price || 0)), 0)
+        const rate = Number(tax_rate) || 14.975
+        const tax = Math.round(subtotal * rate) / 100
+        const total = subtotal + tax
+        // Auto-generate number
+        const { count } = await supabaseAdmin.from("quotes").select("id", { count: "exact" }).eq("organization_id", orgId)
+        const num = `DEV-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`
+
+        const { data, error } = await supabaseAdmin.from("quotes").insert({
+            organization_id: orgId, contact_id: contact_id || null, number: num,
+            items: parsedItems, subtotal, tax_rate: rate, tax_amount: tax, total,
+            notes: notes || null, valid_until: valid_until || null,
+            created_by: req.user?.userId || null,
+        }).select().single()
+        if (error) throw error
+        sendSuccess(res, data, 201)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.patch("/quotes/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const updates: any = {}
+        const fields = ["status","items","subtotal","tax_rate","tax_amount","total","notes","valid_until","pdf_url"]
+        fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+        const { data, error } = await supabaseAdmin.from("quotes")
+            .update(updates).eq("id", req.params.id).eq("organization_id", getOrgId(req)).select().single()
+        if (error) throw error
+        sendSuccess(res, data)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+// ════════════════════════════════════════════════════════════
+//  EMAIL TEMPLATES (migration 038)
+// ════════════════════════════════════════════════════════════
+
+router.get("/email-templates", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const { data, error } = await supabaseAdmin.from("email_templates")
+            .select("*").eq("organization_id", getOrgId(req)).eq("is_active", true).order("name")
+        if (error) throw error
+        sendSuccess(res, data || [])
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.post("/email-templates", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const { name, subject, body_html, variables, category } = req.body
+        if (!name || !subject) return sendError(res, "Nom et sujet requis", 400)
+        const { data, error } = await supabaseAdmin.from("email_templates").insert({
+            organization_id: getOrgId(req), name, subject, body_html: body_html || '',
+            variables: variables || [], category: category || 'general',
+        }).select().single()
+        if (error) throw error
+        sendSuccess(res, data, 201)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.patch("/email-templates/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const updates: any = {}
+        const fields = ["name","subject","body_html","variables","category","is_active"]
+        fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
+        const { data, error } = await supabaseAdmin.from("email_templates")
+            .update(updates).eq("id", req.params.id).eq("organization_id", getOrgId(req)).select().single()
+        if (error) throw error
+        sendSuccess(res, data)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
 export default router
