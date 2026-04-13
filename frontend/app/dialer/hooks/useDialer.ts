@@ -273,7 +273,8 @@ export function useDialer() {
     const [contact, setContact] = useState<Contact | null>(null)
     const [incoming, setIncoming] = useState<{ from: string; co?: Contact } | null>(null)
     const [wrapupDur, setWrapupDur] = useState(0)
-    const [qAgentsXfer, setQAgentsXfer] = useState<AgentInfo[]>([])
+    // Agents disponibles pour transfert = agents avec extension, pas en appel
+    const qAgentsXfer = agents.filter(a => (a.extension || a.ext) && !a.current_call)
     const [searchRes, setSearchRes] = useState<Contact[]>([])
     const [loginErr, setLoginErr] = useState('')
 
