@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     other: [{ rel: 'mask-icon', url: '/icons/favicon.svg', color: '#7b61ff' }],
   },
   manifest: '/site.webmanifest',
-  themeColor: '#7b61ff',
   openGraph: {
     title: 'VoxFlow — Plateforme SaaS Call Center',
     description: 'Gérez vos appels, agents et campagnes depuis une seule interface.',
@@ -32,6 +31,10 @@ export const metadata: Metadata = {
     title: 'VoxFlow',
     images: ['/icons/twitter-card.png'],
   },
+}
+
+export const viewport = {
+  themeColor: '#7b61ff',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
