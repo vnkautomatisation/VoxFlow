@@ -417,18 +417,39 @@ export function useDialer() {
             ])
             if (qr.success) setQueue(qr.data || [])
             if (ar.success && ar.data) {
-                const ags = (ar.data.agentStatuses || ar.data.agents || ar.data || []).map((a: any) => ({
-                    id: a.agentId || a.id,
-                    name: a.name,
-                    first_name: a.name?.split(' ')[0],
-                    last_name: a.name?.split(' ').slice(1).join(' '),
-                    extension: a.extension || a.ext,
-                    status: a.status || 'OFFLINE',
-                    current_call: !!(a.callId),
-                    current_call_number: a.callFrom || a.callTo || null,
-                    call_duration: a.callDuration || 0,
-                }))
-                setAgents(ags)
+                const snapAgents = ar.data.agentStatuses || ar.data.agents || ar.data || []
+                if (Array.isArray(snapAgents) && snapAgents.length > 0) {
+                    setAgents(snapAgents.map((a: any) => ({
+                        id: a.agentId || a.id,
+                        name: a.name,
+                        first_name: a.name?.split(' ')[0],
+                        last_name: a.name?.split(' ').slice(1).join(' '),
+                        extension: a.extension || a.ext,
+                        status: a.status || 'OFFLINE',
+                        current_call: !!(a.callId),
+                        current_call_number: a.callFrom || a.callTo || null,
+                        call_duration: a.callDuration || 0,
+                    })))
+                }
+            }
+            // Fallback : charger agents depuis /admin/agents si snapshot vide
+            if (!ar.success || !(ar.data?.agentStatuses?.length || ar.data?.agents?.length)) {
+                try {
+                    const fallback = await api('/api/v1/admin/agents')
+                    if (fallback.success && Array.isArray(fallback.data)) {
+                        setAgents(fallback.data.map((a: any) => ({
+                            id: a.id,
+                            name: a.name,
+                            first_name: a.name?.split(' ')[0],
+                            last_name: a.name?.split(' ').slice(1).join(' '),
+                            extension: a.extension,
+                            status: a.agentStatus || 'OFFLINE',
+                            current_call: false,
+                            current_call_number: null,
+                            call_duration: 0,
+                        })))
+                    }
+                } catch {}
             }
         } catch { }
         // Charger les numéros de l'org pour le Caller ID picker

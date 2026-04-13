@@ -107,8 +107,9 @@ export default function DialerPage() {
             : <div className="cpill">En communication</div>
 
     const vmBadge = d.voicemails.filter(v => v.status === 'NEW').length
-    const waiting = d.queue.filter(q => !q.status || q.status === 'waiting')
-    const active = d.queue.filter(q => q.status === 'active')
+    // Extraire les appels en attente et actifs depuis les stats realtime des queues
+    const waiting = d.queue.flatMap((q: any) => (q.realtime?.waitingCalls || []).map((c: any) => ({ ...c, queue_name: q.name })))
+    const active = d.queue.flatMap((q: any) => (q.realtime?.activeCalls || []).map((c: any) => ({ ...c, queue_name: q.name })))
 
     return (
         <div className={`popup${embedded ? ' embedded' : ''}`} id="popup">
