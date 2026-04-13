@@ -2,6 +2,9 @@
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth"
 import { ownerService } from "../../services/owner/owner.service"
 import { sendSuccess, sendError } from "../../utils/response"
+import { createClient } from "@supabase/supabase-js"
+
+const supabaseOwner = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
 import plansRouter         from "./plans"
 import featuresRouter      from "./features"
 import extensionPoolRouter from "./extension-pool"
@@ -86,6 +89,64 @@ router.post("/numbers/assign", async (req: AuthRequest, res: Response) => {
 router.get("/revenue", async (req: AuthRequest, res: Response) => {
   try { sendSuccess(res, await ownerService.getRevenueDetails()) }
   catch (err: any) { sendError(res, err.message) }
+})
+
+// ── DID Identities management ────────────────────────────
+router.get("/did/identities", async (req: AuthRequest, res: Response) => {
+  try {
+    const status = req.query.status ? String(req.query.status) : undefined
+    let query = supabaseOwner.from("did_identities")
+      .select("*, org:organization_id(name)")
+      .order("created_at", { ascending: false })
+    if (status) query = query.eq("status", status)
+    const { data } = await query
+    sendSuccess(res, data || [])
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.put("/did/identities/:id/approve", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = String(req.params.id)
+    await supabaseOwner.from("did_identities").update({
+      status: "approved", reviewed_by: req.user?.userId, reviewed_at: new Date().toISOString(),
+    }).eq("id", id)
+    sendSuccess(res, { success: true })
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.put("/did/identities/:id/reject", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = String(req.params.id)
+    const { rejectionReason } = req.body
+    await supabaseOwner.from("did_identities").update({
+      status: "rejected", rejection_reason: rejectionReason || "", reviewed_by: req.user?.userId, reviewed_at: new Date().toISOString(),
+    }).eq("id", id)
+    sendSuccess(res, { success: true })
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+// ── Porting management ───────────────────────────────────
+router.get("/porting", async (_req: AuthRequest, res: Response) => {
+  try {
+    const { data } = await supabaseOwner.from("did_porting_requests")
+      .select("*, org:organization_id(name)")
+      .in("status", ["submitted", "in_progress"])
+      .order("created_at", { ascending: false })
+    sendSuccess(res, data || [])
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.put("/porting/:id/update", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = String(req.params.id)
+    const { status, rejectionReason, estimatedCompletionDate } = req.body
+    const updates: any = { status }
+    if (rejectionReason) updates.rejection_reason = rejectionReason
+    if (estimatedCompletionDate) updates.estimated_completion_date = estimatedCompletionDate
+    if (status === "completed") updates.completed_at = new Date().toISOString()
+    await supabaseOwner.from("did_porting_requests").update(updates).eq("id", id)
+    sendSuccess(res, { success: true })
+  } catch (err: any) { sendError(res, err.message) }
 })
 
 export default router

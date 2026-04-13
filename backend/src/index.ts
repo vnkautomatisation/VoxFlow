@@ -27,6 +27,7 @@ import { startRobotWorker } from './services/robot/robot-worker'
 import { syncTelcoStripeProducts, syncAddonStripeProducts, syncRobotStripeProducts, syncRobotCreditProducts } from './services/stripe/setup'
 import { startSmsOverageJob } from './jobs/smsOverageBilling'
 import { startRobotJobs } from './jobs/robotJobs'
+import { startDidSuspensionJob } from './jobs/didSuspensionRelease'
 import robotCampaignRoutes from './routes/robot/campaigns'
 import webhookRoutes from './routes/webhooks/index'
 import billingRoutes from './routes/billing/index'
@@ -126,6 +127,7 @@ syncRobotCreditProducts().catch((e: any) => console.warn('[Stripe Setup] Robot c
 // ── Cron Jobs ───────────────────────────────────────────
 try { startSmsOverageJob() } catch (e: any) { console.warn('[SMS Overage Job] Start failed:', e.message) }
 try { startRobotJobs() } catch (e: any) { console.warn('[Robot Jobs] Start failed:', e.message) }
+try { startDidSuspensionJob() } catch (e: any) { console.warn('[DID Suspension Job] Start failed:', e.message) }
 
 app.listen(config.app.port, () => {
   console.log('')

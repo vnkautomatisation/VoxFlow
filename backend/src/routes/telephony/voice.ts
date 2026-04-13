@@ -109,5 +109,53 @@ router.get('/recording-proxy', authenticate, async (req: AuthRequest, res: Respo
     res.status(500).send('Erreur proxy')
   }
 })
+// ════════════════════════════════════════════════════════════
+//  POST /voice/incoming — DID incoming call routing
+//  Called by Twilio when a purchased DID receives a call.
+// ════════════════════════════════════════════════════════════
+router.post('/voice/incoming', async (req: Request, res: Response) => {
+  try {
+    const { To } = req.body
+    if (!To) { res.set('Content-Type', 'text/xml'); return res.send('<Response><Hangup/></Response>') }
+
+    const { data: did } = await supabaseAdmin.from('did_orders')
+      .select('assigned_action_type, assigned_action_id, organization_id')
+      .eq('phone_number', To).eq('status', 'active').maybeSingle()
+
+    if (!did || !did.assigned_action_type) {
+      res.set('Content-Type', 'text/xml')
+      return res.send('<?xml version="1.0" encoding="UTF-8"?><Response><Say language="fr-CA">Ce numero n\'est pas configure.</Say><Hangup/></Response>')
+    }
+
+    let twiml = '<?xml version="1.0" encoding="UTF-8"?><Response>'
+    switch (did.assigned_action_type) {
+      case 'extension': {
+        const { data: ext } = await supabaseAdmin.from('extensions').select('extension_number').eq('id', did.assigned_action_id).single()
+        twiml += ext ? `<Dial timeout="30"><Sip>sip:${ext.extension_number}@${process.env.TWILIO_SIP_DOMAIN || 'voxflow.sip.twilio.com'}</Sip></Dial>` : '<Hangup/>'
+        break
+      }
+      case 'queue': {
+        const { data: q } = await supabaseAdmin.from('queues').select('name').eq('id', did.assigned_action_id).single()
+        twiml += `<Enqueue>${q?.name || 'support'}</Enqueue>`
+        break
+      }
+      case 'voicemail':
+        twiml += '<Say language="fr-CA">Veuillez laisser un message apres le bip.</Say><Record maxLength="120" transcribe="true" />'
+        break
+      case 'recording':
+        twiml += `<Play>${did.assigned_action_id}</Play>`
+        break
+      default: twiml += '<Hangup/>'
+    }
+    twiml += '</Response>'
+    res.set('Content-Type', 'text/xml')
+    res.send(twiml)
+  } catch (err: any) {
+    console.error('[Voice Incoming] Error:', err.message)
+    res.set('Content-Type', 'text/xml')
+    res.send('<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>')
+  }
+})
+
 export default router
 

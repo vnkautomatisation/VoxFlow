@@ -357,6 +357,44 @@ function TelcoCards({ annual }: { annual: boolean }) {
   )
 }
 
+function DIDPricingTable() {
+  const api = useApiPublic()
+  const [countries, setCountries] = useState<any[]>([])
+
+  useEffect(() => {
+    api('/api/v1/telephony/did/countries').then(r => {
+      if (r.success) setCountries(r.data || [])
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (countries.length === 0) return null
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', minWidth: 600 }}>
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${CARD_BORDER}` }}>
+            {['Pays', 'Type', 'Prix CAD$/mois', 'Provisionnement', 'Documents'].map(h => (
+              <th key={h} style={{ textAlign: 'left', padding: '0.6rem 1rem', color: '#64748b', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {countries.map((c: any, i: number) => (
+            <tr key={i} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}>
+              <td style={{ padding: '0.6rem 1rem', color: '#e2e8f0' }}>{c.flag} {c.countryName}</td>
+              <td style={{ padding: '0.6rem 1rem', color: '#94a3b8' }}>{(c.types || []).join(', ')}</td>
+              <td style={{ padding: '0.6rem 1rem', color: PURPLE, fontWeight: 700 }}>{c.minPrice} CAD$</td>
+              <td style={{ padding: '0.6rem 1rem', color: '#94a3b8' }}>{c.provisioningTime}</td>
+              <td style={{ padding: '0.6rem 1rem', color: '#94a3b8' }}>{c.requiresDocuments ? 'Oui' : 'Non'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function RobotCards({ annual }: { annual: boolean }) {
   const api = useApiPublic()
   const [plans, setPlans] = useState<any[]>([])
@@ -726,6 +764,23 @@ export default function TarifsPage() {
         <p style={sectionSub}>Personnalisez votre plateforme. Activez uniquement ce dont vous avez besoin. S&apos;ajoutent a votre forfait telephonie.</p>
 
         <AddonCards annual={annual} />
+      </section>
+
+      {/* ============================================================ */}
+      {/*  DID NUMBERS                                                  */}
+      {/* ============================================================ */}
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <h2 style={sectionTitle}>Numeros de telephone DID</h2>
+        <p style={sectionSub}>Obtenez un numero local dans 15+ pays. 1 numero inclus gratuit avec tout forfait telephonie.</p>
+
+        <DIDPricingTable />
+
+        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 12 }}>La portabilite de numero existant est disponible gratuitement. Delai: 7-14 jours.</p>
+          <Link href="/client/numbers/commander" style={{ display: 'inline-block', background: PURPLE, color: '#fff', borderRadius: 10, padding: '0.65rem 1.8rem', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+            Commander un numero
+          </Link>
+        </div>
       </section>
 
       {/* ============================================================ */}
