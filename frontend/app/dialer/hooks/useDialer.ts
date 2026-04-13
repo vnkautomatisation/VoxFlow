@@ -429,7 +429,7 @@ export function useDialer() {
             }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAuth, accessToken, user, loadData, startPoll, stopPoll])
+    }, [isAuth, accessToken, user])
 
 
     // ── Données ────────────────────────────────────────────────
@@ -528,11 +528,38 @@ export function useDialer() {
     const doLogout = useCallback(() => {
         localStorage.removeItem('vf_tok')
         localStorage.removeItem('vf_role')
+        localStorage.removeItem('vf_ext')
+        localStorage.removeItem('vf_name')
         S.current.tok = null
         stopPoll()
         setView('login')
         setLoginErr('')
+        // Notifier le portail parent de la deconnexion
+        try { window.parent.postMessage({ type: 'vf:logout' }, '*') } catch {}
     }, [stopPoll])
+
+    // Ecouter les changements de localStorage (logout depuis le portail)
+    useEffect(() => {
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'vf_tok' && !e.newValue && S.current.tok) {
+                S.current.tok = null
+                stopPoll()
+                setView('login')
+            }
+            if (e.key === 'vf_tok' && e.newValue && !S.current.tok) {
+                S.current.tok = e.newValue
+                S.current.role = localStorage.getItem('vf_role') || 'AGENT'
+                S.current.url = localStorage.getItem('vf_url') || DIALER_CONFIG.API_URL
+                S.current.ext = localStorage.getItem('vf_ext') || null
+                S.current.name = localStorage.getItem('vf_name') || ''
+                setView('main')
+                loadData()
+                startPoll()
+            }
+        }
+        window.addEventListener('storage', onStorage)
+        return () => window.removeEventListener('storage', onStorage)
+    }, [stopPoll, loadData, startPoll])
 
     // ── Statut ─────────────────────────────────────────────────
     const doStatus = useCallback((s: 'ONLINE' | 'BREAK' | 'OFFLINE') => {
