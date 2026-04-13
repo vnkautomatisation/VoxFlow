@@ -136,7 +136,8 @@ router.post("/ivr/:id/compile", async (req: AuthRequest, res: Response) => {
   try {
     const orgId = getOrgId(req)
     const ivrId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
-    const ivr = await adminService.getIVRById?.(ivrId, orgId) || (await adminService.getIVRConfigs(orgId))?.find?.((i: any) => i.id === ivrId)
+    const ivrList = await adminService.getIVRConfigs(orgId)
+    const ivr = Array.isArray(ivrList) ? ivrList.find((i: any) => i.id === ivrId) : null
     if (!ivr) return sendError(res, "IVR introuvable", 404)
 
     const flow = ivr.flow_json || {}
