@@ -41,6 +41,23 @@ export class EmailService {
     return { sent: true }
   }
 
+  async send({ to, subject, html }: { to: string; subject: string; html: string }) {
+    if (!to) throw new Error("Destinataire requis")
+
+    if (!config.email.apiKey || config.email.apiKey.startsWith("re_xxx")) {
+      console.log("[Email simule] To:", to, "| Subject:", subject)
+      return { simulated: true, to, subject }
+    }
+
+    await resend.emails.send({
+      from: config.email.fromName + " <" + config.email.from + ">",
+      to:   [to],
+      subject,
+      html,
+    })
+    return { sent: true, to, subject }
+  }
+
   async sendWelcomeEmail(email: string, name: string, orgName: string) {
     if (!config.email.apiKey || config.email.apiKey.startsWith("re_xxx")) {
       console.log("[Email simule] Welcome email pour:", email)
