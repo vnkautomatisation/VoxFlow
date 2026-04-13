@@ -766,5 +766,49 @@ router.get("/twiml/queue/:id", async (req: Request, res: Response) => {
     }
 })
 
+// ════════════════════════════════════════════════════════════
+//  NUMEROS BLOQUES
+// ════════════════════════════════════════════════════════════
+router.get("/blocked-numbers", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { data } = await supabaseAdmin
+            .from("blocked_numbers")
+            .select("id, phone, reason, created_at, created_by")
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false })
+        sendSuccess(res, data || [])
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.post("/blocked-numbers", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { phone, reason } = req.body
+        if (!phone) return sendError(res, "Numéro requis", 400)
+        const { data, error } = await supabaseAdmin.from("blocked_numbers").insert({
+            organization_id: orgId,
+            phone: phone.trim(),
+            reason: reason || null,
+            created_by: req.user!.userId,
+        }).select().single()
+        if (error) return sendError(res, error.message)
+        sendSuccess(res, data, 201)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.delete("/blocked-numbers/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { error } = await supabaseAdmin
+            .from("blocked_numbers")
+            .delete()
+            .eq("id", req.params.id)
+            .eq("organization_id", orgId)
+        if (error) return sendError(res, error.message)
+        sendSuccess(res, { deleted: true })
+    } catch (err: any) { sendError(res, err.message) }
+})
+
 router.use('/', voiceRoutes)
 export default router

@@ -378,6 +378,34 @@ router.post("/tags", authenticate, async (req: AuthRequest, res: Response) => {
     } catch (err: any) { sendError(res, err.message) }
 })
 
+router.patch("/tags/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const updates: any = {}
+        if (req.body.name) updates.name = req.body.name
+        if (req.body.color) updates.color = req.body.color
+        const { data, error } = await supabaseAdmin
+            .from("tags").update(updates)
+            .eq("id", req.params.id).eq("organization_id", orgId)
+            .select().single()
+        if (error) return sendError(res, error.message)
+        sendSuccess(res, data)
+    } catch (err: any) { sendError(res, err.message) }
+})
+
+router.delete("/tags/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        // Supprimer les associations contact_tags d abord
+        await supabaseAdmin.from("contact_tags").delete().eq("tag_id", req.params.id)
+        const { error } = await supabaseAdmin
+            .from("tags").delete()
+            .eq("id", req.params.id).eq("organization_id", orgId)
+        if (error) return sendError(res, error.message)
+        sendSuccess(res, { deleted: true })
+    } catch (err: any) { sendError(res, err.message) }
+})
+
 // ════════════════════════════════════════════════════════════
 //  ENRICHISSEMENT AUTOMATIQUE
 // ════════════════════════════════════════════════════════════

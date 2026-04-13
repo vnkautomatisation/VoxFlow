@@ -21,8 +21,10 @@ const NAV_GROUPS = [
             { label: 'Médias', href: '/admin/media', desc: 'Musiques et messages audio' },
             { label: 'Numéros DID',   href: '/admin/numbers',   desc: 'Numéros Twilio et assignations' },
             { label: 'Voicemails', href: '/admin/voicemails', desc: 'Messagerie vocale' },
+            { label: 'Enregistrements', href: '/admin/recordings', desc: 'Ecoute et recherche des appels' },
             { label: 'Horaires',      href: '/admin/schedules', desc: 'Heures ouverture et feries' },
             { label: 'Scripts',       href: '/admin/scripts',   desc: 'Scripts appel pour agents' },
+            { label: 'Tags',         href: '/admin/tags',      desc: 'Tags pour appels et contacts' },
         ],
     },
     {
@@ -32,6 +34,8 @@ const NAV_GROUPS = [
             { label: 'Rapports', href: '/admin/reports', desc: 'Graphiques, export CSV, par agent' },
             { label: 'Analytics', href: '/admin/analytics', desc: 'Heatmap et tendances' },
             { label: 'IA', href: '/admin/ia', desc: 'Coaching, quality scores' },
+            { label: 'Campagnes', href: '/admin/campaigns', desc: 'Robot dialer, prospection' },
+            { label: 'Wallboard', href: '/admin/wallboard', desc: 'KPIs plein ecran TV' },
         ],
     },
     {
@@ -98,6 +102,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }, [mobileOpen])
 
     if (!mounted || !isAuth) return null
+
+    // Wallboard = full-screen, pas de nav/layout
+    if (pathname === '/admin/wallboard') return <>{children}</>
 
     const activeGroup = NAV_GROUPS.find(g =>
         g.single ? pathname.startsWith(g.href!) : g.items?.some(i => pathname.startsWith(i.href))
