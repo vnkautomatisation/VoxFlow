@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useAuthStore } from "@/store/authStore"
 import { adminApi } from "@/lib/adminApi"
+import { ConfirmModal } from "@/components/shared/VFModal"
 
 interface Queue {
   id:          string
@@ -44,12 +45,14 @@ export default function QueuesTab({ queues, onRefresh }: Props) {
     finally { setLoading(false) }
   }
 
+  const [deleteQueueId, setDeleteQueueId] = useState<string | null>(null)
+
   const handleDelete = async (queueId: string) => {
-    if (!confirm("Supprimer cette file ?")) return
     try {
       await adminApi.deleteQueue(accessToken!, queueId)
       onRefresh()
     } catch (err) { console.error(err) }
+    setDeleteQueueId(null)
   }
 
   return (
@@ -135,7 +138,7 @@ export default function QueuesTab({ queues, onRefresh }: Props) {
                 <p className="text-gray-500 text-xs mt-0.5">{queue.description}</p>
               </div>
               <button
-                onClick={() => handleDelete(queue.id)}
+                onClick={() => setDeleteQueueId(queue.id)}
                 className="text-gray-600 hover:text-red-400 text-xs transition-colors"
               >
                 Supprimer
@@ -152,6 +155,11 @@ export default function QueuesTab({ queues, onRefresh }: Props) {
           </div>
         ))}
       </div>
+
+      {deleteQueueId && (
+        <ConfirmModal title="Supprimer cette file d'attente ?" message="Les appels en attente seront perdus." confirmLabel="Supprimer" danger
+          onConfirm={() => handleDelete(deleteQueueId)} onCancel={() => setDeleteQueueId(null)} />
+      )}
     </div>
   )
 }
