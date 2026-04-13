@@ -611,6 +611,7 @@ export default function CRMPage() {
 
     const [deleteId, setDeleteId] = useState<string | null>(null)
     const [showNewAppt, setShowNewAppt] = useState(false)
+    const [editAppt, setEditAppt] = useState<any>(null)
     const [showNewTpl, setShowNewTpl] = useState(false)
     const [showNewField, setShowNewField] = useState(false)
     const [showQuoteModal, setShowQuoteModal] = useState(false)
@@ -1047,16 +1048,25 @@ export default function CRMPage() {
                 <ConfirmModal title="Supprimer ce contact ?" message="Cette action est irreversible." confirmLabel="Supprimer" danger
                     onConfirm={() => { deleteContact(deleteId); setDeleteId(null) }} onCancel={() => setDeleteId(null)} />
             )}
-            {showNewAppt && (
-                <PromptModal title="Nouveau rendez-vous" submitLabel="Planifier" wide
+            {showNewAppt && (() => {
+                const ea = editAppt
+                const fmtDT = (iso: string) => { try { return new Date(iso).toISOString().slice(0, 16) } catch { return '' } }
+                const calcDur = () => {
+                    if (!ea?.starts_at || !ea?.ends_at) return '30'
+                    const d = Math.round((new Date(ea.ends_at).getTime() - new Date(ea.starts_at).getTime()) / 60000)
+                    return [15, 30, 45, 60, 90, 120].includes(d) ? String(d) : '30'
+                }
+                return (
+                <PromptModal title={ea ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'} submitLabel={ea ? 'Sauvegarder' : 'Planifier'} wide
                     fields={[
-                        { key: 'title', label: 'Titre', placeholder: 'Appel de suivi, reunion decouverte...', required: true, colSpan: 2 },
+                        { key: 'title', label: 'Titre', placeholder: 'Appel de suivi, reunion decouverte...', required: true, colSpan: 2, defaultValue: ea?.title || '' },
                         { key: 'contact_id', label: 'Contact', type: 'select' as const, required: true, colSpan: 1,
                           options: contacts.map(c => ({ value: c.id, label: contactName(c) + (c.company ? ` (${c.company})` : '') })),
-                          defaultValue: selContact?.id || '',
+                          defaultValue: ea?.contact_id || selContact?.id || '',
                           placeholder: '-- Choisir un contact --' },
                         { key: 'agent_id', label: 'Agent assigne', type: 'select' as const, colSpan: 1,
                           options: agents.map((a: any) => ({ value: a.id, label: a.name || `${a.first_name || ''} ${a.last_name || ''}`.trim() })),
+                          defaultValue: ea?.agent_id || '',
                           placeholder: '-- Choisir un agent --' },
                         { key: 'type', label: 'Type', type: 'select' as const, required: true, colSpan: 1,
                           options: [
@@ -1064,7 +1074,7 @@ export default function CRMPage() {
                             { value: 'VIDEO', label: 'Visioconference' },
                             { value: 'MEETING', label: 'Reunion en personne' },
                             { value: 'VISIT', label: 'Visite client' },
-                          ], defaultValue: 'CALL' },
+                          ], defaultValue: ea?.type || 'CALL' },
                         { key: 'duration', label: 'Duree', type: 'select' as const, required: true, colSpan: 1,
                           options: [
                             { value: '15', label: '15 minutes' },
@@ -1073,14 +1083,14 @@ export default function CRMPage() {
                             { value: '60', label: '1 heure' },
                             { value: '90', label: '1h30' },
                             { value: '120', label: '2 heures' },
-                          ], defaultValue: '30' },
-                        { key: 'starts_at', label: 'Date et heure', type: 'datetime-local' as const, required: true, colSpan: 1 },
-                        { key: 'location', label: 'Lieu', placeholder: 'Bureau, Teams, Zoom, Telephone...', colSpan: 1 },
-                        { key: 'notes', label: 'Notes', type: 'textarea' as const, placeholder: 'Details du rendez-vous...', rows: 2, colSpan: 2 },
+                          ], defaultValue: ea ? calcDur() : '30' },
+                        { key: 'starts_at', label: 'Date et heure', type: 'datetime-local' as const, required: true, colSpan: 1, defaultValue: ea?.starts_at ? fmtDT(ea.starts_at) : '' },
+                        { key: 'location', label: 'Lieu', placeholder: 'Bureau, Teams, Zoom, Telephone...', colSpan: 1, defaultValue: ea?.location || '' },
+                        { key: 'notes', label: 'Notes', type: 'textarea' as const, placeholder: 'Details du rendez-vous...', rows: 2, colSpan: 2, defaultValue: ea?.notes || '' },
                     ]}
-                    onSubmit={vals => {
+                    onSubmit={async vals => {
                         const durationMs = parseInt(vals.duration || '30') * 60000
-                        createAppointment({
+                        const payload = {
                             title: vals.title,
                             contact_id: vals.contact_id,
                             agent_id: vals.agent_id || undefined,
@@ -1089,12 +1099,35 @@ export default function CRMPage() {
                             ends_at: new Date(new Date(vals.starts_at).getTime() + durationMs).toISOString(),
                             location: vals.location || undefined,
                             notes: vals.notes || undefined,
-                        })
-                        showToast('Rendez-vous planifie')
+                        }
+                        if (ea?.id) {
+                            await apiFetch(`/api/v1/crm/appointments/${ea.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+                            showToast('Rendez-vous modifie')
+                        } else {
+                            await createAppointment(payload)
+                            showToast('Rendez-vous planifie')
+                        }
+                        loadCalendar()
                         setShowNewAppt(false)
+                        setEditAppt(null)
                     }}
-                    onCancel={() => setShowNewAppt(false)} />
-            )}
+                    onCancel={() => { setShowNewAppt(false); setEditAppt(null) }}>
+                    {ea?.id && (
+                        <div className="mt-4 pt-4 border-t border-[#2e2e44]">
+                            <button type="button" onClick={async () => {
+                                await apiFetch(`/api/v1/crm/appointments/${ea.id}`, { method: 'DELETE' })
+                                showToast('Rendez-vous supprime')
+                                loadCalendar()
+                                setShowNewAppt(false)
+                                setEditAppt(null)
+                            }} className="text-xs font-bold text-[#ff4d6d] border border-[#ff4d6d]/30 bg-[#ff4d6d]/10 px-4 py-2 rounded-lg hover:bg-[#ff4d6d]/20 transition-colors">
+                                Supprimer ce rendez-vous
+                            </button>
+                        </div>
+                    )}
+                </PromptModal>
+                )
+            })()}
             {showNewTpl && (
                 <PromptModal title="Nouveau template email" submitLabel="Creer" wide
                     fields={[
@@ -1149,6 +1182,7 @@ export default function CRMPage() {
                                 setShowNewAppt(true)
                             }}
                             onSelect={(apt) => {
+                                setEditAppt(apt)
                                 setShowNewAppt(true)
                             }}
                         />
@@ -1505,6 +1539,22 @@ export default function CRMPage() {
                                 setShowTplEditor(null)
                             }}
                                 className="text-xs font-bold text-[#ff4d6d] border border-[#ff4d6d]/30 bg-[#ff4d6d]/10 px-4 py-2 rounded-lg hover:bg-[#ff4d6d]/20 transition-colors">Supprimer</button>
+                            <div className="flex items-center gap-2">
+                                <select value={showTplEditor._sendTo || ''} onChange={e => setShowTplEditor((p: any) => ({ ...p, _sendTo: e.target.value }))}
+                                    className="bg-[#111118] border border-[#2e2e44] rounded-lg px-2 py-2 text-[10px] text-[#eeeef8] outline-none w-40">
+                                    <option value="">-- Envoyer a --</option>
+                                    {contacts.filter(c => c.email).map(c => <option key={c.id} value={c.id}>{contactName(c)}</option>)}
+                                </select>
+                                <button onClick={async () => {
+                                    if (!showTplEditor._sendTo) { showToast('Choisissez un contact', 'err'); return }
+                                    const r = await apiFetch(`/api/v1/crm/email-templates/${showTplEditor.id}/send`, {
+                                        method: 'POST', body: JSON.stringify({ contact_id: showTplEditor._sendTo })
+                                    })
+                                    if (r.success) showToast(`Email envoye a ${r.data?.to || 'contact'}`)
+                                    else showToast(r.error || 'Erreur envoi', 'err')
+                                }}
+                                    className="text-xs font-bold text-emerald-400 border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 rounded-lg hover:bg-emerald-400/20 transition-colors">Envoyer</button>
+                            </div>
                             <div className="flex-1" />
                             <button onClick={() => setShowTplEditor(null)}
                                 className="text-xs font-bold text-[#9898b8] border border-[#2e2e44] bg-[#1f1f2a] px-4 py-2 rounded-lg hover:text-[#eeeef8] transition-colors">Annuler</button>

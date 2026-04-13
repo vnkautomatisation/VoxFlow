@@ -13,6 +13,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [editProduct, setEditProduct] = useState<any>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = async () => {
@@ -64,6 +65,7 @@ export default function ProductsPage() {
                 <div className="text-sm font-bold text-[#7b61ff]">{((p.price_monthly || 0) / 100).toFixed(2)} CAD</div>
                 <div className="text-[9px] text-[#55557a]">/mois</div>
               </div>
+              <button onClick={() => setEditProduct(p)} className="text-[10px] text-[#7b61ff] hover:text-[#a695ff] mr-2">Modifier</button>
               <button onClick={() => setDeleting(p.id)} className="text-[10px] text-[#ff4d6d55] hover:text-[#ff4d6d]">Desactiver</button>
             </div>
           </div>
@@ -83,6 +85,25 @@ export default function ProductsPage() {
           submitLabel="Creer"
           onSubmit={create}
           onCancel={() => setShowNew(false)}
+        />
+      )}
+
+      {editProduct && (
+        <PromptModal
+          title="Modifier le produit"
+          fields={[
+            { key: 'sku', label: 'SKU', defaultValue: editProduct.sku, required: true },
+            { key: 'name', label: 'Nom du produit', defaultValue: editProduct.name, required: true },
+            { key: 'country', label: 'Pays', defaultValue: editProduct.country || 'CA' },
+            { key: 'price', label: 'Prix mensuel (cents CAD)', defaultValue: String(editProduct.price_monthly || 500), type: 'number' as const },
+          ]}
+          submitLabel="Sauvegarder"
+          onSubmit={async vals => {
+            await api(`/api/v1/owner/products/${editProduct.id}`, { method: 'PATCH', body: JSON.stringify({ sku: vals.sku, name: vals.name, country: vals.country, price_monthly: Number(vals.price) || 500 }) })
+            setEditProduct(null)
+            load()
+          }}
+          onCancel={() => setEditProduct(null)}
         />
       )}
 

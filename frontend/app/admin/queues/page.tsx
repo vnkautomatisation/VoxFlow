@@ -63,6 +63,16 @@ export default function QueuesPage() {
     const [delConfirm, setDelConfirm] = useState<string | null>(null)
     const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
     const [queueAgents, setQueueAgents] = useState<string[]>([])
+    const [queueAgentIds, setQueueAgentIds] = useState<string[]>([])
+    const allAgents = agents
+
+    const loadQueueAgents = async (queueId: string) => {
+        try {
+            const r = await apiFetch(`/api/v1/admin/queues/${queueId}`)
+            if (r.success && r.data?.agents) setQueueAgentIds(r.data.agents.map((a: any) => a.agent_id || a.user_id || a.id))
+            else setQueueAgentIds([])
+        } catch { setQueueAgentIds([]) }
+    }
 
     const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
         setToast({ msg, type })
@@ -101,9 +111,11 @@ export default function QueuesPage() {
             is_vip: queue.is_vip || false,
             callback_enabled: queue.callback_enabled !== false,
         })
-        // Agents assignés à cette file
+        // Agents assignes a cette file
         const assigned = agents.filter(a => (a as any).queue_ids?.includes(queue.id)).map(a => a.id)
         setQueueAgents(assigned)
+        setQueueAgentIds(assigned)
+        loadQueueAgents(queue.id)
         setShowDrawer(true)
     }
 
@@ -418,11 +430,37 @@ export default function QueuesPage() {
                             {/* Agents assignés */}
                             <section>
                                 <div className="text-[10px] font-bold uppercase tracking-widest text-[#55557a] mb-3 flex items-center gap-2">
-                                    <div className="flex-1 h-px bg-[#2e2e44]" />Agents assignés<div className="flex-1 h-px bg-[#2e2e44]" />
+                                    <div className="flex-1 h-px bg-[#2e2e44]" />Agents assignes<div className="flex-1 h-px bg-[#2e2e44]" />
                                 </div>
-                                <div className="text-xs text-[#55557a] bg-[#1f1f2a] rounded-lg p-3">
-                                    Pour assigner des agents à cette file, modifiez l'agent depuis la page <button onClick={() => router.push('/admin/agents')} className="text-[#7b61ff] hover:underline">Agents</button> et cochez cette file.
-                                </div>
+                                {allAgents.length === 0 ? (
+                                    <div className="text-xs text-[#55557a] bg-[#1f1f2a] rounded-lg p-3">Aucun agent. Creez un agent depuis la page <button onClick={() => router.push('/admin/agents')} className="text-[#7b61ff] hover:underline">Agents</button>.</div>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        {allAgents.map((a: any) => {
+                                            const assigned = queueAgentIds.includes(a.id)
+                                            return (
+                                                <label key={a.id} className="flex items-center gap-3 bg-[#1f1f2a] rounded-lg px-3 py-2 cursor-pointer hover:bg-[#252535] transition-colors">
+                                                    <input type="checkbox" checked={assigned}
+                                                        onChange={async () => {
+                                                            try {
+                                                                if (assigned) {
+                                                                    await apiFetch(`/api/v1/admin/queues/${selectedQueue.id}/agents/${a.id}`, { method: 'DELETE' })
+                                                                } else {
+                                                                    await apiFetch(`/api/v1/admin/queues/${selectedQueue.id}/agents`, { method: 'POST', body: JSON.stringify({ agentId: a.id }) })
+                                                                }
+                                                                loadQueueAgents(selectedQueue.id)
+                                                            } catch {}
+                                                        }}
+                                                        className="w-4 h-4 rounded border-[#2e2e44] bg-[#111118] accent-[#7b61ff]" />
+                                                    <div className="flex-1">
+                                                        <div className="text-xs font-semibold text-[#eeeef8]">{a.name}</div>
+                                                        <div className="text-[10px] text-[#55557a]">{a.email}{a.extension ? ` · EXT ${a.extension}` : ''}</div>
+                                                    </div>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                )}
                             </section>
 
                             {/* Zone danger */}
