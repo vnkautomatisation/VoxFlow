@@ -743,7 +743,7 @@ export default function CRMPage() {
                         const selected = filtered.filter(c => c.phone)
                         if (!selected.length) { showToast('Aucun contact avec telephone', 'err'); return }
                         try {
-                            const r = await apiFetch('/api/v1/robot/campaigns', {
+                            const r = await apiFetch('/api/v1/ai2/campaigns', {
                                 method: 'POST',
                                 body: JSON.stringify({
                                     name: `Campagne CRM — ${new Date().toLocaleDateString('fr-CA')}`,
@@ -1144,8 +1144,11 @@ export default function CRMPage() {
                     ) : (
                         <CRMCalendar
                             appointments={appointments}
+                            contacts={contacts}
                             onCreate={(start, end) => {
-                                // Pre-remplir le modal avec les dates selectionnees
+                                setShowNewAppt(true)
+                            }}
+                            onSelect={(apt) => {
                                 setShowNewAppt(true)
                             }}
                         />
