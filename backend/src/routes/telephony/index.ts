@@ -503,26 +503,58 @@ router.get("/lookup/:phone", authenticate, async (req: AuthRequest, res: Respons
 router.post("/webhook/voice", async (req: Request, res: Response) => {
     try {
         const { From, To, CallSid } = req.body
-        const orgId = String(req.query.orgId || "org_test_001")
-        const contact = orgId ? await findContactByPhone(From, orgId) : null
-        if (orgId) {
-            await supabaseAdmin.from("calls").insert({
-                organization_id: orgId, twilio_sid: CallSid, from_number: From, to_number: To,
-                direction: "INBOUND", status: "RINGING", contact_id: contact?.id || null,
-                started_at: new Date().toISOString(),
-            })
+
+        // Trouver l'org via le numero appele (To) dans phone_numbers
+        // Fallback sur orgId en query string (pour compat legacy)
+        let orgId = ''
+        if (To) {
+            const { data: phone } = await supabaseAdmin
+                .from("phone_numbers").select("organization_id")
+                .eq("number", To).limit(1).single()
+            if (phone) orgId = phone.organization_id
         }
-        let agentIdentity = "agent-default"
-        if (orgId) {
-            const { data: agents } = await supabaseAdmin.from("agents").select("user_id")
-                .eq("organization_id", orgId).eq("status", "ONLINE").limit(1)
-            if (agents?.length) agentIdentity = agents[0].user_id
+        if (!orgId) orgId = String(req.query.orgId || '')
+        if (!orgId) {
+            console.error("[webhook/voice] No org found for number:", To)
+            res.set("Content-Type", "text/xml")
+            return res.send(`<?xml version="1.0"?><Response><Say language="fr-CA">Numero non configure.</Say><Hangup/></Response>`)
         }
+
+        const contact = await findContactByPhone(From, orgId)
+
+        // Creer la row calls
+        await supabaseAdmin.from("calls").insert({
+            organization_id: orgId, twilio_sid: CallSid, from_number: From, to_number: To,
+            direction: "INBOUND", status: "RINGING", contact_id: contact?.id || null,
+            started_at: new Date().toISOString(),
+        })
+
+        // Trouver un agent ONLINE (pas busy) pour router l'appel
+        let agentIdentity = ""
+        const { data: agents } = await supabaseAdmin.from("agents").select("user_id")
+            .eq("organization_id", orgId).eq("status", "ONLINE").limit(1)
+        if (agents?.length) {
+            agentIdentity = agents[0].user_id
+            // Marquer l'agent comme BUSY
+            await supabaseAdmin.from("agents").update({ status: "BUSY" }).eq("user_id", agentIdentity)
+        }
+
+        if (agentIdentity) {
+            res.set("Content-Type", "text/xml")
+            res.send(twilioService.generateIncomingTwiML({ agentIdentity }))
+        } else {
+            // Aucun agent dispo → voicemail
+            const vmUrl = BACKEND() + "/api/v1/telephony/webhook/voicemail?orgId=" + orgId
+            res.set("Content-Type", "text/xml")
+            res.send(`<?xml version="1.0"?><Response>
+                <Say language="fr-CA">Tous nos agents sont occupes. Laissez un message apres le signal.</Say>
+                <Record maxLength="120" playBeep="true" recordingStatusCallback="${vmUrl}"/>
+            </Response>`)
+        }
+    } catch (err: any) {
+        console.error("[webhook/voice]", err.message)
         res.set("Content-Type", "text/xml")
-        res.send(twilioService.generateIncomingTwiML({ agentIdentity }))
-    } catch {
-        res.set("Content-Type", "text/xml")
-        res.send(`<?xml version="1.0"?><Response><Say language="fr-CA">Erreur. Rappellez.</Say></Response>`)
+        res.send(`<?xml version="1.0"?><Response><Say language="fr-CA">Erreur. Rappelez plus tard.</Say></Response>`)
     }
 })
 
