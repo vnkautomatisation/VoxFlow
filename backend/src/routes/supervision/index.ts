@@ -151,10 +151,22 @@ router.get("/log", async (req: AuthRequest, res: Response) => {
 router.post("/heartbeat", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
-    const { status } = req.body // ONLINE, BREAK, etc.
-    const update: any = { last_seen_at: new Date().toISOString() }
-    if (status) update.status = status
-    await supabaseAdmin.from("agents").update(update).eq("user_id", userId)
+    const orgId = req.user!.organizationId
+    const { status } = req.body
+    const now = new Date().toISOString()
+
+    // Upsert : creer l'entree agent si elle n'existe pas
+    const { data: existing } = await supabaseAdmin
+      .from("agents").select("user_id").eq("user_id", userId).single()
+
+    if (existing) {
+      await supabaseAdmin.from("agents")
+        .update({ status: status || 'ONLINE', last_seen_at: now })
+        .eq("user_id", userId)
+    } else {
+      await supabaseAdmin.from("agents")
+        .insert({ user_id: userId, organization_id: orgId, status: status || 'ONLINE', last_seen_at: now })
+    }
     sendSuccess(res, { ok: true })
   } catch (err: any) { sendError(res, err.message) }
 })
