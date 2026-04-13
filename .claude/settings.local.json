@@ -24,7 +24,12 @@
       "Bash(powershell -Command \"Stop-Process -Id 30544 -Force\")",
       "Read(//f/Logiciel/Developpement/GIT/VoxFlow/backend/**)",
       "Bash(npm run:*)",
-      "Bash(powershell -Command 'Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }')"
+      "Bash(powershell -Command 'Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }')",
+      "Bash(npx tsx:*)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\);const j=JSON.parse\\(d\\);console.log\\('success:',j.success,'services:',Object.keys\\(j.data?.services||{}\\),'addons:',j.data?.addons?.length\\)\")",
+      "Bash(curl -s http://localhost:4000/api/v1/billing/plans)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\);const j=JSON.parse\\(d\\);console.log\\('success:',j.success,'plans:',j.data?.plans?.length,'modules:',j.data?.modules?.length\\)\")",
+      "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('OK services:',list\\(d.get\\('data',{}\\).get\\('services',{}\\).keys\\(\\)\\),'addons:',len\\(d.get\\('data',{}\\).get\\('addons',[]\\)\\)\\)\")"
     ]
   }
 }
