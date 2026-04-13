@@ -482,6 +482,8 @@ export function useDialer() {
                 })
             } catch { }
             setView('main')
+            // Demander permission notification pour appels entrants
+            try { if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission() } catch {}
             await loadData()
             startPoll()
         } else {
@@ -625,6 +627,51 @@ export function useDialer() {
         S.current._inCo = co || null
         setIncoming({ from, co })
         setView('incoming')
+
+        // ── Notification browser (meme si onglet en arriere-plan) ──
+        const callerName = co ? `${co.first_name} ${co.last_name}`.trim() : from
+        try {
+            if (Notification.permission === 'granted') {
+                const n = new Notification('Appel entrant', {
+                    body: callerName,
+                    icon: '/icons/icon-192.png',
+                    tag: 'vf-incoming',
+                    requireInteraction: true,
+                })
+                n.onclick = () => { window.focus(); n.close() }
+                call.on('cancel', () => n.close())
+                call.on('disconnect', () => n.close())
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission()
+            }
+        } catch {}
+
+        // ── Son de sonnerie ──
+        try {
+            const ring = new Audio('/sounds/ringtone.mp3')
+            ring.loop = true
+            ring.volume = 0.7
+            ring.play().catch(() => {})
+            call.on('cancel', () => { ring.pause(); ring.currentTime = 0 })
+            call.on('disconnect', () => { ring.pause(); ring.currentTime = 0 })
+            // Arreter a la reponse aussi
+            const origAccept = call.accept?.bind(call)
+            if (origAccept) {
+                call.accept = (...args: any[]) => { ring.pause(); ring.currentTime = 0; return origAccept(...args) }
+            }
+        } catch {}
+
+        // ── Titre onglet clignotant ──
+        const origTitle = document.title
+        let blink: ReturnType<typeof setInterval> | null = null
+        let on = false
+        blink = setInterval(() => {
+            document.title = on ? `APPEL — ${callerName}` : origTitle
+            on = !on
+        }, 800)
+        call.on('cancel', () => { if (blink) clearInterval(blink); document.title = origTitle })
+        call.on('disconnect', () => { if (blink) clearInterval(blink); document.title = origTitle })
+
         call.on('cancel', () => { vfGlobals.clearCall(); setView('main') })
     }, [api])
 
@@ -634,6 +681,8 @@ export function useDialer() {
             call.accept()
             call.on('disconnect', endCallCleanup)
         }
+        // Arreter le titre clignotant
+        document.title = 'VoxFlow Dialer'
         S.current.contact = incoming?.co || null
         setContact(incoming?.co || null)
         S.current.dir = 'INBOUND'
