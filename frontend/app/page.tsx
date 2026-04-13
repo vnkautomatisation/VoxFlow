@@ -112,7 +112,7 @@ const pricingPlans = [
 
 export default function LandingPage() {
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", background: bg, color: '#fff', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", background: bg, color: '#fff', height: '100vh', overflowY: 'auto' }}>
       {/* Google Font */}
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link
