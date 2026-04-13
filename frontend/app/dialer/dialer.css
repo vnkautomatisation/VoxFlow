@@ -406,32 +406,11 @@ html, body {
         height: 100%;
         overflow-y: auto;
         overflow-x: hidden;
+        scrollbar-width: none;
     }
 
-    /* Scrollbar dialer : invisible par defaut, apparait au hover.
-       Sur le pane composer (keypad), le contenu peut depasser en
-       hauteur quand il y a des recents — le scroll est fonctionnel
-       mais la barre est cachee pour ne pas polluer le design. */
     .pane.on::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .pane.on::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .pane.on::-webkit-scrollbar-thumb {
-        background: transparent;
-        border-radius: 3px;
-        transition: background .2s;
-    }
-
-    .pane.on:hover::-webkit-scrollbar-thumb {
-        background: var(--line2);
-    }
-
-    .pane.on::-webkit-scrollbar-thumb:hover {
-        background: var(--violet);
+        display: none;
     }
 
 .p12 {
