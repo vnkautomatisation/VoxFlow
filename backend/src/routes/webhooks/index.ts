@@ -77,14 +77,15 @@ router.post("/twilio/robot-result", async (req: Request, res: Response) => {
       : newStatus === "no_answer" ? "no_answer" : "failed"
 
     const { data: camp } = await supabaseAdmin.from("robot_campaigns_v2")
-      .select(`called, ${counterField}, minutes_used, max_attempts, status, total_contacts`)
+      .select("called, answered_human, answered_machine, no_answer, failed, minutes_used, max_attempts, status, total_contacts")
       .eq("id", contact.campaign_id).single()
 
     if (camp) {
+      const c = camp as any
       await supabaseAdmin.from("robot_campaigns_v2").update({
-        called: (camp.called || 0) + 1,
-        [counterField]: (camp[counterField] || 0) + 1,
-        minutes_used: parseFloat(camp.minutes_used || "0") + durationMin,
+        called: (c.called || 0) + 1,
+        [counterField]: (c[counterField] || 0) + 1,
+        minutes_used: parseFloat(c.minutes_used || "0") + durationMin,
       }).eq("id", contact.campaign_id)
 
       // Track minutes for billing
@@ -93,7 +94,7 @@ router.post("/twilio/robot-result", async (req: Request, res: Response) => {
       }
 
       // Recycle no_answer contacts
-      if (newStatus === "no_answer" && (contact.call_attempts || 0) + 1 < (camp.max_attempts || 3) && camp.status === "running") {
+      if (newStatus === "no_answer" && (contact.call_attempts || 0) + 1 < (c.max_attempts || 3) && c.status === "running") {
         await supabaseAdmin.from("robot_contacts").update({ status: "pending" }).eq("id", contact.id)
       }
 
