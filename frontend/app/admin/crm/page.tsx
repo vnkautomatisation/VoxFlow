@@ -1359,11 +1359,15 @@ export default function CRMPage() {
                         </div>
                         {/* Actions */}
                         <div className="px-6 py-4 border-t border-[#2e2e44] flex gap-2 flex-shrink-0">
-                            <button onClick={() => generateQuotePDF(showQuotePreview)}
-                                className="flex items-center gap-1.5 text-xs font-bold text-[#7b61ff] border border-[#7b61ff]/30 bg-[#7b61ff]/10 px-4 py-2 rounded-lg hover:bg-[#7b61ff]/20 transition-colors">
-                                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                                Telecharger PDF
-                            </button>
+                            {/* PDF seulement si envoye ou accepte */}
+                            {(showQuotePreview.status === 'SENT' || showQuotePreview.status === 'ACCEPTED') && (
+                                <button onClick={() => generateQuotePDF(showQuotePreview)}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#7b61ff] border border-[#7b61ff]/30 bg-[#7b61ff]/10 px-4 py-2 rounded-lg hover:bg-[#7b61ff]/20 transition-colors">
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                    Telecharger PDF
+                                </button>
+                            )}
+                            {/* Envoyer seulement si brouillon */}
                             {showQuotePreview.status === 'DRAFT' && (
                                 <button onClick={async () => {
                                     await apiFetch(`/api/v1/crm/quotes/${showQuotePreview.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'SENT' }) })
@@ -1376,6 +1380,7 @@ export default function CRMPage() {
                                     Marquer envoye
                                 </button>
                             )}
+                            {/* Accepter/Refuser si brouillon ou envoye */}
                             {(showQuotePreview.status === 'SENT' || showQuotePreview.status === 'DRAFT') && (
                                 <>
                                     <button onClick={async () => {
