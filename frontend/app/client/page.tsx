@@ -72,10 +72,41 @@ function statusBadge(status: string) {
   }
 }
 
+// -- Telephony summary type --
+interface TelSummary {
+  activePlan: { plan_code: string; name: string; price_monthly: number; destinations: string[] } | null
+  billingCycle: string
+  status: string | null
+  nbAgentsActive: number
+  monthlyTotal: number
+  trialEndsAt: string | null
+}
+
+// -- Addon summary type --
+interface AddonModule {
+  module_type: string; plan_code: string; status: string; price_monthly: number
+}
+interface AddonSummaryDash {
+  activeModules: AddonModule[]
+  monthlyTotal: number
+  smsUsage: { smsSent: number; smsReceived: number; smsIncluded: number; percentUsed: number }
+}
+
+// -- Robot summary type --
+interface RobotSummaryDash {
+  activePlan: { plan_code: string; name: string; price_monthly: number; minutes_included: number } | null
+  status: string | null
+  minutesUsage: { minutesUsed: number; minutesIncluded: number; minutesRemaining: number; minutesOverage: number; percentUsed: number }
+  creditsBalance: number
+}
+
 // -- Main Page --
 export default function ClientDashboardPage() {
   const api = useApi()
   const [data, setData] = useState<DashboardData | null>(null)
+  const [telSummary, setTelSummary] = useState<TelSummary | null>(null)
+  const [addonSummary, setAddonSummary] = useState<AddonSummaryDash | null>(null)
+  const [robotSummary, setRobotSummary] = useState<RobotSummaryDash | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -83,14 +114,22 @@ export default function ClientDashboardPage() {
     let cancelled = false
     async function load() {
       try {
-        const res = await api('/api/v1/client/portal/dashboard')
-        const d = res.data || res
+        const [dashRes, telRes, addonRes, robotRes] = await Promise.all([
+          api('/api/v1/client/portal/dashboard'),
+          api('/api/v1/billing/telephony/summary').catch(() => ({ success: false })),
+          api('/api/v1/billing/addons/summary').catch(() => ({ success: false })),
+          api('/api/v1/billing/robot/summary').catch(() => ({ success: false })),
+        ])
+        const d = dashRes.data || dashRes
         if (!cancelled) {
           if (d.org) {
             setData(d)
           } else {
-            setError(res.error || 'Impossible de charger le tableau de bord')
+            setError(dashRes.error || 'Impossible de charger le tableau de bord')
           }
+          if (telRes.success) setTelSummary(telRes.data)
+          if ((addonRes as any).success) setAddonSummary((addonRes as any).data)
+          if ((robotRes as any).success) setRobotSummary((robotRes as any).data)
         }
       } catch {
         if (!cancelled) setError('Erreur de connexion au serveur')
@@ -308,6 +347,166 @@ export default function ClientDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* -- Telephony card -- */}
+      {telSummary && telSummary.activePlan && (
+        <div className="mb-7">
+          <h2 className="text-base font-bold text-[#9898b8] mb-3.5">Telephonie</h2>
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5">
+            {telSummary.status === 'trialing' && telSummary.trialEndsAt && (
+              <div className="bg-blue-950/50 border border-blue-800/40 rounded-lg px-4 py-2 mb-4 flex items-center gap-2 text-[12px] text-blue-300 font-semibold">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Essai gratuit — {daysUntil(telSummary.trialEndsAt)} jours restants
+              </div>
+            )}
+            {telSummary.status === 'past_due' && (
+              <div className="bg-red-950/50 border border-red-800/40 rounded-lg px-4 py-2 mb-4 flex items-center justify-between text-[12px] text-red-300 font-semibold">
+                <span>Paiement en retard</span>
+                <Link href="/client/plans" className="text-red-400 underline text-[11px] no-underline hover:text-red-300">Mettre a jour la carte</Link>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-900/50 text-blue-400">Telephonie</span>
+                <span className="text-sm font-semibold text-[#eeeef8]">{telSummary.activePlan.name}</span>
+                <span className="text-[12px] text-[#55557a]">{telSummary.nbAgentsActive} agent{telSummary.nbAgentsActive > 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-bold text-[#eeeef8]">
+                  {formatCAD(telSummary.monthlyTotal / 100)}
+                  <span className="text-[11px] text-[#55557a] font-normal"> /mois</span>
+                </span>
+                {telSummary.status && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${telSummary.status === 'active' ? 'bg-emerald-900/40 text-[#00d4aa]' : telSummary.status === 'trialing' ? 'bg-blue-900/40 text-blue-400' : 'bg-red-900/40 text-[#ff4d6d]'}`}>
+                    {telSummary.status === 'active' ? 'Actif' : telSummary.status === 'trialing' ? 'Essai' : telSummary.status === 'past_due' ? 'En retard' : telSummary.status}
+                  </span>
+                )}
+                <Link href="/client/plans" className="inline-block text-[11px] font-semibold text-[#7b61ff] px-3 py-1 border border-[#7b61ff]/25 rounded-lg no-underline bg-[#7b61ff]/5 hover:bg-[#7b61ff]/15 transition-colors">
+                  Gerer
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Telephony CTA when no active plan */}
+      {telSummary && !telSummary.activePlan && !hasSubscriptions && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl py-10 px-8 text-center">
+            <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto mb-4">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.79a16 16 0 0 0 6.29 6.29l1.86-1.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </div>
+            <h3 className="text-base font-bold text-[#eeeef8] mb-2">Commencer avec la telephonie VoxFlow</h3>
+            <p className="text-[12px] text-[#55557a] mb-5 max-w-[340px] mx-auto">Appels illimites, CRM integre, supervision live et plus encore.</p>
+            <Link href="/commander?service=telephony" className="inline-flex items-center gap-2 bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-6 py-2.5 text-sm font-bold no-underline transition-colors">
+              Decouvrir les forfaits
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* -- Active modules -- */}
+      {addonSummary && addonSummary.activeModules.length > 0 && (
+        <div className="mb-7">
+          <div className="flex items-center justify-between mb-3.5">
+            <h2 className="text-base font-bold text-[#9898b8]">Modules actifs</h2>
+            <Link href="/client/plans" className="text-[11px] font-semibold text-[#7b61ff] no-underline hover:underline">Gerer les modules</Link>
+          </div>
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl divide-y divide-[#2e2e44]/60">
+            {addonSummary.activeModules.map(m => (
+              <div key={m.module_type} className="flex items-center justify-between px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-[#7b61ff]/10 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7b61ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+                  </div>
+                  <span className="text-[13px] font-semibold text-[#eeeef8]">{m.plan_code.replace('MODULE_', '').replace(/_/g, ' ')}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${m.status === 'active' ? 'bg-emerald-900/40 text-emerald-400' : m.status === 'trialing' ? 'bg-blue-900/40 text-blue-400' : 'bg-orange-900/40 text-orange-400'}`}>
+                    {m.status === 'active' ? 'Actif' : m.status === 'trialing' ? 'Essai' : m.status}
+                  </span>
+                  <span className="text-[12px] text-[#9898b8]">{formatCAD(m.price_monthly / 100)}/mois</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* SMS quota alert */}
+          {addonSummary.smsUsage && addonSummary.smsUsage.percentUsed > 80 && addonSummary.activeModules.some(m => m.module_type === 'sms') && (
+            <div className="bg-orange-950/40 border border-orange-800/30 rounded-lg px-4 py-2.5 mt-3 flex items-center gap-2 text-[12px] text-orange-300 font-semibold">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Quota SMS bientot atteint — {Math.max(0, addonSummary.smsUsage.smsIncluded - addonSummary.smsUsage.smsSent - addonSummary.smsUsage.smsReceived)} SMS restants ce mois.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Module CTA when no modules active */}
+      {(!addonSummary || addonSummary.activeModules.length === 0) && telSummary?.activePlan && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl py-8 px-6 text-center">
+            <h3 className="text-base font-bold text-[#eeeef8] mb-2">Boostez votre equipe</h3>
+            <p className="text-[12px] text-[#55557a] mb-4 max-w-[380px] mx-auto">IA transcription, campagnes sortantes, analytics avances et SMS — personnalisez votre plateforme.</p>
+            <Link href="/tarifs#modules" className="inline-flex items-center gap-2 bg-[#7b61ff]/10 border border-[#7b61ff]/30 text-[#7b61ff] rounded-lg px-5 py-2 text-[13px] font-semibold no-underline hover:bg-[#7b61ff]/20 transition-colors">
+              Decouvrir les modules
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* -- Robot card -- */}
+      {robotSummary?.activePlan && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-900/50 text-purple-400">Robot</span>
+                <span className="text-sm font-semibold text-[#eeeef8]">{robotSummary.activePlan.name}</span>
+                {robotSummary.status && <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${robotSummary.status === 'active' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-blue-900/40 text-blue-400'}`}>{robotSummary.status === 'active' ? 'Actif' : 'Essai'}</span>}
+              </div>
+              <Link href="/client/robot" className="inline-block text-[11px] font-semibold text-[#7b61ff] px-3 py-1 border border-[#7b61ff]/25 rounded-lg no-underline bg-[#7b61ff]/5 hover:bg-[#7b61ff]/15 transition-colors">Gerer les campagnes</Link>
+            </div>
+            {robotSummary.minutesUsage && (
+              <div>
+                <div className="flex justify-between mb-1 text-[12px]">
+                  <span className="text-[#9898b8]">{robotSummary.minutesUsage.minutesUsed.toFixed(0)} / {robotSummary.minutesUsage.minutesIncluded} min</span>
+                  <span className="text-[#eeeef8] font-semibold">{robotSummary.minutesUsage.percentUsed}%</span>
+                </div>
+                <div className="h-2 bg-[#111118] rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${robotSummary.minutesUsage.percentUsed > 100 ? 'bg-red-500' : robotSummary.minutesUsage.percentUsed > 80 ? 'bg-orange-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, robotSummary.minutesUsage.percentUsed)}%` }} />
+                </div>
+              </div>
+            )}
+            {robotSummary.minutesUsage.minutesOverage > 0 && (
+              <div className="text-[11px] text-orange-400 mt-2">Surplus: {robotSummary.minutesUsage.minutesOverage.toFixed(1)} min</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Robot credits only */}
+      {robotSummary && !robotSummary.activePlan && robotSummary.creditsBalance > 0 && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-900/50 text-purple-400">Robot</span>
+              <span className="text-sm text-[#eeeef8]">{robotSummary.creditsBalance} minutes disponibles</span>
+            </div>
+            <Link href="/client/robot" className="inline-block text-[11px] font-semibold text-[#7b61ff] px-3 py-1 border border-[#7b61ff]/25 rounded-lg no-underline bg-[#7b61ff]/5">Lancer une campagne</Link>
+          </div>
+        </div>
+      )}
+
+      {/* Robot CTA */}
+      {(!robotSummary || (!robotSummary.activePlan && robotSummary.creditsBalance <= 0)) && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl py-8 px-6 text-center">
+            <h3 className="text-base font-bold text-[#eeeef8] mb-2">Automatisez votre prospection</h3>
+            <p className="text-[12px] text-[#55557a] mb-4">Robot d&apos;appel masse — TTS, audio MP3, IVR, detection repondeur.</p>
+            <Link href="/commander?service=robot" className="inline-flex items-center gap-2 bg-[#7b61ff]/10 border border-[#7b61ff]/30 text-[#7b61ff] rounded-lg px-5 py-2 text-[13px] font-semibold no-underline hover:bg-[#7b61ff]/20 transition-colors">Decouvrir le Robot</Link>
+          </div>
+        </div>
+      )}
 
       {/* -- Addons -- */}
       {addons && addons.length > 0 && (

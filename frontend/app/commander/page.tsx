@@ -138,6 +138,413 @@ const PLAN_NAMES: Record<string, string> = {
   ROBOT: 'Robot d\'appel',
 }
 
+// ── Telephony common features chips ──────────────────────
+const TELCO_COMMON_FEATURES = [
+  'Tableau de bord live', 'Mes lignes et numeros', 'Journal d\'appels', 'Enregistrements',
+  'Statistiques', 'IVR et Standard vocal', 'Files d\'attente ACD', 'Messagerie vocale',
+  'Supervision live', 'Ecoute et Soufflage', 'CRM integre', 'Prospects et calendrier',
+  'Modeles et devis', 'Applications et integrations', 'Dialer web et app', 'Parc telephonique',
+]
+
+// ── Telephony destination flags ──────────────────────────
+const DEST_FLAGS: Record<string, string> = {
+  'Canada fixes et mobiles': 'CA', 'USA fixes et mobiles': 'US',
+  'France fixes et mobiles': 'FR', 'Europe 30+ pays fixes et mobiles': 'EU',
+}
+
+// ── RobotStep2: robot plan or credits selection ──────────
+function RobotStep2({ onBack, onAddToCart }: { onBack: () => void; onAddToCart: (item: CartItem) => void }) {
+  const api = useApi()
+  const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [robotPlans, setRobotPlans] = useState<any[]>([])
+  const [creditsPacks, setCreditsPacks] = useState<any[]>([])
+  const [selectedPlan, setSelectedPlan] = useState('')
+  const [selectedCredits, setSelectedCredits] = useState('')
+  const [mode, setMode] = useState<'plan' | 'credits'>('plan')
+
+  useEffect(() => {
+    Promise.all([
+      api('/api/v1/billing/robot/plans'),
+      api('/api/v1/billing/robot/credits-plans'),
+    ]).then(([p, c]) => {
+      if (p.success) {
+        setRobotPlans(p.data || [])
+        const pop = (p.data || []).find((x: any) => x.popular)
+        if (pop) setSelectedPlan(pop.plan_code)
+      }
+      if (c.success) setCreditsPacks(c.data || [])
+    })
+    // Check URL for mode
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'credits') setMode('credits')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any) => cycle === 'yearly' && p.price_yearly ? Math.round(p.price_yearly / 12) : p.price_monthly
+
+  const handleNext = () => {
+    if (mode === 'plan') {
+      const plan = robotPlans.find(p => p.plan_code === selectedPlan)
+      if (!plan) return
+      onAddToCart({ planId: plan.plan_code, planName: plan.name, serviceType: 'ROBOT', priceCents: getPrice(plan), cycle, quantity: 1 })
+    } else {
+      const pack = creditsPacks.find((p: any) => p.code === selectedCredits)
+      if (!pack) return
+      onAddToCart({ planId: pack.code, planName: pack.name, serviceType: 'ROBOT_CREDITS', priceCents: pack.amount, cycle: 'monthly', quantity: 1 })
+    }
+  }
+
+  return (
+    <div style={{ padding: '40px 32px' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', marginBottom: 8, marginTop: 0 }}>2. Robot d&apos;appel masse — configurer votre plan</h2>
+
+      {/* How it works */}
+      <div style={{ display: 'flex', gap: 24, marginBottom: 32, padding: '16px 20px', background: '#0f0f1e', borderRadius: 12, border: '1px solid #1e1e3a' }}>
+        {['1. Importez CSV', '2. Configurez le message', '3. Lancez et suivez en direct'].map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#7b61ff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+            <span style={{ fontSize: 13, color: '#8888a8' }}>{s.split('. ')[1]}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Plans */}
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#e8e8f8' }}>Plans abonnement</span>
+        <div style={{ display: 'flex', background: '#0f0f1e', borderRadius: 10, border: '1px solid #1e1e3a', overflow: 'hidden' }}>
+          <button onClick={() => setCycle('monthly')} style={{ padding: '8px 20px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: cycle === 'monthly' ? '#7b61ff' : 'transparent', color: cycle === 'monthly' ? '#fff' : '#8888a8' }}>Mensuel</button>
+          <button onClick={() => setCycle('yearly')} style={{ padding: '8px 20px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: cycle === 'yearly' ? '#7b61ff' : 'transparent', color: cycle === 'yearly' ? '#fff' : '#8888a8' }}>Annuel</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+        {robotPlans.map(p => {
+          const isSel = mode === 'plan' && selectedPlan === p.plan_code
+          return (
+            <div key={p.plan_code} onClick={() => { setMode('plan'); setSelectedPlan(p.plan_code); setSelectedCredits('') }}
+              style={{ background: isSel ? '#0f0f2a' : '#0f0f1e', border: `2px solid ${isSel ? '#7b61ff' : '#1e1e3a'}`, borderRadius: 14, padding: '22px 18px', cursor: 'pointer', position: 'relative' }}>
+              {p.popular && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', padding: '4px 14px', borderRadius: 20, background: '#7b61ff', color: '#fff', fontSize: 11, fontWeight: 700 }}>Populaire</div>}
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e8e8f8', marginBottom: 6, marginTop: p.popular ? 4 : 0 }}>{p.name}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#e8e8f8' }}>{fmtPrice(getPrice(p))} <span style={{ fontSize: 12, color: '#8888a8' }}>CAD$/mois</span></div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#7b61ff', margin: '6px 0' }}>{p.minutes_included} min incluses</div>
+              <div style={{ fontSize: 11, color: '#5a5a7a' }}>{p.max_concurrent_calls} simultanes — Surplus: {p.overage_rate.toFixed(2)} CAD$/min</div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ textAlign: 'center', fontSize: 13, color: '#5a5a7a', margin: '20px 0', fontWeight: 600 }}>— OU —</div>
+
+      {/* Credits */}
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#e8e8f8', marginBottom: 12 }}>Achetez des minutes sans abonnement</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+        {creditsPacks.map((p: any) => {
+          const isSel = mode === 'credits' && selectedCredits === p.code
+          return (
+            <div key={p.code} onClick={() => { setMode('credits'); setSelectedCredits(p.code); setSelectedPlan('') }}
+              style={{ background: isSel ? '#0f0f2a' : '#0f0f1e', border: `2px solid ${isSel ? '#7b61ff' : '#1e1e3a'}`, borderRadius: 12, padding: '16px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#e8e8f8' }}>{p.minutes}</div>
+              <div style={{ fontSize: 11, color: '#5a5a7a', marginBottom: 4 }}>minutes</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#7b61ff' }}>{fmtPrice(p.amount)} CAD$</div>
+              <div style={{ fontSize: 10, color: '#5a5a7a', marginTop: 4 }}>~ {p.estimatedCalls30s} appels 30s</div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ fontSize: 12, color: '#5a5a7a', marginBottom: 24 }}>Facture par organisation. 14 jours gratuits sur les abonnements. Credits valides 12 mois.</div>
+
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+        <button onClick={onBack} style={{ padding: '12px 28px', background: '#1a1a3a', border: '1px solid #2a2a3e', borderRadius: 10, color: '#8888a8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Retour</button>
+        <button onClick={handleNext} disabled={mode === 'plan' ? !selectedPlan : !selectedCredits}
+          style={{ padding: '12px 28px', background: (mode === 'plan' ? selectedPlan : selectedCredits) ? '#7b61ff' : '#2a2a3e', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: (mode === 'plan' ? selectedPlan : selectedCredits) ? 'pointer' : 'not-allowed' }}>
+          Suivant
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── AddonsStep2: module addon multi-select step 2 ────────
+function AddonsStep2({
+  onBack, onAddToCart,
+}: {
+  onBack: () => void
+  onAddToCart: (item: CartItem) => void
+}) {
+  const api = useApi()
+  const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [addonPlans, setAddonPlans] = useState<any[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    api('/api/v1/billing/addons/plans').then(r => {
+      if (r.success) setAddonPlans(r.data || [])
+    }).catch(() => {})
+    // Pre-select from URL params
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const mods = params.get('modules')
+      if (mods) setSelected(new Set(mods.split(',').filter(Boolean)))
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggle = (mt: string) => {
+    const next = new Set(selected)
+    if (next.has(mt)) { next.delete(mt) } else { next.add(mt) }
+    // ia_coaching replaces ia_basic
+    if (mt === 'ia_coaching' && next.has('ia_coaching')) next.delete('ia_basic')
+    setSelected(next)
+  }
+
+  const getPrice = (p: any): number => {
+    if (cycle === 'yearly' && p.price_yearly) return Math.round(p.price_yearly / 12)
+    return p.price_monthly
+  }
+
+  const handleNext = () => {
+    for (const mt of selected) {
+      const plan = addonPlans.find((p: any) => p.module_type === mt)
+      if (!plan) continue
+      onAddToCart({
+        planId: plan.plan_code,
+        planName: plan.name,
+        serviceType: 'ADDON',
+        priceCents: getPrice(plan),
+        cycle,
+        quantity: 1,
+      })
+    }
+  }
+
+  const totalSelected = addonPlans.filter((p: any) => selected.has(p.module_type)).reduce((s: number, p: any) => s + getPrice(p), 0)
+
+  return (
+    <div style={{ padding: '40px 32px' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', marginBottom: 8, marginTop: 0 }}>
+        2. Modules additionnels
+      </h2>
+      <p style={{ fontSize: 13, color: '#8888a8', marginBottom: 24 }}>
+        Les modules s&apos;ajoutent a votre forfait telephonie existant. Un forfait telephonie actif est requis.
+      </p>
+
+      {/* Cycle toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'flex', background: '#0f0f1e', borderRadius: 10, border: '1px solid #1e1e3a', overflow: 'hidden' }}>
+          <button onClick={() => setCycle('monthly')} style={{ padding: '10px 24px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: cycle === 'monthly' ? '#7b61ff' : 'transparent', color: cycle === 'monthly' ? '#fff' : '#8888a8' }}>Mensuel</button>
+          <button onClick={() => setCycle('yearly')} style={{ padding: '10px 24px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: cycle === 'yearly' ? '#7b61ff' : 'transparent', color: cycle === 'yearly' ? '#fff' : '#8888a8' }}>Annuel</button>
+        </div>
+        {cycle === 'yearly' && <span style={{ padding: '4px 12px', borderRadius: 20, background: '#00d4aa22', color: '#00d4aa', fontSize: 12, fontWeight: 600 }}>Economisez 2 mois</span>}
+      </div>
+
+      {/* Module cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+        {addonPlans.map((p: any) => {
+          const isSel = selected.has(p.module_type)
+          const isPerOrg = p.module_type === 'sms'
+          return (
+            <div
+              key={p.plan_code}
+              onClick={() => toggle(p.module_type)}
+              style={{
+                background: isSel ? '#0f0f2a' : '#0f0f1e',
+                border: `2px solid ${isSel ? '#7b61ff' : '#1e1e3a'}`,
+                borderRadius: 14, padding: '20px 18px', cursor: 'pointer',
+                position: 'relative', transition: 'all 0.2s',
+              }}
+            >
+              {isSel && (
+                <div style={{ position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: 6, background: '#7b61ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              )}
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#e8e8f8', marginBottom: 6 }}>{p.name}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#e8e8f8', marginBottom: 4 }}>
+                {fmtPrice(getPrice(p))} <span style={{ fontSize: 12, color: '#8888a8', fontWeight: 500 }}>CAD$/{isPerOrg ? 'mois' : 'agent/mois'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#8888a8', marginBottom: 12 }}>{p.description}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {(p.features || []).slice(0, 3).map((f: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8888a8' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    {f}
+                  </div>
+                ))}
+              </div>
+              {p.module_type === 'sms' && (
+                <div style={{ fontSize: 10, color: '#5a5a7a', marginTop: 8 }}>1000 SMS inclus — surplus 0,018 CAD$/SMS</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* IA conflict note */}
+      {selected.has('ia_coaching') && (
+        <div style={{ fontSize: 12, color: '#7b61ff', marginBottom: 16 }}>
+          IA Coaching Live remplace IA Basique et inclut toutes ses fonctionnalites.
+        </div>
+      )}
+
+      {/* Total */}
+      {selected.size > 0 && (
+        <div style={{ padding: '14px 20px', background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 10, fontSize: 13, color: '#8888a8', marginBottom: 24 }}>
+          <span style={{ fontWeight: 600, color: '#e8e8f8' }}>{selected.size} module{selected.size > 1 ? 's' : ''} selectionne{selected.size > 1 ? 's' : ''}</span> — Total estime: <span style={{ fontWeight: 700, color: '#7b61ff' }}>{fmtPrice(totalSelected)} CAD$/mois</span>
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+        <button onClick={onBack} style={{ padding: '12px 28px', background: '#1a1a3a', border: '1px solid #2a2a3e', borderRadius: 10, color: '#8888a8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Retour</button>
+        <button onClick={handleNext} disabled={selected.size === 0} style={{ padding: '12px 28px', background: selected.size > 0 ? '#7b61ff' : '#2a2a3e', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: selected.size > 0 ? 'pointer' : 'not-allowed', opacity: selected.size > 0 ? 1 : 0.5 }}>Suivant</button>
+      </div>
+    </div>
+  )
+}
+
+// ── TelcoStep2: specialized telephony step 2 ─────────────
+function TelcoStep2({
+  onBack, onAddToCart,
+}: {
+  onBack: () => void
+  onAddToCart: (item: CartItem) => void
+}) {
+  const api = useApi()
+  const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [telcoPlans, setTelcoPlans] = useState<any[]>([])
+  const [selectedPlan, setSelectedPlan] = useState('TELCO_CA_US_FR')
+  const [prorata, setProrata] = useState<any>(null)
+
+  useEffect(() => {
+    api('/api/v1/billing/telephony/plans').then(r => {
+      if (r.success) {
+        setTelcoPlans(r.data || [])
+        const pop = (r.data || []).find((p: any) => p.popular)
+        if (pop) setSelectedPlan(pop.plan_code)
+      }
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedPlan) return
+    api(`/api/v1/billing/telephony/prorata?planCode=${selectedPlan}&billingCycle=${cycle}`)
+      .then(r => { if (r.success) setProrata(r.data) })
+      .catch(() => {})
+  }, [selectedPlan, cycle]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any): number => {
+    if (cycle === 'yearly' && p.price_yearly) return Math.round(p.price_yearly / 12)
+    return p.price_monthly
+  }
+
+  const handleNext = () => {
+    const plan = telcoPlans.find(p => p.plan_code === selectedPlan)
+    if (!plan) return
+    onAddToCart({
+      planId: plan.plan_code,
+      planName: plan.name,
+      serviceType: 'TELEPHONY',
+      priceCents: getPrice(plan),
+      cycle,
+      quantity: prorata?.nbAgents || 1,
+    })
+  }
+
+  return (
+    <div style={{ padding: '40px 32px' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', marginBottom: 8, marginTop: 0 }}>
+        2. Telephonie d&apos;entreprise — configurer le forfait
+      </h2>
+
+      {/* Cycle toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+        <div style={{ display: 'flex', background: '#0f0f1e', borderRadius: 10, border: '1px solid #1e1e3a', overflow: 'hidden' }}>
+          <button onClick={() => setCycle('monthly')} style={{ padding: '10px 24px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: cycle === 'monthly' ? '#7b61ff' : 'transparent', color: cycle === 'monthly' ? '#fff' : '#8888a8', transition: 'all 0.2s' }}>Mensuel</button>
+          <button onClick={() => setCycle('yearly')} style={{ padding: '10px 24px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: cycle === 'yearly' ? '#7b61ff' : 'transparent', color: cycle === 'yearly' ? '#fff' : '#8888a8', transition: 'all 0.2s' }}>Annuel</button>
+        </div>
+        {cycle === 'yearly' && <span style={{ padding: '4px 12px', borderRadius: 20, background: '#00d4aa22', color: '#00d4aa', fontSize: 12, fontWeight: 600 }}>Economisez 2 mois</span>}
+      </div>
+
+      {/* Inclus dans tous les forfaits */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#e8e8f8', marginBottom: 6 }}>Inclus dans tous les forfaits</div>
+        <div style={{ fontSize: 12, color: '#8888a8', marginBottom: 12 }}>La seule difference entre les plans est la destination des appels sortants illimites.</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {TELCO_COMMON_FEATURES.map(f => (
+            <span key={f} style={{ padding: '5px 12px', borderRadius: 8, background: '#1a1a2e', color: '#9898b8', fontSize: 12, fontWeight: 500 }}>{f}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Plan cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
+        {telcoPlans.map(p => {
+          const isSelected = selectedPlan === p.plan_code
+          const price = getPrice(p)
+          return (
+            <div
+              key={p.plan_code}
+              onClick={() => setSelectedPlan(p.plan_code)}
+              style={{
+                background: isSelected ? '#0f0f2a' : '#0f0f1e',
+                border: `2px solid ${isSelected ? '#7b61ff' : '#1e1e3a'}`,
+                borderRadius: 14, padding: '22px 18px', cursor: 'pointer',
+                position: 'relative', transition: 'all 0.2s',
+                boxShadow: isSelected ? '0 0 24px #7b61ff22' : 'none',
+              }}
+            >
+              {p.popular && (
+                <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', padding: '4px 16px', borderRadius: 20, background: '#7b61ff', color: '#fff', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>Populaire</div>
+              )}
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e8e8f8', marginBottom: 10, marginTop: p.popular ? 4 : 0 }}>{p.name}</div>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 26, fontWeight: 800, color: '#e8e8f8' }}>{fmtPrice(price)}</span>
+                <span style={{ fontSize: 12, color: '#8888a8', marginLeft: 4 }}>CAD$/mois</span>
+                {cycle === 'yearly' && p.price_yearly && (
+                  <div style={{ fontSize: 11, color: '#5a5a7a', marginTop: 4 }}>(facture {fmtPrice(p.price_yearly)} CAD$/an)</div>
+                )}
+              </div>
+              {p.destinations && p.destinations.length > 0 ? (
+                <div style={{ padding: '10px 12px', background: '#111128', borderRadius: 8, border: '1px solid #1e1e3a' }}>
+                  <div style={{ fontSize: 11, color: '#8888a8', fontWeight: 600, marginBottom: 6 }}>Appels sortants illimites vers:</div>
+                  {p.destinations.map((d: string, i: number) => (
+                    <div key={i} style={{ fontSize: 12, color: '#c0c0d8', marginBottom: 2 }}>
+                      {DEST_FLAGS[d] || ''} {d.replace(' fixes et mobiles', '')}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: '10px 12px', background: '#111128', borderRadius: 8, border: '1px solid #1e1e3a', fontSize: 12, color: '#8888a8' }}>
+                  Appels sortants: tarif a la minute selon destination
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Note */}
+      <div style={{ fontSize: 12, color: '#5a5a7a', marginBottom: 20 }}>
+        Facture selon le nombre d&apos;agents actifs dans votre compte. Ajoutez ou retirez des agents a tout moment depuis Equipe &gt; Agents.
+      </div>
+
+      {/* Prorata */}
+      {prorata && (
+        <div style={{ padding: '14px 20px', background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 10, fontSize: 13, color: '#8888a8', marginBottom: 28, lineHeight: 1.6 }}>
+          Le paiement au prorata sera calcule du {new Date(prorata.periodStart).toLocaleDateString('fr-CA')} au {new Date(prorata.periodEnd).toLocaleDateString('fr-CA')}.
+          Prochain paiement le {new Date(prorata.nextPaymentDate).toLocaleDateString('fr-CA')}.
+          <br />
+          <span style={{ fontWeight: 600, color: '#e8e8f8' }}>Estimation aujourd&apos;hui: {fmtPrice(prorata.prorataAmount)} CAD$ ({prorata.nbAgents} agent{prorata.nbAgents > 1 ? 's' : ''} x {fmtPrice(prorata.pricePerAgent)} CAD$ x {prorata.daysRemaining} jours / {prorata.daysInMonth} jours)</span>
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+        <button onClick={onBack} style={{ padding: '12px 28px', background: '#1a1a3a', border: '1px solid #2a2a3e', borderRadius: 10, color: '#8888a8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Retour</button>
+        <button onClick={handleNext} disabled={!selectedPlan} style={{ padding: '12px 28px', background: selectedPlan ? '#7b61ff' : '#2a2a3e', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: selectedPlan ? 'pointer' : 'not-allowed', opacity: selectedPlan ? 1 : 0.5 }}>Suivant</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Stepper component ─────────────────────────────────────
 function VerticalStepper({ currentStep }: { currentStep: number }) {
   const steps = [
@@ -215,6 +622,13 @@ function Step1({ onSelect }: { onSelect: (service: string) => void }) {
       icon: <RobotIcon />,
       price: '135 CAD$/mois',
       desc: '150k appels/h, TTS dynamique, IVR post-robot',
+    },
+    {
+      key: 'ADDONS',
+      title: 'Modules additionnels',
+      icon: <PhoneIcon />,
+      price: 'A partir de 15 CAD$/mois',
+      desc: 'IA, Campagnes, Analytics, SMS — personnalisez votre plateforme',
     },
   ]
 
@@ -961,7 +1375,7 @@ export default function CommanderPage() {
       const pParam = searchParams.get('plan')
       if (sParam) {
         const serviceKey = sParam.toUpperCase()
-        if (['TELEPHONY', 'DIALER', 'ROBOT'].includes(serviceKey)) {
+        if (['TELEPHONY', 'DIALER', 'ROBOT', 'ADDONS'].includes(serviceKey)) {
           setService(serviceKey)
           setStep(2)
         }
@@ -1058,7 +1472,25 @@ export default function CommanderPage() {
         {step === 1 && (
           <Step1 onSelect={handleServiceSelect} />
         )}
-        {step === 2 && service && (
+        {step === 2 && service === 'TELEPHONY' && (
+          <TelcoStep2
+            onBack={() => setStep(1)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+        {step === 2 && service === 'ADDONS' && (
+          <AddonsStep2
+            onBack={() => setStep(1)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+        {step === 2 && service === 'ROBOT' && (
+          <RobotStep2
+            onBack={() => setStep(1)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+        {step === 2 && service && service !== 'TELEPHONY' && service !== 'ADDONS' && service !== 'ROBOT' && (
           <Step2
             service={service}
             plans={plans}

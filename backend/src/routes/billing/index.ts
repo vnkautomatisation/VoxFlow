@@ -1,7 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { authenticate, AuthRequest } from '../../middleware/auth'
-import telephonyRouter from './telephony'
+import telephonyRouter, { telcoPlansHandler } from './telephony'
+import addonsRouter, { addonPlansHandler } from './addons'
+import robotBillingRouter, { robotPlansHandler, creditsPlansHandler } from './robot'
 
 const router = Router()
 
@@ -10,11 +12,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY!
 )
 
-// ── Telephony billing sub-router ──────────────────────────
+// ── Telephony billing — public route first ────────────────
+router.get('/telephony/plans', telcoPlansHandler)
+// ── Telephony billing — authenticated routes ──────────────
 router.use('/telephony', authenticate, telephonyRouter)
 
+// ── Addons billing — public route first ───────────────────
+router.get('/addons/plans', addonPlansHandler)
+// ── Addons billing — authenticated routes ─────────────────
+router.use('/addons', authenticate, addonsRouter)
+
+// ── Robot billing — public routes first ───────────────────
+router.get('/robot/plans', robotPlansHandler)
+router.get('/robot/credits-plans', creditsPlansHandler)
+// ── Robot billing — authenticated routes ──────────────────
+router.use('/robot', authenticate, robotBillingRouter)
+
 // ── Auth middleware selectif ───────────────────────────────
-const PUBLIC_PATHS = new Set(['/plans', '/modules', '/webhook'])
+const PUBLIC_PATHS = new Set(['/plans', '/modules', '/webhook', '/telephony/plans', '/addons/plans', '/robot/plans', '/robot/credits-plans'])
 router.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path)) return next()
   return authenticate(req as AuthRequest, res, next)

@@ -12,121 +12,116 @@ try {
   }
 } catch {}
 
+const VALID_PLAN_CODES = ['TELCO_INBOUND', 'TELCO_CA_US', 'TELCO_CA_US_FR', 'TELCO_INTL']
+
 function getOrgId(req: Request): string {
   const orgId = (req as any).user?.organizationId || (req as any).user?.organization_id
   if (!orgId) throw new Error('Organisation introuvable')
   return String(orgId)
 }
 
-// ── Plan codes & pricing ──────────────────────────────────
-const TELEPHONY_PLANS = [
-  { code: 'ENTRANTS',           name: 'Entrants',           price: 1900,  description: 'Appels entrants uniquement' },
-  { code: 'CANADA_USA',         name: 'Canada/USA',         price: 3500,  description: 'Illimite fixes et mobiles : Canada et USA' },
-  { code: 'CANADA_USA_FRANCE',  name: 'Canada/USA/France',  price: 5000,  description: 'Illimite fixes et mobiles : Canada, USA et France' },
-  { code: 'INTERNATIONAL',      name: 'International',      price: 7500,  description: 'Illimite fixes et mobiles : pays Europeens' },
-] as const
+// ──────────────────────────────────────────────────────────
+// GET /plans — public, retourne les 4 plans TELCO_*
+// ──────────────────────────────────────────────────────────
+export async function telcoPlansHandler(_req: Request, res: Response) {
+  try {
+    const { data: plans, error } = await supabase
+      .from('plan_definitions')
+      .select('id, name, description, price_monthly, price_yearly, destinations, features_list, sms_included, sort_order, highlight')
+      .in('id', VALID_PLAN_CODES)
+      .order('sort_order', { ascending: true })
 
-type PlanCode = typeof TELEPHONY_PLANS[number]['code']
+    if (error) throw error
 
-const PLAN_BY_CODE = Object.fromEntries(TELEPHONY_PLANS.map(p => [p.code, p]))
-
-// ── Destinations by plan ──────────────────────────────────
-const DESTINATIONS: Record<string, { country: string; fixed: boolean; mobile: boolean }[]> = {
-  ENTRANTS: [],
-  CANADA_USA: [
-    { country: 'Canada',    fixed: true, mobile: true },
-    { country: 'Etats-Unis', fixed: true, mobile: true },
-  ],
-  CANADA_USA_FRANCE: [
-    { country: 'Canada',    fixed: true, mobile: true },
-    { country: 'Etats-Unis', fixed: true, mobile: true },
-    { country: 'France',    fixed: true, mobile: true },
-  ],
-  INTERNATIONAL: [
-    { country: 'Canada',       fixed: true, mobile: true },
-    { country: 'Etats-Unis',  fixed: true, mobile: true },
-    { country: 'France',      fixed: true, mobile: true },
-    { country: 'Allemagne',   fixed: true, mobile: true },
-    { country: 'Royaume-Uni', fixed: true, mobile: true },
-    { country: 'Espagne',     fixed: true, mobile: true },
-    { country: 'Italie',      fixed: true, mobile: true },
-    { country: 'Portugal',    fixed: true, mobile: true },
-    { country: 'Pays-Bas',    fixed: true, mobile: true },
-    { country: 'Belgique',    fixed: true, mobile: true },
-    { country: 'Suisse',      fixed: true, mobile: true },
-    { country: 'Autriche',    fixed: true, mobile: true },
-    { country: 'Suede',       fixed: true, mobile: true },
-    { country: 'Norvege',     fixed: true, mobile: true },
-    { country: 'Danemark',    fixed: true, mobile: true },
-    { country: 'Finlande',    fixed: true, mobile: true },
-    { country: 'Irlande',     fixed: true, mobile: true },
-    { country: 'Pologne',     fixed: true, mobile: true },
-    { country: 'Republique tcheque', fixed: true, mobile: true },
-    { country: 'Roumanie',    fixed: true, mobile: true },
-    { country: 'Hongrie',     fixed: true, mobile: true },
-    { country: 'Grece',       fixed: true, mobile: true },
-    { country: 'Croatie',     fixed: true, mobile: true },
-    { country: 'Bulgarie',    fixed: true, mobile: true },
-    { country: 'Slovaquie',   fixed: true, mobile: true },
-    { country: 'Slovenie',    fixed: true, mobile: true },
-    { country: 'Lituanie',    fixed: true, mobile: true },
-    { country: 'Lettonie',    fixed: true, mobile: true },
-    { country: 'Estonie',     fixed: true, mobile: true },
-    { country: 'Luxembourg',  fixed: true, mobile: true },
-    { country: 'Malte',       fixed: true, mobile: true },
-    { country: 'Chypre',      fixed: true, mobile: true },
-    { country: 'Islande',     fixed: true, mobile: true },
-  ],
+    res.json({
+      success: true,
+      data: (plans || []).map((p: any) => ({
+        plan_code: p.id,
+        name: p.name,
+        description: p.description,
+        price_monthly: p.price_monthly,
+        price_yearly: p.price_yearly,
+        destinations: p.destinations || [],
+        features: p.features_list || [],
+        sms_included: p.sms_included || 0,
+        sort_order: p.sort_order,
+        popular: p.highlight || p.id === 'TELCO_CA_US_FR',
+      })),
+    })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
+  }
 }
+router.get('/plans', telcoPlansHandler)
 
 // ──────────────────────────────────────────────────────────
-// GET /summary — forfaits actifs de l'org, nb agents par plan
+// GET /summary — resume billing telephonie pour l'org
 // ──────────────────────────────────────────────────────────
 router.get('/summary', async (req: Request, res: Response) => {
   try {
-    const org_id = getOrgId(req)
+    const orgId = getOrgId(req)
 
-    // Extensions with telephony plan
-    const { data: extensions } = await supabase
-      .from('extensions')
-      .select('id, extension_number, plan_id, status, cost_per_month, user_id')
-      .eq('organization_id', org_id)
-      .in('status', ['active', 'ACTIVE', 'registered'])
+    // Active subscription for telephony
+    const { data: sub } = await supabase
+      .from('org_subscriptions')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing', 'past_due', 'canceling'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    const exts = extensions || []
+    // Count active agents (users with active status in org)
+    const { count: nbAgents } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
 
-    // Count per plan
-    const planSummary = TELEPHONY_PLANS.map(p => {
-      const agents = exts.filter(e => e.plan_id === p.code)
-      return {
-        plan_code: p.code,
-        plan_name: p.name,
-        description: p.description,
-        price_per_agent: p.price, // cents
-        active_agents: agents.length,
-        monthly_total: agents.length * p.price, // cents
+    const agentCount = nbAgents || 0
+
+    // Get plan details if subscription exists
+    let activePlan: any = null
+    if (sub?.plan_id) {
+      const { data: plan } = await supabase
+        .from('plan_definitions')
+        .select('id, name, price_monthly, price_yearly, destinations, features_list')
+        .eq('id', sub.plan_id)
+        .single()
+      if (plan) {
+        activePlan = {
+          plan_code: plan.id,
+          name: plan.name,
+          price_monthly: plan.price_monthly,
+          price_yearly: plan.price_yearly,
+          destinations: plan.destinations || [],
+        }
       }
-    })
+    }
 
-    const totalMonthly = planSummary.reduce((s, p) => s + p.monthly_total, 0)
-    const totalAgents = planSummary.reduce((s, p) => s + p.active_agents, 0)
+    const pricePerAgent = activePlan ? (sub?.billing_cycle === 'yearly' ? Math.round(activePlan.price_yearly / 12) : activePlan.price_monthly) : 0
 
-    // Org info for dates
+    // Org info
     const { data: org } = await supabase
       .from('organizations')
-      .select('created_at, billing_cycle_end')
-      .eq('id', org_id)
+      .select('created_at')
+      .eq('id', orgId)
       .single()
 
     res.json({
       success: true,
       data: {
-        plans: planSummary,
-        total_agents: totalAgents,
-        total_monthly: totalMonthly, // cents
-        currency: 'CAD',
-        registration_date: org?.created_at || null,
-        next_payment_date: org?.billing_cycle_end || null,
+        activePlan,
+        billingCycle: sub?.billing_cycle || 'monthly',
+        status: sub?.status || null,
+        nbAgentsActive: agentCount,
+        monthlyTotal: pricePerAgent * agentCount,
+        registeredAt: org?.created_at || null,
+        nextPaymentAt: sub?.current_period_end || null,
+        trialEndsAt: sub?.trial_ends_at || null,
+        cancelAt: sub?.cancelled_at || null,
+        stripeSubscriptionId: sub?.stripe_subscription_id || null,
       },
     })
   } catch (err: any) {
@@ -135,29 +130,59 @@ router.get('/summary', async (req: Request, res: Response) => {
 })
 
 // ──────────────────────────────────────────────────────────
-// GET /agents — liste agents de l'org avec extension, plan
+// GET /agents — liste agents actifs avec forfait
 // ──────────────────────────────────────────────────────────
 router.get('/agents', async (req: Request, res: Response) => {
   try {
-    const org_id = getOrgId(req)
+    const orgId = getOrgId(req)
 
+    // Get extensions with user info and plan
     const { data: extensions } = await supabase
       .from('extensions')
-      .select('id, extension_number, label, plan_id, status, cost_per_month, user_id, user:user_id(id, email, name)')
-      .eq('organization_id', org_id)
+      .select('id, extension_number, plan_id, status, cost_per_month, user:user_id(id, email, name)')
+      .eq('organization_id', orgId)
+      .in('status', ['active', 'ACTIVE', 'registered'])
       .order('extension_number', { ascending: true })
 
-    const agents = (extensions || []).map((e: any) => ({
-      id: e.id,
-      extension: e.extension_number,
-      label: e.label || '',
-      email: e.user?.email || '',
-      name: e.user?.name || '',
-      plan_code: e.plan_id || null,
-      plan_name: e.plan_id ? (PLAN_BY_CODE[e.plan_id]?.name || e.plan_id) : 'Aucun',
-      price: e.plan_id ? (PLAN_BY_CODE[e.plan_id]?.price || 0) : 0,
-      status: e.status,
-    }))
+    // Get org subscription for default plan
+    const { data: sub } = await supabase
+      .from('org_subscriptions')
+      .select('plan_id')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing', 'past_due'])
+      .limit(1)
+      .maybeSingle()
+
+    // Plan name lookup
+    const planCodes = new Set<string>()
+    for (const ext of extensions || []) {
+      planCodes.add(ext.plan_id || sub?.plan_id || '')
+    }
+    const { data: planDefs } = await supabase
+      .from('plan_definitions')
+      .select('id, name, price_monthly')
+      .in('id', [...planCodes].filter(Boolean))
+
+    const planMap: Record<string, { name: string; price: number }> = {}
+    for (const p of planDefs || []) {
+      planMap[p.id] = { name: p.name, price: p.price_monthly }
+    }
+
+    const agents = (extensions || []).map((e: any) => {
+      const effectivePlan = e.plan_id || sub?.plan_id || null
+      const info = effectivePlan ? planMap[effectivePlan] : null
+      return {
+        id: e.id,
+        firstName: e.user?.name?.split(' ')[0] || '',
+        lastName: e.user?.name?.split(' ').slice(1).join(' ') || '',
+        email: e.user?.email || '',
+        extension: e.extension_number,
+        planCode: effectivePlan,
+        planName: info?.name || 'Aucun',
+        unitPrice: info?.price || 0,
+      }
+    })
 
     res.json({ success: true, data: agents })
   } catch (err: any) {
@@ -166,159 +191,62 @@ router.get('/agents', async (req: Request, res: Response) => {
 })
 
 // ──────────────────────────────────────────────────────────
-// POST /upgrade — batch update: assign/change plans
-// Body: { changes: [{ agentId, planCode }] }
+// GET /prorata — calcul prorata pour changement de plan
 // ──────────────────────────────────────────────────────────
-router.post('/upgrade', async (req: Request, res: Response) => {
+router.get('/prorata', async (req: Request, res: Response) => {
   try {
-    const org_id = getOrgId(req)
-    const { changes } = req.body as { changes: { agentId: string; planCode: string }[] }
+    const orgId = getOrgId(req)
+    const planCode = String(req.query.planCode || '')
+    const billingCycle = String(req.query.billingCycle || 'monthly')
 
-    if (!changes || !Array.isArray(changes) || changes.length === 0) {
-      return res.status(400).json({ success: false, error: 'Aucun changement specifie' })
+    if (!VALID_PLAN_CODES.includes(planCode)) {
+      return res.status(400).json({ success: false, error: 'Plan code invalide' })
     }
 
-    // Validate plan codes
-    for (const c of changes) {
-      if (!PLAN_BY_CODE[c.planCode]) {
-        return res.status(400).json({ success: false, error: `Plan invalide: ${c.planCode}` })
-      }
-    }
+    const { data: plan } = await supabase
+      .from('plan_definitions')
+      .select('price_monthly, price_yearly')
+      .eq('id', planCode)
+      .single()
 
-    // Load current extensions
-    const extIds = changes.map(c => c.agentId)
-    const { data: currentExts } = await supabase
-      .from('extensions')
-      .select('id, plan_id, cost_per_month')
-      .eq('organization_id', org_id)
-      .in('id', extIds)
+    if (!plan) return res.status(404).json({ success: false, error: 'Plan introuvable' })
 
-    // Calculate prorata
+    const { count: nbAgents } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
+
+    const agentCount = Math.max(1, nbAgents || 1)
+
     const now = new Date()
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    const daysRemaining = Math.max(1, Math.ceil((endOfMonth.getTime() - now.getTime()) / 86400000))
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const proRataFactor = daysRemaining / daysInMonth
+    const year = now.getFullYear()
+    const month = now.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const periodEnd = new Date(year, month + 1, 0)
+    const daysRemaining = Math.max(1, Math.ceil((periodEnd.getTime() - now.getTime()) / 86400000))
 
-    let proRataTotal = 0
-    const updatedAgents: any[] = []
+    const pricePerAgent = billingCycle === 'yearly'
+      ? Math.round((plan.price_yearly || plan.price_monthly * 10) / 12)
+      : plan.price_monthly
 
-    for (const change of changes) {
-      const plan = PLAN_BY_CODE[change.planCode]!
-      const current = (currentExts || []).find(e => e.id === change.agentId)
-      const oldPrice = current?.cost_per_month || 0
-      const newPrice = plan.price
-      const diff = newPrice - oldPrice
+    const prorataAmount = Math.round((daysRemaining / daysInMonth) * pricePerAgent * agentCount)
 
-      // Update extension
-      await supabase
-        .from('extensions')
-        .update({
-          plan_id: change.planCode,
-          cost_per_month: newPrice,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', change.agentId)
-        .eq('organization_id', org_id)
-
-      const proRata = Math.round(diff * proRataFactor)
-      proRataTotal += proRata
-
-      updatedAgents.push({
-        agentId: change.agentId,
-        planCode: change.planCode,
-        planName: plan.name,
-        price: newPrice,
-        proRata,
-      })
-    }
-
-    // Handle Stripe if available
-    if (stripe) {
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('stripe_customer_id, stripe_subscription_id')
-        .eq('id', org_id)
-        .single()
-
-      if (org?.stripe_subscription_id) {
-        try {
-          // Retrieve subscription to update items
-          const sub = await stripe.subscriptions.retrieve(org.stripe_subscription_id)
-
-          // Build quantity per plan code
-          const { data: allExts } = await supabase
-            .from('extensions')
-            .select('plan_id')
-            .eq('organization_id', org_id)
-            .in('status', ['active', 'ACTIVE', 'registered'])
-
-          const qtyByPlan: Record<string, number> = {}
-          for (const e of allExts || []) {
-            if (e.plan_id) qtyByPlan[e.plan_id] = (qtyByPlan[e.plan_id] || 0) + 1
-          }
-
-          // Fetch plan stripe_price_ids
-          const planCodes = Object.keys(qtyByPlan)
-          if (planCodes.length > 0) {
-            const { data: planDefs } = await supabase
-              .from('plan_definitions')
-              .select('id, stripe_price_id')
-              .in('id', planCodes)
-
-            // Update subscription items
-            const items = sub.items.data
-            for (const pd of planDefs || []) {
-              if (!pd.stripe_price_id) continue
-              const qty = qtyByPlan[pd.id] || 0
-              const existingItem = items.find((i: any) => i.price.id === pd.stripe_price_id)
-
-              if (existingItem && qty > 0) {
-                await stripe.subscriptionItems.update(existingItem.id, {
-                  quantity: qty,
-                  proration_behavior: 'create_prorations',
-                })
-              } else if (!existingItem && qty > 0) {
-                await stripe.subscriptionItems.create({
-                  subscription: org.stripe_subscription_id,
-                  price: pd.stripe_price_id,
-                  quantity: qty,
-                  proration_behavior: 'create_prorations',
-                })
-              } else if (existingItem && qty === 0) {
-                await stripe.subscriptionItems.del(existingItem.id, {
-                  proration_behavior: 'create_prorations',
-                })
-              }
-            }
-          }
-        } catch (stripeErr: any) {
-          console.error('[telephony/upgrade] Stripe error:', stripeErr.message)
-        }
-      }
-    }
-
-    // Billing event
-    await supabase.from('billing_events').insert({
-      organization_id: org_id,
-      event_type: 'telephony_upgrade',
-      description: `Mise a jour forfaits telephonie: ${changes.length} agent(s)`,
-      amount: proRataTotal,
-      currency: 'CAD',
-      metadata: { changes: updatedAgents },
-    })
-
-    const taxRate = 0.14975 // TPS 5% + TVQ 9.975%
-    const taxAmount = Math.round(proRataTotal * taxRate)
+    const nextPaymentDate = new Date(year, month + 1, 1).toISOString()
+    const nextPaymentAmount = pricePerAgent * agentCount
 
     res.json({
       success: true,
       data: {
-        agents: updatedAgents,
-        prorata: proRataTotal,
-        tax: taxAmount,
-        total: proRataTotal + taxAmount,
-        currency: 'CAD',
+        prorataAmount,
+        nextPaymentDate,
+        nextPaymentAmount,
+        nbAgents: agentCount,
+        daysRemaining,
+        daysInMonth,
+        pricePerAgent,
+        periodStart: now.toISOString(),
+        periodEnd: periodEnd.toISOString(),
       },
     })
   } catch (err: any) {
@@ -327,86 +255,463 @@ router.post('/upgrade', async (req: Request, res: Response) => {
 })
 
 // ──────────────────────────────────────────────────────────
-// PUT /agent/:agentId — update plan for one agent
-// Body: { planCode }
+// POST /subscribe — nouvel abonnement ou changement de plan
 // ──────────────────────────────────────────────────────────
-router.put('/agent/:agentId', async (req: Request, res: Response) => {
+router.post('/subscribe', async (req: Request, res: Response) => {
   try {
-    const org_id = getOrgId(req)
-    const { planCode } = req.body
-    const plan = PLAN_BY_CODE[planCode]
-    if (!plan) return res.status(400).json({ success: false, error: 'Plan invalide' })
+    const orgId = getOrgId(req)
+    const { planCode, billingCycle = 'monthly' } = req.body
 
-    const { data, error } = await supabase
-      .from('extensions')
+    if (!VALID_PLAN_CODES.includes(planCode)) {
+      return res.status(400).json({ success: false, error: 'Plan code invalide' })
+    }
+
+    // Get plan
+    const { data: plan } = await supabase
+      .from('plan_definitions')
+      .select('id, name, price_monthly, price_yearly, stripe_price_id_monthly, stripe_price_id_yearly, stripe_product_id')
+      .eq('id', planCode)
+      .single()
+    if (!plan) return res.status(404).json({ success: false, error: 'Plan introuvable' })
+
+    // Count agents
+    const { count: nbAgents } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
+    const agentCount = Math.max(1, nbAgents || 1)
+
+    // Get or create Stripe customer
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('stripe_customer_id, name, email')
+      .eq('id', orgId)
+      .single()
+
+    let customerId = org?.stripe_customer_id
+    if (stripe && !customerId) {
+      const { data: adminUser } = await supabase
+        .from('users')
+        .select('email, name')
+        .eq('organization_id', orgId)
+        .eq('role', 'ADMIN')
+        .limit(1)
+        .maybeSingle()
+
+      const customer = await stripe.customers.create({
+        email: adminUser?.email || org?.email || '',
+        name: org?.name || '',
+        metadata: { organization_id: orgId },
+      })
+      customerId = customer.id
+      await supabase.from('organizations').update({ stripe_customer_id: customerId }).eq('id', orgId)
+    }
+
+    // Check existing active subscription
+    const { data: existingSub } = await supabase
+      .from('org_subscriptions')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing', 'past_due'])
+      .limit(1)
+      .maybeSingle()
+
+    const priceId = billingCycle === 'yearly' ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly
+
+    if (!existingSub) {
+      // NEW SUBSCRIPTION
+      if (stripe && priceId) {
+        const subscription = await stripe.subscriptions.create({
+          customer: customerId,
+          items: [{ price: priceId, quantity: agentCount }],
+          trial_period_days: 14,
+          payment_behavior: 'default_incomplete',
+          expand: ['latest_invoice.payment_intent'],
+          currency: 'cad',
+          metadata: { orgId, planCode, serviceType: 'telephony' },
+        })
+
+        const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+        const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+        await supabase.from('org_subscriptions').insert({
+          organization_id: orgId,
+          plan_id: planCode,
+          service_type: 'TELEPHONY',
+          stripe_subscription_id: subscription.id,
+          stripe_customer_id: customerId,
+          stripe_price_id: priceId,
+          quantity: agentCount,
+          billing_cycle: billingCycle,
+          status: 'trialing',
+          unit_price: billingCycle === 'yearly' ? Math.round((plan.price_yearly || 0) / 12) : plan.price_monthly,
+          trial_ends_at: trialEnd.toISOString(),
+          current_period_start: new Date().toISOString(),
+          current_period_end: periodEnd.toISOString(),
+        })
+
+        const clientSecret = (subscription as any).latest_invoice?.payment_intent?.client_secret || null
+
+        return res.json({
+          success: true,
+          data: {
+            subscriptionId: subscription.id,
+            clientSecret,
+            planCode,
+            trialEnd: trialEnd.toISOString(),
+            prorataAmount: 0,
+          },
+        })
+      }
+
+      // Demo mode (no Stripe)
+      const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+      await supabase.from('org_subscriptions').insert({
+        organization_id: orgId,
+        plan_id: planCode,
+        service_type: 'TELEPHONY',
+        quantity: agentCount,
+        billing_cycle: billingCycle,
+        status: 'trialing',
+        unit_price: billingCycle === 'yearly' ? Math.round((plan.price_yearly || 0) / 12) : plan.price_monthly,
+        trial_ends_at: trialEnd.toISOString(),
+        current_period_start: new Date().toISOString(),
+        current_period_end: periodEnd.toISOString(),
+      })
+
+      return res.json({
+        success: true,
+        data: {
+          subscriptionId: 'demo_sub_' + Date.now(),
+          clientSecret: null,
+          planCode,
+          trialEnd: trialEnd.toISOString(),
+          prorataAmount: 0,
+        },
+      })
+    }
+
+    // EXISTING SUBSCRIPTION — plan change
+    if (stripe && existingSub.stripe_subscription_id && priceId) {
+      try {
+        const stripeSub = await stripe.subscriptions.retrieve(existingSub.stripe_subscription_id)
+        const itemId = stripeSub.items.data[0]?.id
+
+        if (itemId) {
+          await stripe.subscriptionItems.update(itemId, {
+            price: priceId,
+            quantity: agentCount,
+            proration_behavior: 'create_prorations',
+          })
+        }
+      } catch (stripeErr: any) {
+        console.error('[telephony/subscribe] Stripe update error:', stripeErr.message)
+      }
+    }
+
+    await supabase
+      .from('org_subscriptions')
       .update({
         plan_id: planCode,
-        cost_per_month: plan.price,
-        updated_at: new Date().toISOString(),
+        billing_cycle: billingCycle,
+        stripe_price_id: priceId || null,
+        quantity: agentCount,
+        unit_price: billingCycle === 'yearly' ? Math.round((plan.price_yearly || 0) / 12) : plan.price_monthly,
       })
-      .eq('id', req.params.agentId)
-      .eq('organization_id', org_id)
-      .select()
-      .single()
+      .eq('id', existingSub.id)
 
-    if (error) throw error
-    res.json({ success: true, data })
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message })
-  }
-})
+    const pricePerAgent = billingCycle === 'yearly' ? Math.round((plan.price_yearly || 0) / 12) : plan.price_monthly
 
-// ──────────────────────────────────────────────────────────
-// DELETE /agent/:agentId — retire l'agent du forfait
-// ──────────────────────────────────────────────────────────
-router.delete('/agent/:agentId', async (req: Request, res: Response) => {
-  try {
-    const org_id = getOrgId(req)
-
-    const { data, error } = await supabase
-      .from('extensions')
-      .update({
-        plan_id: null,
-        cost_per_month: 0,
-        status: 'inactive',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', req.params.agentId)
-      .eq('organization_id', org_id)
-      .select()
-      .single()
-
-    if (error) throw error
-
-    await supabase.from('billing_events').insert({
-      organization_id: org_id,
-      event_type: 'telephony_agent_removed',
-      description: `Agent ${data.extension_number} retire du forfait`,
+    res.json({
+      success: true,
+      data: {
+        planCode,
+        newMonthlyTotal: pricePerAgent * agentCount,
+        prorataToday: 0,
+      },
     })
-
-    res.json({ success: true, data })
   } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message })
+    res.status(500).json({ success: false, error: err.message })
   }
 })
 
 // ──────────────────────────────────────────────────────────
-// GET /destinations/:planCode — pays inclus dans le plan
+// PUT /plan — modifier le plan (alias de subscribe pour plan actif)
 // ──────────────────────────────────────────────────────────
-router.get('/destinations/:planCode', async (req: Request, res: Response) => {
-  const code = req.params.planCode.toUpperCase()
-  const destinations = DESTINATIONS[code]
-  if (!destinations) {
-    return res.status(404).json({ success: false, error: 'Plan introuvable' })
+router.put('/plan', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const { planCode, billingCycle = 'monthly' } = req.body
+
+    if (!VALID_PLAN_CODES.includes(planCode)) {
+      return res.status(400).json({ success: false, error: 'Plan code invalide' })
+    }
+
+    const { data: plan } = await supabase
+      .from('plan_definitions')
+      .select('id, name, price_monthly, price_yearly, stripe_price_id_monthly, stripe_price_id_yearly')
+      .eq('id', planCode)
+      .single()
+    if (!plan) return res.status(404).json({ success: false, error: 'Plan introuvable' })
+
+    const { data: existingSub } = await supabase
+      .from('org_subscriptions')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing', 'past_due'])
+      .limit(1)
+      .maybeSingle()
+
+    if (!existingSub) {
+      return res.status(400).json({ success: false, error: 'Aucun abonnement telephonie actif' })
+    }
+
+    const { count: nbAgents } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
+    const agentCount = Math.max(1, nbAgents || 1)
+
+    const priceId = billingCycle === 'yearly' ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly
+
+    if (stripe && existingSub.stripe_subscription_id && priceId) {
+      try {
+        const stripeSub = await stripe.subscriptions.retrieve(existingSub.stripe_subscription_id)
+        const itemId = stripeSub.items.data[0]?.id
+        if (itemId) {
+          await stripe.subscriptionItems.update(itemId, {
+            price: priceId,
+            quantity: agentCount,
+            proration_behavior: 'create_prorations',
+          })
+        }
+      } catch (stripeErr: any) {
+        console.error('[telephony/plan] Stripe error:', stripeErr.message)
+      }
+    }
+
+    const pricePerAgent = billingCycle === 'yearly' ? Math.round((plan.price_yearly || 0) / 12) : plan.price_monthly
+
+    await supabase
+      .from('org_subscriptions')
+      .update({
+        plan_id: planCode,
+        billing_cycle: billingCycle,
+        stripe_price_id: priceId || null,
+        quantity: agentCount,
+        unit_price: pricePerAgent,
+      })
+      .eq('id', existingSub.id)
+
+    // Prorata calc
+    const now = new Date()
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const daysRemaining = Math.max(1, Math.ceil((endOfMonth.getTime() - now.getTime()) / 86400000))
+    const daysInMonth = endOfMonth.getDate()
+    const prorataToday = Math.round((daysRemaining / daysInMonth) * pricePerAgent * agentCount)
+    const nextPaymentDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+
+    res.json({
+      success: true,
+      data: {
+        planCode,
+        newMonthlyTotal: pricePerAgent * agentCount,
+        prorataToday,
+        nextPaymentDate,
+      },
+    })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
   }
-  res.json({
-    success: true,
-    data: {
-      plan_code: code,
-      plan_name: PLAN_BY_CODE[code]?.name || code,
-      destinations,
-    },
-  })
 })
+
+// ──────────────────────────────────────────────────────────
+// DELETE /cancel — annuler a la fin de la periode
+// ──────────────────────────────────────────────────────────
+router.delete('/cancel', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+
+    const { data: sub } = await supabase
+      .from('org_subscriptions')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing'])
+      .limit(1)
+      .maybeSingle()
+
+    if (!sub) {
+      return res.status(400).json({ success: false, error: 'Aucun abonnement actif' })
+    }
+
+    if (stripe && sub.stripe_subscription_id) {
+      try {
+        await stripe.subscriptions.update(sub.stripe_subscription_id, {
+          cancel_at_period_end: true,
+        })
+      } catch (stripeErr: any) {
+        console.error('[telephony/cancel] Stripe error:', stripeErr.message)
+      }
+    }
+
+    const cancelAt = sub.current_period_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    await supabase
+      .from('org_subscriptions')
+      .update({ status: 'canceling', cancelled_at: cancelAt })
+      .eq('id', sub.id)
+
+    res.json({ success: true, data: { cancelAt } })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// ──────────────────────────────────────────────────────────
+// POST /sync-quantity — synchronise quantite agents <> Stripe
+// ──────────────────────────────────────────────────────────
+router.post('/sync-quantity', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+
+    const { count: nbAgents } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
+    const agentCount = Math.max(1, nbAgents || 1)
+
+    const { data: sub } = await supabase
+      .from('org_subscriptions')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing', 'past_due'])
+      .limit(1)
+      .maybeSingle()
+
+    if (sub) {
+      if (stripe && sub.stripe_subscription_id) {
+        try {
+          const stripeSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id)
+          const itemId = stripeSub.items.data[0]?.id
+          if (itemId) {
+            await stripe.subscriptionItems.update(itemId, { quantity: agentCount })
+          }
+        } catch (stripeErr: any) {
+          console.error('[telephony/sync-quantity] Stripe error:', stripeErr.message)
+        }
+      }
+
+      await supabase
+        .from('org_subscriptions')
+        .update({ quantity: agentCount })
+        .eq('id', sub.id)
+    }
+
+    res.json({ success: true, data: { nbAgents: agentCount, synced: true } })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// ──────────────────────────────────────────────────────────
+// Backward compat: GET /destinations/:planCode
+// ──────────────────────────────────────────────────────────
+const DESTINATIONS: Record<string, { country: string; fixed: boolean; mobile: boolean }[]> = {
+  TELCO_INBOUND: [],
+  TELCO_CA_US: [
+    { country: 'Canada', fixed: true, mobile: true },
+    { country: 'Etats-Unis', fixed: true, mobile: true },
+  ],
+  TELCO_CA_US_FR: [
+    { country: 'Canada', fixed: true, mobile: true },
+    { country: 'Etats-Unis', fixed: true, mobile: true },
+    { country: 'France', fixed: true, mobile: true },
+  ],
+  TELCO_INTL: [
+    { country: 'Canada', fixed: true, mobile: true },
+    { country: 'Etats-Unis', fixed: true, mobile: true },
+    { country: 'France', fixed: true, mobile: true },
+    { country: 'Allemagne', fixed: true, mobile: true },
+    { country: 'Royaume-Uni', fixed: true, mobile: true },
+    { country: 'Espagne', fixed: true, mobile: true },
+    { country: 'Italie', fixed: true, mobile: true },
+    { country: 'Portugal', fixed: true, mobile: true },
+    { country: 'Pays-Bas', fixed: true, mobile: true },
+    { country: 'Belgique', fixed: true, mobile: true },
+    { country: 'Suisse', fixed: true, mobile: true },
+    { country: 'Autriche', fixed: true, mobile: true },
+    { country: 'Suede', fixed: true, mobile: true },
+    { country: 'Norvege', fixed: true, mobile: true },
+    { country: 'Danemark', fixed: true, mobile: true },
+    { country: 'Finlande', fixed: true, mobile: true },
+    { country: 'Irlande', fixed: true, mobile: true },
+    { country: 'Pologne', fixed: true, mobile: true },
+    { country: 'Republique tcheque', fixed: true, mobile: true },
+    { country: 'Roumanie', fixed: true, mobile: true },
+    { country: 'Hongrie', fixed: true, mobile: true },
+    { country: 'Grece', fixed: true, mobile: true },
+    { country: 'Croatie', fixed: true, mobile: true },
+    { country: 'Bulgarie', fixed: true, mobile: true },
+    { country: 'Slovaquie', fixed: true, mobile: true },
+    { country: 'Slovenie', fixed: true, mobile: true },
+    { country: 'Lituanie', fixed: true, mobile: true },
+    { country: 'Lettonie', fixed: true, mobile: true },
+    { country: 'Estonie', fixed: true, mobile: true },
+    { country: 'Luxembourg', fixed: true, mobile: true },
+    { country: 'Malte', fixed: true, mobile: true },
+    { country: 'Chypre', fixed: true, mobile: true },
+    { country: 'Islande', fixed: true, mobile: true },
+  ],
+}
+
+router.get('/destinations/:planCode', async (req: Request, res: Response) => {
+  const code = String(req.params.planCode).toUpperCase()
+  const destinations = DESTINATIONS[code]
+  if (!destinations) return res.status(404).json({ success: false, error: 'Plan introuvable' })
+  res.json({ success: true, data: { plan_code: code, destinations } })
+})
+
+// ── Export sync-quantity helper for agent routes ──────────
+export async function syncOrgQuantity(orgId: string): Promise<void> {
+  try {
+    const { count: nbAgents } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'active')
+    const agentCount = Math.max(1, nbAgents || 1)
+
+    const { data: sub } = await supabase
+      .from('org_subscriptions')
+      .select('id, stripe_subscription_id')
+      .eq('organization_id', orgId)
+      .eq('service_type', 'TELEPHONY')
+      .in('status', ['active', 'trialing', 'past_due'])
+      .limit(1)
+      .maybeSingle()
+
+    if (sub) {
+      if (stripe && sub.stripe_subscription_id) {
+        try {
+          const stripeSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id)
+          const itemId = stripeSub.items.data[0]?.id
+          if (itemId) {
+            await stripe.subscriptionItems.update(itemId, { quantity: agentCount })
+          }
+        } catch {}
+      }
+      await supabase.from('org_subscriptions').update({ quantity: agentCount }).eq('id', sub.id)
+    }
+  } catch {}
+}
 
 export default router

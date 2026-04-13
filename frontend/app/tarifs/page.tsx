@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 /* ------------------------------------------------------------------ */
@@ -259,6 +259,203 @@ const FAQ = [
 /*  Component                                                          */
 /* ================================================================== */
 
+// ── API helper for tarifs ─────────────────────────────────
+function useApiPublic() {
+  const getUrl = () => typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
+  return async (path: string) => {
+    const r = await fetch(getUrl() + path, { headers: { 'Content-Type': 'application/json' } })
+    return r.json()
+  }
+}
+
+function fmtCentsT(cents: number): string {
+  return (cents / 100).toFixed(2).replace('.', ',').replace(/,00$/, '')
+}
+
+function TelcoCards({ annual }: { annual: boolean }) {
+  const api = useApiPublic()
+  const [plans, setPlans] = useState<any[]>([])
+
+  useEffect(() => {
+    api('/api/v1/billing/telephony/plans').then(r => {
+      if (r.success) setPlans(r.data || [])
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any): number => {
+    if (annual && p.price_yearly) return Math.round(p.price_yearly / 12)
+    return p.price_monthly
+  }
+
+  if (plans.length === 0) return null
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
+      {plans.map((p: any) => (
+        <div
+          key={p.plan_code}
+          style={{
+            background: CARD_BG,
+            border: p.popular ? `2px solid ${PURPLE}` : `1px solid ${CARD_BORDER}`,
+            borderRadius: '16px',
+            padding: '2rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+          }}
+        >
+          {p.popular && (
+            <span style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: PURPLE, color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '3px 14px', borderRadius: '20px' }}>Populaire</span>
+          )}
+
+          <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.5rem' }}>{p.name}</h3>
+
+          <div style={{ marginBottom: '1.2rem' }}>
+            <span style={{ fontSize: '2.4rem', fontWeight: 800 }}>{fmtCentsT(getPrice(p))}</span>
+            <span style={{ color: '#94a3b8', fontSize: '0.95rem' }}> CAD$/mois</span>
+            {annual && p.price_yearly && (
+              <div style={{ color: '#64748b', fontSize: '0.8rem' }}>facture {fmtCentsT(p.price_yearly)} CAD$/an</div>
+            )}
+          </div>
+
+          {/* Destinations */}
+          {p.destinations && p.destinations.length > 0 ? (
+            <div style={{ padding: '10px 12px', background: '#111128', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, marginBottom: '1.2rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#8888a8', fontWeight: 600, marginBottom: 6 }}>Appels sortants illimites vers:</div>
+              {p.destinations.map((d: string, i: number) => (
+                <div key={i} style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: 2 }}>{d.replace(' fixes et mobiles', '')}</div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '10px 12px', background: '#111128', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, marginBottom: '1.2rem', fontSize: '0.82rem', color: '#8888a8' }}>
+              Appels sortants: tarif a la minute
+            </div>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          <Link
+            href={`/commander?service=telephony&plan=${p.plan_code}`}
+            style={{
+              display: 'block', textAlign: 'center',
+              background: p.popular ? PURPLE : 'transparent',
+              color: '#fff',
+              border: p.popular ? 'none' : `1px solid ${CARD_BORDER}`,
+              borderRadius: '10px', padding: '0.7rem 1rem',
+              textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem',
+              transition: 'all .2s',
+            }}
+          >
+            Commencer l&apos;essai gratuit
+          </Link>
+          <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#475569', marginTop: 6 }}>
+            14 jours gratuits · Sans carte de credit requise
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RobotCards({ annual }: { annual: boolean }) {
+  const api = useApiPublic()
+  const [plans, setPlans] = useState<any[]>([])
+
+  useEffect(() => {
+    api('/api/v1/billing/robot/plans').then(r => {
+      if (r.success) setPlans(r.data || [])
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any): number => {
+    if (annual && p.price_yearly) return Math.round(p.price_yearly / 12)
+    return p.price_monthly
+  }
+
+  if (plans.length === 0) return null
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+      {plans.map((p: any) => (
+        <div key={p.plan_code} style={{ background: CARD_BG, border: p.popular ? `2px solid ${PURPLE}` : `1px solid ${CARD_BORDER}`, borderRadius: '16px', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {p.popular && <span style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: PURPLE, color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '3px 14px', borderRadius: '20px' }}>Populaire</span>}
+          <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.3rem' }}>{p.name}</h3>
+          <div style={{ marginBottom: '0.8rem' }}>
+            <span style={{ fontSize: '2.2rem', fontWeight: 800 }}>{fmtCentsT(getPrice(p))}</span>
+            <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}> CAD$/mois</span>
+            {annual && p.price_yearly && <div style={{ color: '#64748b', fontSize: '0.78rem' }}>facture {fmtCentsT(p.price_yearly)} CAD$/an</div>}
+          </div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: PURPLE, marginBottom: '0.8rem' }}>{p.minutes_included} minutes incluses</div>
+          <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1rem' }}>{p.max_concurrent_calls} simultanes — Surplus: {p.overage_rate.toFixed(2)} CAD$/min</div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.2rem', flex: 1 }}>
+            {(p.features || []).slice(0, 6).map((f: string, i: number) => (
+              <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0', fontSize: '0.82rem', color: '#cbd5e1' }}>
+                <span style={{ color: GREEN, fontWeight: 700 }}>{'\u2713'}</span> {f}
+              </li>
+            ))}
+          </ul>
+          <Link href={`/commander?service=robot&plan=${p.plan_code}`} style={{ display: 'block', textAlign: 'center', background: p.popular ? PURPLE : 'transparent', color: '#fff', border: p.popular ? 'none' : `1px solid ${CARD_BORDER}`, borderRadius: '10px', padding: '0.7rem 1rem', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+            Commencer l&apos;essai gratuit
+          </Link>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AddonCards({ annual }: { annual: boolean }) {
+  const api = useApiPublic()
+  const [plans, setPlans] = useState<any[]>([])
+
+  useEffect(() => {
+    api('/api/v1/billing/addons/plans').then(r => {
+      if (r.success) setPlans(r.data || [])
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any): number => {
+    if (annual && p.price_yearly) return Math.round(p.price_yearly / 12)
+    return p.price_monthly
+  }
+
+  if (plans.length === 0) return null
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+      {plans.map((p: any) => {
+        const isPerOrg = p.module_type === 'sms'
+        return (
+          <div key={p.plan_code} style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: '16px', padding: '1.8rem 1.5rem', display: 'flex', flexDirection: 'column' }}>
+            <h4 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.3rem' }}>{p.name}</h4>
+            <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '0.8rem' }}>{p.description}</p>
+            <div style={{ marginBottom: '1rem' }}>
+              <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{fmtCentsT(getPrice(p))}</span>
+              <span style={{ color: '#94a3b8', fontSize: '0.88rem' }}> CAD$/{isPerOrg ? 'mois' : 'agent/mois'}</span>
+              {annual && p.price_yearly && <div style={{ color: '#64748b', fontSize: '0.78rem' }}>facture {fmtCentsT(p.price_yearly)} CAD$/an</div>}
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.2rem', flex: 1 }}>
+              {(p.features || []).map((f: string, i: number) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0', fontSize: '0.82rem', color: '#cbd5e1' }}>
+                  <span style={{ color: GREEN, fontWeight: 700 }}>{'\u2713'}</span> {f}
+                </li>
+              ))}
+            </ul>
+            {p.module_type === 'sms' && (
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.8rem' }}>1000 SMS inclus — surplus 0,018 CAD$/SMS</div>
+            )}
+            {p.module_type === 'ia_coaching' && (
+              <div style={{ fontSize: '0.75rem', color: PURPLE, marginBottom: '0.8rem' }}>Inclut tout IA Basique</div>
+            )}
+            <Link href={`/commander?service=addons&modules=${p.module_type}`} style={{ display: 'block', textAlign: 'center', background: 'transparent', color: '#fff', border: `1px solid ${CARD_BORDER}`, borderRadius: '10px', padding: '0.65rem 1rem', textDecoration: 'none', fontWeight: 600, fontSize: '0.88rem', transition: 'all .2s' }}>
+              Ajouter ce module
+            </Link>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function TarifsPage() {
   const [annual, setAnnual] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
@@ -423,100 +620,26 @@ export default function TarifsPage() {
       </section>
 
       {/* ============================================================ */}
-      {/*  TELEPHONIE                                                   */}
+      {/*  INCLUS DANS TOUS LES FORFAITS                                */}
       {/* ============================================================ */}
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <h2 style={sectionTitle}>Telephonie d&apos;entreprise</h2>
-        <p style={sectionSub}>Solutions cloud pour toutes les tailles d&apos;equipe</p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
-          {TEL_PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              style={{
-                background: CARD_BG,
-                border: plan.popular ? `2px solid ${PURPLE}` : `1px solid ${CARD_BORDER}`,
-                borderRadius: '16px',
-                padding: '2rem 1.5rem',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-              }}
-            >
-              {plan.popular && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '-12px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: PURPLE,
-                    color: '#fff',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '3px 14px',
-                    borderRadius: '20px',
-                  }}
-                >
-                  Populaire
-                </span>
-              )}
-
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.5rem' }}>{plan.name}</h3>
-
-              <div style={{ marginBottom: '1.2rem' }}>
-                <span style={{ fontSize: '2.4rem', fontWeight: 800 }}>
-                  {price(plan.monthlyPrice, plan.annualMonthly)}
-                </span>
-                <span style={{ color: '#94a3b8', fontSize: '0.95rem' }}> CAD$/mois</span>
-                <div style={{ color: '#64748b', fontSize: '0.8rem' }}>/utilisateur/mois</div>
-              </div>
-
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.5rem', flex: 1 }}>
-                {plan.features.map((f, i) => {
-                  const included = f.included !== false
-                  return (
-                    <li
-                      key={i}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.3rem 0',
-                        fontSize: '0.88rem',
-                        color: included ? '#cbd5e1' : '#475569',
-                      }}
-                    >
-                      <span style={{ color: included ? GREEN : '#475569', fontWeight: 700, fontSize: '0.95rem' }}>
-                        {included ? '\u2713' : '\u2717'}
-                      </span>
-                      {typeof f.included === 'string' ? `${f.label}: ${f.included}` : f.label}
-                    </li>
-                  )
-                })}
-              </ul>
-
-              <Link
-                href={`/commander?service=telephony&plan=${plan.id}`}
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  background: plan.popular ? PURPLE : 'transparent',
-                  color: '#fff',
-                  border: plan.popular ? 'none' : `1px solid ${CARD_BORDER}`,
-                  borderRadius: '10px',
-                  padding: '0.7rem 1rem',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  transition: 'all .2s',
-                }}
-              >
-                Commencer l&apos;essai gratuit
-              </Link>
-            </div>
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem 1rem' }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>Inclus dans tous les forfaits telephonie</h3>
+        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: 16 }}>La seule difference entre les plans est la destination des appels sortants illimites.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {['Tableau de bord live','Mes lignes et numeros','Journal d\'appels','Enregistrements','Statistiques','IVR et Standard vocal','Files d\'attente ACD','Messagerie vocale','Supervision live','Ecoute et Soufflage','CRM integre','Prospects et calendrier','Modeles et devis','Applications et integrations','Dialer web et app','Parc telephonique'].map(f => (
+            <span key={f} style={{ padding: '5px 12px', borderRadius: 8, background: '#1a1a2e', color: '#94a3b8', fontSize: '0.78rem', fontWeight: 500 }}>{f}</span>
           ))}
         </div>
+      </section>
+
+      {/* ============================================================ */}
+      {/*  TELEPHONIE — 4 plans destinations                            */}
+      {/* ============================================================ */}
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem 3rem' }}>
+        <h2 style={sectionTitle}>Telephonie d&apos;entreprise</h2>
+        <p style={sectionSub}>Appels illimites selon votre destination</p>
+
+        <TelcoCards annual={annual} />
       </section>
 
       {/* ============================================================ */}
@@ -573,75 +696,36 @@ export default function TarifsPage() {
       {/*  ROBOT                                                        */}
       {/* ============================================================ */}
       <section style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <h2 style={sectionTitle}>Robot d&apos;appel</h2>
-        <p style={sectionSub}>Automatisation vocale pour vos campagnes a grande echelle</p>
+        <h2 style={sectionTitle}>Robot d&apos;appel masse</h2>
+        <p style={sectionSub}>Envoyez des milliers d&apos;appels automatises. Payez ce que vous utilisez.</p>
 
-        <div
-          style={{
-            background: CARD_BG,
-            border: `1px solid ${CARD_BORDER}`,
-            borderRadius: '16px',
-            padding: '2.5rem 2rem',
-            maxWidth: 600,
-            margin: '0 auto',
-            textAlign: 'center',
-          }}
-        >
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>{ROBOT.name}</h3>
-          <p style={{ color: '#94a3b8', fontSize: '0.92rem', marginBottom: '1.2rem' }}>{ROBOT.desc}</p>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '2.6rem', fontWeight: 800 }}>
-              {price(ROBOT.monthlyPrice, ROBOT.annualMonthly)}
-            </span>
-            <span style={{ color: '#94a3b8', fontSize: '1rem' }}> CAD$/mois</span>
-            <div style={{ color: '#64748b', fontSize: '0.8rem' }}>prix fixe, utilisateurs illimites</div>
+        <RobotCards annual={annual} />
+
+        {/* Credits */}
+        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>Sans abonnement — credits a la carte</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', maxWidth: 800, margin: '0 auto' }}>
+            {[{ min: 1000, price: 29 }, { min: 5000, price: 120 }, { min: 15000, price: 300 }, { min: 50000, price: 850 }].map(c => (
+              <div key={c.min} style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: '1.2rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{c.min.toLocaleString()}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 6 }}>minutes</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: PURPLE }}>{c.price} CAD$</div>
+                <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: 4 }}>~ {c.min * 2} appels 30s</div>
+              </div>
+            ))}
           </div>
-          <Link
-            href={`/commander?service=robot&plan=${ROBOT.id}`}
-            style={{
-              display: 'inline-block',
-              background: PURPLE,
-              color: '#fff',
-              borderRadius: '10px',
-              padding: '0.75rem 2rem',
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: '0.95rem',
-              border: 'none',
-            }}
-          >
-            Commencer l&apos;essai gratuit
-          </Link>
+          <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: 12 }}>Minutes incluses renouvelees chaque mois. Credits valables 12 mois. Surplus facture en fin de mois.</div>
         </div>
       </section>
 
       {/* ============================================================ */}
-      {/*  ADD-ONS                                                      */}
+      {/*  MODULES ADDITIONNELS                                         */}
       {/* ============================================================ */}
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem' }}>
-        <h2 style={sectionTitle}>Add-ons vendables separement</h2>
-        <p style={sectionSub}>Ajoutez des fonctionnalites a la carte</p>
+      <section id="modules" style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem' }}>
+        <h2 style={sectionTitle}>Modules additionnels</h2>
+        <p style={sectionSub}>Personnalisez votre plateforme. Activez uniquement ce dont vous avez besoin. S&apos;ajoutent a votre forfait telephonie.</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', maxWidth: 900, margin: '0 auto' }}>
-          {ADDONS.map((a) => (
-            <div
-              key={a.id}
-              style={{
-                background: CARD_BG,
-                border: `1px solid ${CARD_BORDER}`,
-                borderRadius: '16px',
-                padding: '1.5rem',
-              }}
-            >
-              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.3rem' }}>{a.name}</h4>
-              <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '0.8rem' }}>{a.desc}</p>
-              <div>
-                <span style={{ fontSize: '1.6rem', fontWeight: 800 }}>{a.monthlyPrice}</span>
-                <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}> CAD$/mois</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <AddonCards annual={annual} />
       </section>
 
       {/* ============================================================ */}

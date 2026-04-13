@@ -21,10 +21,24 @@ export default function AnalyticsPage() {
   const [period,      setPeriod]      = useState("30d")
   const [loading,     setLoading]     = useState(true)
   const [activeTab,   setActiveTab]   = useState<Tab>("analytics")
+  const [analyticsModuleActive, setAnalyticsModuleActive] = useState(true)
 
   useEffect(() => {
     if (!isAuth || !user) { router.push("/login"); return }
     loadData()
+    // Check analytics module
+    const tok = typeof window !== 'undefined' ? localStorage.getItem('vf_tok') : null
+    const url = typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
+    if (tok) {
+      fetch(url + '/api/v1/billing/addons/summary', {
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      }).then(r => r.json()).then(res => {
+        if (res.success && res.data?.activeModules) {
+          const active = (res.data.activeModules as any[]).some((m: any) => m.module_type === 'analytics' && ['active', 'trialing'].includes(m.status))
+          setAnalyticsModuleActive(active)
+        }
+      }).catch(() => {})
+    }
   }, [isAuth, user])
 
   const loadData = useCallback(async () => {
@@ -51,6 +65,14 @@ export default function AnalyticsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      {/* Module banner */}
+      {!analyticsModuleActive && (
+        <div className="bg-orange-950/40 border border-orange-800/30 rounded-xl px-5 py-4 mb-5 flex items-center justify-between">
+          <div className="text-[13px] text-orange-300">Analytics+ non active — Les rapports avances et l&apos;historique illimite ne sont pas disponibles.</div>
+          <a href="/client/plans" className="px-4 py-2 bg-[#7b61ff] text-white rounded-lg text-xs font-bold no-underline hover:bg-[#6145ff] whitespace-nowrap ml-4">Activer Analytics+</a>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl font-bold text-[#eeeef8]">IA + Analytics</h1>

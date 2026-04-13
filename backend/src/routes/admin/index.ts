@@ -2,6 +2,8 @@ import { Router, Response } from "express"
 import { authenticate, authorize, AuthRequest } from "../../middleware/auth"
 import { adminService } from "../../services/admin/admin.service"
 import { sendSuccess, sendError } from "../../utils/response"
+import { syncOrgQuantity } from "../billing/telephony"
+import { syncAddonQuantities } from "../billing/addons"
 
 const router = Router()
 router.use(authenticate)
@@ -46,7 +48,9 @@ router.post("/agents", async (req: AuthRequest, res: Response) => {
     if (!orgId) return sendError(res, "Organisation requise", 400)
     const { name, email, password, role, extension } = req.body
     if (!name || !email || !password) return sendError(res, "Nom, email et mot de passe requis", 400)
-    sendSuccess(res, await adminService.createAgent(orgId, { name, email, password, role, extension }), 201)
+    const result = await adminService.createAgent(orgId, { name, email, password, role, extension })
+    syncOrgQuantity(orgId).catch(() => {}); syncAddonQuantities(orgId).catch(() => {})
+    sendSuccess(res, result, 201)
   } catch (err: any) { sendError(res, err.message, 400) }
 })
 
@@ -56,6 +60,9 @@ router.patch("/agents/:id", async (req: AuthRequest, res: Response) => {
     const agentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
     console.log('[PATCH agent]', agentId, 'body keys:', Object.keys(req.body))
     const result = await adminService.updateAgent(agentId, orgId, req.body)
+    if (req.body.status === 'inactive' || req.body.status === 'INACTIVE') {
+      syncOrgQuantity(orgId).catch(() => {}); syncAddonQuantities(orgId).catch(() => {})
+    }
     sendSuccess(res, result)
   } catch (err: any) {
     console.error('[PATCH agent ERROR]', err.message)
@@ -67,7 +74,9 @@ router.delete("/agents/:id", async (req: AuthRequest, res: Response) => {
   try {
     const orgId   = getOrgId(req)
     const agentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
-    sendSuccess(res, await adminService.deleteAgent(agentId, orgId))
+    const result = await adminService.deleteAgent(agentId, orgId)
+    syncOrgQuantity(orgId).catch(() => {}); syncAddonQuantities(orgId).catch(() => {})
+    sendSuccess(res, result)
   } catch (err: any) { sendError(res, err.message) }
 })
 

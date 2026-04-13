@@ -1,5 +1,6 @@
 ﻿import { Router, Response } from "express"
 import { authenticate, authorize, AuthRequest, resolveOrgId } from "../../middleware/auth"
+import { requireModule } from "../../middleware/requireModule"
 import { analyticsService } from "../../services/analytics/analytics.service"
 import { sendSuccess, sendError } from "../../utils/response"
 
@@ -10,7 +11,7 @@ router.use(authorize("ADMIN", "OWNER", "OWNER_STAFF" as any, "SUPERVISOR"))
 // GET /api/v1/analytics/advanced — Stats avancées
 // OWNER / OWNER_STAFF peuvent passer ?orgId=X pour cibler une autre org.
 // ADMIN / SUPERVISOR utilisent strictement leur propre org depuis le JWT.
-router.get("/advanced", async (req: AuthRequest, res: Response) => {
+router.get("/advanced", requireModule('analytics'), async (req: AuthRequest, res: Response) => {
   try {
     const orgId  = resolveOrgId(req)
     const period = String(req.query.period || "30d")

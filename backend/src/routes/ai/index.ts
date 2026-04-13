@@ -1,11 +1,13 @@
 ﻿import { Router, Response } from "express"
 import { authenticate, AuthRequest } from "../../middleware/auth"
+import { requireModule } from "../../middleware/requireModule"
 import { aiService } from "../../services/openai/ai.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
 
 const router = Router()
 router.use(authenticate)
+router.use(requireModule('ia_basic'))
 
 // POST /api/v1/ai/transcribe/:callId — Transcription d un appel
 router.post("/transcribe/:callId", async (req: AuthRequest, res: Response) => {
