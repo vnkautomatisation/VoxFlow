@@ -21,19 +21,12 @@ interface Props {
   onCreate?: (start: Date, end: Date) => void
 }
 
-const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
-  SCHEDULED: { bg: '#7b61ff', border: '#6145ff' },
-  CONFIRMED: { bg: '#00d4aa', border: '#00b890' },
-  CANCELLED: { bg: '#ff4d6d', border: '#e03050' },
-  COMPLETED: { bg: '#55557a', border: '#3a3a55' },
-  NO_SHOW:   { bg: '#ffb547', border: '#e09a30' },
-}
-
-const TYPE_ICONS: Record<string, string> = {
-  CALL: 'tel',
-  VIDEO: 'cam',
-  MEETING: 'mtg',
-  VISIT: 'vis',
+const STATUS_COLORS: Record<string, string> = {
+  SCHEDULED: '#7b61ff',
+  CONFIRMED: '#00d4aa',
+  CANCELLED: '#ff4d6d',
+  COMPLETED: '#55557a',
+  NO_SHOW:   '#ffb547',
 }
 
 export default function CRMCalendar({ appointments, contacts, onSelect, onCreate }: Props) {
@@ -52,271 +45,109 @@ export default function CRMCalendar({ appointments, contacts, onSelect, onCreate
   }), [appointments, contacts])
 
   const eventStyleGetter = useCallback((event: any) => {
-    const colors = STATUS_COLORS[event.resource?.status] || STATUS_COLORS.SCHEDULED
+    const bg = STATUS_COLORS[event.resource?.status] || '#7b61ff'
     return {
       style: {
-        backgroundColor: colors.bg,
-        borderLeft: `3px solid ${colors.border}`,
+        backgroundColor: bg,
+        borderLeft: `3px solid ${bg}`,
         borderTop: 'none',
         borderRight: 'none',
         borderBottom: 'none',
-        borderRadius: '4px',
+        borderRadius: '6px',
         fontSize: '11px',
         fontWeight: 600,
         fontFamily: "'DM Sans', sans-serif",
-        padding: '3px 8px',
+        padding: '4px 8px',
         color: '#fff',
-        textShadow: '0 1px 2px rgba(0,0,0,.3)',
-        boxShadow: '0 2px 8px rgba(0,0,0,.25)',
-        lineHeight: '1.3',
+        boxShadow: `0 2px 8px ${bg}44`,
+        lineHeight: '1.4',
+        cursor: 'pointer',
       },
     }
   }, [])
 
-  const handleSelectSlot = useCallback(({ start, end }: { start: Date; end: Date }) => {
-    onCreate?.(start, end)
-  }, [onCreate])
-
-  const handleSelectEvent = useCallback((event: any) => {
-    onSelect?.(event.resource)
-  }, [onSelect])
-
   return (
-    <div style={{ height: '100%', minHeight: 560 }}>
+    <div className="vf-cal-wrap" style={{ height: '100%', minHeight: 560 }}>
       <style>{`
-        /* ── Base ── */
-        .rbc-calendar {
-          background: transparent;
-          color: #eeeef8;
-          font-family: 'DM Sans', sans-serif;
-          border: none;
-        }
+        .vf-cal-wrap .rbc-calendar,
+        .vf-cal-wrap .rbc-calendar * { box-sizing: border-box; }
+        .vf-cal-wrap .rbc-calendar { background: transparent !important; color: #eeeef8 !important; font-family: 'DM Sans',sans-serif !important; border: none !important; }
 
-        /* ── Toolbar ── */
-        .rbc-toolbar {
-          padding: 0 0 12px;
-          margin-bottom: 0;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .rbc-toolbar button {
-          color: #9898b8;
-          border: 1px solid #2e2e44;
-          background: #18181f;
-          border-radius: 8px;
-          padding: 6px 14px;
-          font-size: 12px;
-          font-weight: 600;
-          font-family: 'DM Sans', sans-serif;
-          transition: all 0.15s;
-        }
-        .rbc-toolbar button:hover {
-          background: #1f1f2a;
-          color: #eeeef8;
-          border-color: #3a3a55;
-        }
-        .rbc-toolbar button.rbc-active {
-          background: #7b61ff;
-          color: white;
-          border-color: #7b61ff;
-          box-shadow: 0 2px 8px rgba(123,97,255,.3);
-        }
-        .rbc-toolbar-label {
-          color: #eeeef8;
-          font-size: 15px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-        }
-        .rbc-btn-group {
-          gap: 2px;
-        }
+        /* Toolbar */
+        .vf-cal-wrap .rbc-toolbar { padding: 0 0 14px !important; margin-bottom: 0 !important; gap: 8px !important; }
+        .vf-cal-wrap .rbc-toolbar button { color: #9898b8 !important; border: 1px solid #2e2e44 !important; background: #18181f !important; border-radius: 8px !important; padding: 7px 16px !important; font-size: 12px !important; font-weight: 600 !important; font-family: 'DM Sans',sans-serif !important; transition: all .15s !important; }
+        .vf-cal-wrap .rbc-toolbar button:hover { background: #1f1f2a !important; color: #eeeef8 !important; }
+        .vf-cal-wrap .rbc-toolbar button.rbc-active { background: #7b61ff !important; color: #fff !important; border-color: #7b61ff !important; box-shadow: 0 2px 8px rgba(123,97,255,.35) !important; }
+        .vf-cal-wrap .rbc-toolbar-label { color: #eeeef8 !important; font-size: 15px !important; font-weight: 700 !important; }
 
-        /* ── Header (jours) ── */
-        .rbc-header {
-          background: #18181f;
-          border-bottom: 1px solid #2e2e44 !important;
-          color: #9898b8;
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          padding: 10px 8px;
-        }
-        .rbc-header + .rbc-header {
-          border-left: 1px solid #2e2e44 !important;
-        }
+        /* Header jours */
+        .vf-cal-wrap .rbc-header { background: #15151f !important; border-color: #2e2e44 !important; color: #9898b8 !important; font-size: 11px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; padding: 10px 8px !important; }
+        .vf-cal-wrap .rbc-header + .rbc-header { border-left-color: #2e2e44 !important; }
 
-        /* ── Vue semaine/jour ── */
-        .rbc-time-view {
-          border: 1px solid #2e2e44;
-          border-radius: 12px;
-          overflow: hidden;
-          background: #111118;
-        }
-        .rbc-time-header {
-          border-bottom: 1px solid #2e2e44;
-        }
-        .rbc-time-header-content {
-          border-left: 1px solid #2e2e44;
-        }
-        .rbc-time-content {
-          border-top: none;
-        }
-        .rbc-time-content > * + * > * {
-          border-left: 1px solid #1a1a2e;
-        }
-        .rbc-timeslot-group {
-          border-bottom: 1px solid #1a1a2e;
-          min-height: 48px;
-        }
-        .rbc-time-slot {
-          border-top: none;
-        }
-        .rbc-time-gutter .rbc-timeslot-group {
-          border-bottom: 1px solid #1a1a2e;
-        }
+        /* Time view */
+        .vf-cal-wrap .rbc-time-view { border: 1px solid #2e2e44 !important; border-radius: 14px !important; overflow: hidden !important; background: #0d0d16 !important; }
+        .vf-cal-wrap .rbc-time-header { border-bottom: 1px solid #2e2e44 !important; }
+        .vf-cal-wrap .rbc-time-header-content { border-left: 1px solid #2e2e44 !important; }
+        .vf-cal-wrap .rbc-time-content { border-top: none !important; }
+        .vf-cal-wrap .rbc-time-content > * + * > * { border-left: 1px solid #1a1a28 !important; }
+        .vf-cal-wrap .rbc-timeslot-group { border-bottom: 1px solid #1a1a28 !important; min-height: 52px !important; }
+        .vf-cal-wrap .rbc-time-slot { border-top: none !important; }
+        .vf-cal-wrap .rbc-time-gutter .rbc-timeslot-group { border-bottom-color: #1a1a28 !important; }
 
-        /* ── Label heures ── */
-        .rbc-label {
-          color: #55557a;
-          font-size: 10px;
-          font-weight: 600;
-          padding: 0 8px;
-        }
+        /* Heures label */
+        .vf-cal-wrap .rbc-label { color: #4a4a6a !important; font-size: 10px !important; font-weight: 700 !important; padding: 0 10px !important; }
 
-        /* ── Cellules jour ── */
-        .rbc-day-bg {
-          background: #111118;
-          transition: background 0.15s;
-        }
-        .rbc-day-bg:hover {
-          background: #15151f;
-        }
-        .rbc-day-bg + .rbc-day-bg {
-          border-left: 1px solid #1a1a2e;
-        }
-        .rbc-today {
-          background: rgba(123,97,255,0.04) !important;
-        }
-        .rbc-off-range-bg {
-          background: #0a0a14;
-        }
+        /* Cellules */
+        .vf-cal-wrap .rbc-day-bg { background: #0d0d16 !important; }
+        .vf-cal-wrap .rbc-day-bg:hover { background: #121220 !important; }
+        .vf-cal-wrap .rbc-day-bg + .rbc-day-bg { border-left: 1px solid #1a1a28 !important; }
+        .vf-cal-wrap .rbc-today { background: rgba(123,97,255,0.06) !important; }
+        .vf-cal-wrap .rbc-off-range-bg { background: #080810 !important; }
 
-        /* ── Vue mois ── */
-        .rbc-month-view {
-          border: 1px solid #2e2e44;
-          border-radius: 12px;
-          overflow: hidden;
-          background: #111118;
-        }
-        .rbc-month-row + .rbc-month-row {
-          border-top: 1px solid #1a1a2e;
-        }
-        .rbc-date-cell {
-          color: #55557a;
-          font-size: 12px;
-          font-weight: 600;
-          padding: 6px 8px;
-        }
-        .rbc-date-cell.rbc-now {
-          color: #7b61ff;
-          font-weight: 800;
-        }
+        /* Vue mois */
+        .vf-cal-wrap .rbc-month-view { border: 1px solid #2e2e44 !important; border-radius: 14px !important; overflow: hidden !important; background: #0d0d16 !important; }
+        .vf-cal-wrap .rbc-month-row + .rbc-month-row { border-top: 1px solid #1a1a28 !important; }
+        .vf-cal-wrap .rbc-month-row { overflow: visible !important; }
+        .vf-cal-wrap .rbc-date-cell { color: #55557a !important; font-size: 12px !important; font-weight: 600 !important; padding: 6px 10px !important; }
+        .vf-cal-wrap .rbc-date-cell.rbc-now { color: #7b61ff !important; font-weight: 800 !important; }
+        .vf-cal-wrap .rbc-row-bg { background: #0d0d16 !important; }
 
-        /* ── Evenements ── */
-        .rbc-event {
-          box-shadow: 0 2px 8px rgba(0,0,0,.3);
-          outline: none !important;
-        }
-        .rbc-event:hover {
-          filter: brightness(1.12);
-          transform: scale(1.01);
-          z-index: 10 !important;
-        }
-        .rbc-event:focus {
-          outline: 2px solid #7b61ff !important;
-          outline-offset: 1px;
-        }
-        .rbc-event-label {
-          font-size: 10px;
-          font-weight: 600;
-          opacity: 0.85;
-        }
-        .rbc-event-content {
-          font-size: 11px;
-          font-weight: 600;
-        }
-        .rbc-selected {
-          outline: 2px solid #eeeef8 !important;
-          outline-offset: 1px;
-        }
+        /* Events */
+        .vf-cal-wrap .rbc-event { outline: none !important; border: none !important; }
+        .vf-cal-wrap .rbc-event:hover { filter: brightness(1.15) !important; transform: translateY(-1px) !important; }
+        .vf-cal-wrap .rbc-event-label { font-size: 9px !important; opacity: .8 !important; }
+        .vf-cal-wrap .rbc-event-content { font-size: 11px !important; font-weight: 600 !important; }
+        .vf-cal-wrap .rbc-selected { box-shadow: 0 0 0 2px #eeeef8 !important; }
+        .vf-cal-wrap .rbc-event-overlaps { box-shadow: -1px 1px 5px rgba(0,0,0,.2) !important; }
 
-        /* ── Indicateur heure courante ── */
-        .rbc-current-time-indicator {
-          background: #7b61ff;
-          height: 2px;
-          box-shadow: 0 0 8px rgba(123,97,255,.6);
-        }
+        /* Current time */
+        .vf-cal-wrap .rbc-current-time-indicator { background: #7b61ff !important; height: 2px !important; box-shadow: 0 0 10px rgba(123,97,255,.7) !important; z-index: 3 !important; }
 
-        /* ── Show more ── */
-        .rbc-show-more {
-          color: #7b61ff;
-          font-size: 10px;
-          font-weight: 700;
-          background: transparent !important;
-        }
+        /* Show more */
+        .vf-cal-wrap .rbc-show-more { color: #7b61ff !important; font-size: 10px !important; font-weight: 700 !important; background: transparent !important; }
 
-        /* ── Agenda ── */
-        .rbc-agenda-view table.rbc-agenda-table {
-          border: 1px solid #2e2e44;
-          border-radius: 12px;
-          overflow: hidden;
-        }
-        .rbc-agenda-view table.rbc-agenda-table thead > tr > th {
-          background: #18181f;
-          color: #55557a;
-          border-bottom: 1px solid #2e2e44;
-          font-size: 10px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          padding: 10px 12px;
-        }
-        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
-          padding: 8px 12px;
-          border-top: 1px solid #1a1a2e;
-          color: #eeeef8;
-          font-size: 12px;
-        }
-        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td + td {
-          border-left: 1px solid #1a1a2e;
-        }
-        .rbc-agenda-date-cell, .rbc-agenda-time-cell {
-          color: #9898b8;
-          white-space: nowrap;
-        }
-        .rbc-agenda-event-cell {
-          color: #eeeef8;
-        }
+        /* Agenda */
+        .vf-cal-wrap .rbc-agenda-view table { border-collapse: collapse !important; }
+        .vf-cal-wrap .rbc-agenda-view table.rbc-agenda-table { border: 1px solid #2e2e44 !important; border-radius: 14px !important; overflow: hidden !important; }
+        .vf-cal-wrap .rbc-agenda-view table thead th { background: #15151f !important; color: #55557a !important; border: none !important; border-bottom: 1px solid #2e2e44 !important; font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase !important; padding: 10px 14px !important; }
+        .vf-cal-wrap .rbc-agenda-view table tbody td { padding: 10px 14px !important; border-top: 1px solid #1a1a28 !important; color: #eeeef8 !important; font-size: 12px !important; }
+        .vf-cal-wrap .rbc-agenda-view table tbody td + td { border-left: 1px solid #1a1a28 !important; }
+        .vf-cal-wrap .rbc-agenda-date-cell { color: #9898b8 !important; }
+        .vf-cal-wrap .rbc-agenda-time-cell { color: #55557a !important; }
+        .vf-cal-wrap .rbc-agenda-empty { color: #55557a !important; text-align: center !important; padding: 40px !important; }
 
-        /* ── Selection slot ── */
-        .rbc-slot-selection {
-          background: rgba(123,97,255,0.15);
-          border: 1px solid rgba(123,97,255,0.4);
-          border-radius: 4px;
-        }
+        /* Slot selection */
+        .vf-cal-wrap .rbc-slot-selection { background: rgba(123,97,255,.12) !important; border: 1px dashed rgba(123,97,255,.4) !important; border-radius: 6px !important; }
 
-        /* ── Scrollbar ── */
-        .rbc-time-content::-webkit-scrollbar {
-          width: 6px;
-        }
-        .rbc-time-content::-webkit-scrollbar-track {
-          background: #111118;
-        }
-        .rbc-time-content::-webkit-scrollbar-thumb {
-          background: #2e2e44;
-          border-radius: 3px;
-        }
+        /* Scrollbar */
+        .vf-cal-wrap .rbc-time-content::-webkit-scrollbar { width: 6px !important; }
+        .vf-cal-wrap .rbc-time-content::-webkit-scrollbar-track { background: #0d0d16 !important; }
+        .vf-cal-wrap .rbc-time-content::-webkit-scrollbar-thumb { background: #2e2e44 !important; border-radius: 3px !important; }
+
+        /* All borders override */
+        .vf-cal-wrap .rbc-month-header, .vf-cal-wrap .rbc-time-header-gutter { border-color: #2e2e44 !important; background: #15151f !important; }
+        .vf-cal-wrap .rbc-allday-cell { border-color: #2e2e44 !important; background: #0d0d16 !important; }
+        .vf-cal-wrap .rbc-row-content { z-index: 1 !important; }
       `}</style>
       <BigCalendar
         localizer={localizer}
@@ -325,8 +156,8 @@ export default function CRMCalendar({ appointments, contacts, onSelect, onCreate
         date={date}
         onView={v => setView(v)}
         onNavigate={d => setDate(d)}
-        onSelectSlot={handleSelectSlot}
-        onSelectEvent={handleSelectEvent}
+        onSelectSlot={({ start, end }) => onCreate?.(start, end)}
+        onSelectEvent={(event: any) => onSelect?.(event.resource)}
         selectable
         eventPropGetter={eventStyleGetter}
         messages={{
