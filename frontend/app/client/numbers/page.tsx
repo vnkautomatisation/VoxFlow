@@ -29,27 +29,149 @@ function useApi() {
 
 /* ────────────────────────────── Data ─────────────────────────────── */
 
+// All Twilio-supported countries for DID purchase
 const COUNTRY_OPTIONS = [
   { code: 'CA', label: 'Canada', dotColors: ['#ff0000'] },
   { code: 'US', label: 'Etats-Unis', dotColors: ['#3c3bfa'] },
   { code: 'FR', label: 'France', dotColors: ['#0055a4', '#ffffff', '#ef4135'] },
+  { code: 'GB', label: 'Royaume-Uni', dotColors: ['#c8102e'] },
+  { code: 'DE', label: 'Allemagne', dotColors: ['#000000', '#dd0000', '#ffcc00'] },
+  { code: 'ES', label: 'Espagne', dotColors: ['#c60b1e', '#ffc400'] },
+  { code: 'IT', label: 'Italie', dotColors: ['#008c45', '#ffffff', '#cd212a'] },
+  { code: 'NL', label: 'Pays-Bas', dotColors: ['#ae1c28', '#ffffff', '#21468b'] },
+  { code: 'BE', label: 'Belgique', dotColors: ['#000000', '#ffd90c', '#f31830'] },
+  { code: 'CH', label: 'Suisse', dotColors: ['#ff0000'] },
+  { code: 'PT', label: 'Portugal', dotColors: ['#006600', '#ff0000'] },
+  { code: 'AT', label: 'Autriche', dotColors: ['#ed2939', '#ffffff'] },
+  { code: 'IE', label: 'Irlande', dotColors: ['#169b62', '#ffffff', '#ff883e'] },
+  { code: 'SE', label: 'Suede', dotColors: ['#006aa7', '#fecc00'] },
+  { code: 'NO', label: 'Norvege', dotColors: ['#ef2b2d', '#002868'] },
+  { code: 'DK', label: 'Danemark', dotColors: ['#c60c30'] },
+  { code: 'FI', label: 'Finlande', dotColors: ['#003580', '#ffffff'] },
+  { code: 'PL', label: 'Pologne', dotColors: ['#ffffff', '#dc143c'] },
+  { code: 'CZ', label: 'Republique Tcheque', dotColors: ['#11457e', '#d7141a'] },
+  { code: 'AU', label: 'Australie', dotColors: ['#00008b', '#ffffff'] },
+  { code: 'NZ', label: 'Nouvelle-Zelande', dotColors: ['#00247d'] },
+  { code: 'JP', label: 'Japon', dotColors: ['#bc002d'] },
+  { code: 'SG', label: 'Singapour', dotColors: ['#ef3340', '#ffffff'] },
+  { code: 'HK', label: 'Hong Kong', dotColors: ['#de2910'] },
+  { code: 'IL', label: 'Israel', dotColors: ['#0038b8'] },
+  { code: 'ZA', label: 'Afrique du Sud', dotColors: ['#007749', '#000000', '#de3831'] },
+  { code: 'BR', label: 'Bresil', dotColors: ['#009c3b', '#ffdf00'] },
+  { code: 'MX', label: 'Mexique', dotColors: ['#006847', '#ffffff', '#ce1126'] },
+  { code: 'AR', label: 'Argentine', dotColors: ['#75aadb', '#ffffff'] },
+  { code: 'CL', label: 'Chili', dotColors: ['#d52b1e', '#ffffff', '#0039a6'] },
+  { code: 'CO', label: 'Colombie', dotColors: ['#fcd116', '#003893', '#ce1126'] },
+  { code: 'PR', label: 'Porto Rico', dotColors: ['#3c3bfa', '#ff0000'] },
+  { code: 'DO', label: 'Republique Dominicaine', dotColors: ['#002d62', '#ce1126'] },
+  { code: 'IN', label: 'Inde', dotColors: ['#ff9933', '#ffffff', '#138808'] },
+  { code: 'PH', label: 'Philippines', dotColors: ['#0038a8', '#ce1126'] },
+  { code: 'RO', label: 'Roumanie', dotColors: ['#002b7f', '#fcd116', '#ce1126'] },
+  { code: 'BG', label: 'Bulgarie', dotColors: ['#ffffff', '#00966e', '#d62612'] },
+  { code: 'HR', label: 'Croatie', dotColors: ['#ff0000', '#ffffff', '#171796'] },
+  { code: 'SK', label: 'Slovaquie', dotColors: ['#ffffff', '#0b4ea2', '#ee1c25'] },
+  { code: 'LT', label: 'Lituanie', dotColors: ['#fdb913', '#006a44', '#c1272d'] },
+  { code: 'LV', label: 'Lettonie', dotColors: ['#9e3039'] },
+  { code: 'EE', label: 'Estonie', dotColors: ['#0072ce', '#000000'] },
 ]
 
+// Default regions per country (main areas) — for countries not listed, user enters area code manually
 const REGIONS_BY_COUNTRY: Record<string, { label: string; areaCode: string; addressRequired: boolean; delay: string; documentsRequired: string }[]> = {
   CA: [
-    { label: 'Quebec', areaCode: '514', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
-    { label: 'Ontario', areaCode: '416', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
-    { label: 'Colombie-Britannique', areaCode: '604', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Quebec - Montreal', areaCode: '514', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Quebec - Quebec City', areaCode: '418', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Ontario - Toronto', areaCode: '416', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Ontario - Ottawa', areaCode: '613', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Colombie-Britannique - Vancouver', areaCode: '604', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Alberta - Calgary', areaCode: '403', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Alberta - Edmonton', areaCode: '780', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Manitoba - Winnipeg', areaCode: '204', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Sans-frais / Toll-free', areaCode: '800', addressRequired: false, delay: '1-2 jours', documentsRequired: 'Aucun' },
   ],
   US: [
     { label: 'New York', areaCode: '212', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
-    { label: 'California', areaCode: '310', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Los Angeles', areaCode: '310', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Chicago', areaCode: '312', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Houston', areaCode: '713', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Miami', areaCode: '305', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'San Francisco', areaCode: '415', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Washington DC', areaCode: '202', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Toll-free', areaCode: '888', addressRequired: false, delay: '1-2 jours', documentsRequired: 'Aucun' },
   ],
   FR: [
-    { label: 'Paris', areaCode: '01', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
-    { label: 'Lyon', areaCode: '04', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Paris / Ile-de-France', areaCode: '01', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Lyon / Rhone-Alpes', areaCode: '04', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Marseille / PACA', areaCode: '04', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Toulouse / Midi-Pyrenees', areaCode: '05', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Bordeaux / Aquitaine', areaCode: '05', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Nantes / Pays de la Loire', areaCode: '02', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Strasbourg / Alsace', areaCode: '03', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Mobile', areaCode: '06', addressRequired: true, delay: '5-7 jours', documentsRequired: 'Piece identite' },
+  ],
+  GB: [
+    { label: 'London', areaCode: '20', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Proof of address' },
+    { label: 'Manchester', areaCode: '161', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Proof of address' },
+    { label: 'Birmingham', areaCode: '121', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Proof of address' },
+    { label: 'Edinburgh', areaCode: '131', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Proof of address' },
+    { label: 'National', areaCode: '330', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+  ],
+  DE: [
+    { label: 'Berlin', areaCode: '30', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Munich', areaCode: '89', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Frankfurt', areaCode: '69', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Hamburg', areaCode: '40', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+  ],
+  ES: [
+    { label: 'Madrid', areaCode: '91', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Barcelona', areaCode: '93', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'National', areaCode: '900', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+  ],
+  IT: [
+    { label: 'Rome', areaCode: '06', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Milan', areaCode: '02', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+  ],
+  NL: [
+    { label: 'Amsterdam', areaCode: '20', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Rotterdam', areaCode: '10', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+  ],
+  BE: [
+    { label: 'Bruxelles', areaCode: '2', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Anvers', areaCode: '3', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+  ],
+  CH: [
+    { label: 'Zurich', areaCode: '44', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Geneve', areaCode: '22', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+  ],
+  AU: [
+    { label: 'Sydney', areaCode: '2', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+    { label: 'Melbourne', areaCode: '3', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
+  ],
+  BR: [
+    { label: 'Sao Paulo', areaCode: '11', addressRequired: true, delay: '5-7 jours', documentsRequired: 'Piece identite + adresse' },
+    { label: 'Rio de Janeiro', areaCode: '21', addressRequired: true, delay: '5-7 jours', documentsRequired: 'Piece identite + adresse' },
+  ],
+  MX: [
+    { label: 'Mexico City', areaCode: '55', addressRequired: true, delay: '5-7 jours', documentsRequired: 'Piece identite' },
+  ],
+  JP: [
+    { label: 'Tokyo', areaCode: '3', addressRequired: true, delay: '5-10 jours', documentsRequired: 'Documents entreprise' },
+    { label: 'Osaka', areaCode: '6', addressRequired: true, delay: '5-10 jours', documentsRequired: 'Documents entreprise' },
+  ],
+  IL: [
+    { label: 'Tel Aviv', areaCode: '3', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+  ],
+  IN: [
+    { label: 'Mumbai', areaCode: '22', addressRequired: true, delay: '7-14 jours', documentsRequired: 'Documents entreprise' },
+    { label: 'Delhi', areaCode: '11', addressRequired: true, delay: '7-14 jours', documentsRequired: 'Documents entreprise' },
+  ],
+  ZA: [
+    { label: 'Johannesburg', areaCode: '11', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
+    { label: 'Cape Town', areaCode: '21', addressRequired: true, delay: '3-5 jours', documentsRequired: 'Piece identite' },
   ],
 }
+
+// For countries without predefined regions, show a generic "area code" input
+const DEFAULT_REGION = { label: 'Numero national', areaCode: '', addressRequired: true, delay: '3-7 jours', documentsRequired: 'Selon le pays' }
 
 interface ActionOption { label: string; value: string }
 interface ActionGroup { category: string; options: ActionOption[] }
@@ -251,8 +373,8 @@ export default function NumbersPage() {
     setWizOrdering(false); setWizDone(false)
   }
 
-  const wizRegions = REGIONS_BY_COUNTRY[wizCountry] || []
-  const wizSelectedRegion = wizRegions[wizRegionIdx] || wizRegions[0]
+  const wizRegions = REGIONS_BY_COUNTRY[wizCountry] || [DEFAULT_REGION]
+  const wizSelectedRegion = wizRegions[wizRegionIdx] || wizRegions[0] || DEFAULT_REGION
 
   const submitOrder = async () => {
     if (!wizSelectedRegion) return
