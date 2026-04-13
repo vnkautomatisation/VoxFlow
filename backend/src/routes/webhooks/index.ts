@@ -2,6 +2,8 @@
 import { stripeService } from "../../services/stripe/stripe.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess } from "../../utils/response"
+import { cancelAllAddons } from "../billing/addons"
+import { trackRobotMinutes } from "../billing/robot"
 
 const router = Router()
 
@@ -36,6 +38,82 @@ router.post("/twilio/status", async (req: Request, res: Response) => {
   sendSuccess(res, { received: true })
 })
 
+// POST /api/v1/webhooks/twilio/robot-result — Robot call result
+router.post("/twilio/robot-result", async (req: Request, res: Response) => {
+  try {
+    const { CallSid, CallStatus, Duration, To, AnsweredBy } = req.body
+    if (!CallSid) return sendSuccess(res, { received: true })
+
+    // Find contact by twilio_call_sid
+    const { data: contact } = await supabaseAdmin
+      .from("robot_contacts")
+      .select("id, campaign_id, organization_id, call_attempts, status")
+      .eq("twilio_call_sid", CallSid)
+      .maybeSingle()
+
+    if (!contact) return sendSuccess(res, { received: true })
+
+    // Determine result
+    let newStatus = contact.status
+    if (CallStatus === "completed") {
+      if (AnsweredBy === "human") newStatus = "answered_human"
+      else if (["machine_start", "machine_end_beep", "machine_end_silence", "fax"].includes(AnsweredBy)) newStatus = "answered_machine"
+    } else if (CallStatus === "no-answer") { newStatus = "no_answer" }
+    else if (["failed", "busy"].includes(CallStatus)) { newStatus = "failed" }
+
+    const durationMin = parseFloat(Duration || "0") / 60
+
+    // Update contact
+    await supabaseAdmin.from("robot_contacts").update({
+      status: newStatus,
+      call_duration_seconds: parseFloat(Duration || "0"),
+      last_attempt_at: new Date().toISOString(),
+      call_attempts: (contact.call_attempts || 0) + 1,
+    }).eq("id", contact.id)
+
+    // Update campaign counters
+    const counterField = newStatus === "answered_human" ? "answered_human"
+      : newStatus === "answered_machine" ? "answered_machine"
+      : newStatus === "no_answer" ? "no_answer" : "failed"
+
+    const { data: camp } = await supabaseAdmin.from("robot_campaigns_v2")
+      .select(`called, ${counterField}, minutes_used, max_attempts, status, total_contacts`)
+      .eq("id", contact.campaign_id).single()
+
+    if (camp) {
+      await supabaseAdmin.from("robot_campaigns_v2").update({
+        called: (camp.called || 0) + 1,
+        [counterField]: (camp[counterField] || 0) + 1,
+        minutes_used: parseFloat(camp.minutes_used || "0") + durationMin,
+      }).eq("id", contact.campaign_id)
+
+      // Track minutes for billing
+      if (durationMin > 0) {
+        trackRobotMinutes(contact.organization_id, durationMin).catch(() => {})
+      }
+
+      // Recycle no_answer contacts
+      if (newStatus === "no_answer" && (contact.call_attempts || 0) + 1 < (camp.max_attempts || 3) && camp.status === "running") {
+        await supabaseAdmin.from("robot_contacts").update({ status: "pending" }).eq("id", contact.id)
+      }
+
+      // Check if campaign complete
+      const { count: pendingCount } = await supabaseAdmin.from("robot_contacts")
+        .select("id", { count: "exact", head: true })
+        .eq("campaign_id", contact.campaign_id)
+        .in("status", ["pending", "calling"])
+      if ((pendingCount || 0) === 0) {
+        await supabaseAdmin.from("robot_campaigns_v2").update({ status: "completed" }).eq("id", contact.campaign_id)
+      }
+    }
+
+    sendSuccess(res, { received: true })
+  } catch (err: any) {
+    console.error("[Robot Webhook] Error:", err.message)
+    sendSuccess(res, { received: true })
+  }
+})
+
 // POST /api/v1/webhooks/stripe — Paiements
 router.post("/stripe", async (req: Request, res: Response) => {
   const signature = req.headers["stripe-signature"] as string
@@ -67,6 +145,31 @@ router.post("/stripe", async (req: Request, res: Response) => {
         await supabaseAdmin.from("subscriptions")
           .update({ status: "cancelled" })
           .eq("stripe_id", sub.id)
+
+        // Check if this is a telephony subscription — cancel all addons
+        const { data: telSub } = await supabaseAdmin
+          .from("org_subscriptions")
+          .select("organization_id")
+          .eq("stripe_subscription_id", sub.id)
+          .maybeSingle()
+        if (telSub) {
+          await supabaseAdmin.from("org_subscriptions")
+            .update({ status: "canceled", cancelled_at: new Date().toISOString() })
+            .eq("stripe_subscription_id", sub.id)
+          cancelAllAddons(telSub.organization_id).catch(() => {})
+        }
+
+        // Check if this is an addon subscription
+        const { data: addonSub } = await supabaseAdmin
+          .from("org_addons")
+          .select("id")
+          .eq("stripe_subscription_id", sub.id)
+          .maybeSingle()
+        if (addonSub) {
+          await supabaseAdmin.from("org_addons")
+            .update({ status: "canceled", canceled_at: new Date().toISOString() })
+            .eq("id", addonSub.id)
+        }
         break
       }
 
@@ -74,9 +177,34 @@ router.post("/stripe", async (req: Request, res: Response) => {
         console.log("Paiement recu:", event.data.object)
         break
 
-      case "invoice.payment_failed":
+      case "invoice.payment_failed": {
         console.log("Paiement echoue:", event.data.object)
+        const failedInvoice = event.data.object as any
+        if (failedInvoice.subscription) {
+          await supabaseAdmin.from("org_addons").update({ status: "past_due" }).eq("stripe_subscription_id", failedInvoice.subscription)
+          await supabaseAdmin.from("org_robot_subscriptions").update({ status: "past_due" }).eq("stripe_subscription_id", failedInvoice.subscription)
+        }
         break
+      }
+
+      case "payment_intent.succeeded": {
+        const pi = event.data.object as any
+        if (pi.metadata?.type === "robot_credits") {
+          const orgId = pi.metadata.orgId
+          const minutes = parseInt(pi.metadata.minutes || "0")
+          if (orgId && minutes > 0) {
+            const { data: existing } = await supabaseAdmin.from("robot_credits")
+              .select("id").eq("stripe_payment_intent_id", pi.id).maybeSingle()
+            if (!existing) {
+              await supabaseAdmin.from("robot_credits").insert({
+                organization_id: orgId, minutes_purchased: minutes, amount_paid: pi.amount / 100,
+                stripe_payment_intent_id: pi.id, status: "active", minutes_remaining: minutes,
+              })
+            }
+          }
+        }
+        break
+      }
     }
 
     sendSuccess(res, { received: true })

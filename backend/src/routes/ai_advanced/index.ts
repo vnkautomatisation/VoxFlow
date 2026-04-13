@@ -1,11 +1,13 @@
 ﻿import { Router, Response } from "express"
 import { authenticate, AuthRequest } from "../../middleware/auth"
+import { requireModule } from "../../middleware/requireModule"
 import { aiAdvancedService } from "../../services/ai_advanced/ai_advanced.service"
 import { dialerService } from "../../services/dialer/dialer.service"
 import { sendSuccess, sendError } from "../../utils/response"
 
 const router = Router()
 router.use(authenticate)
+router.use(requireModule('ia_basic'))
 
 const getOrgId = (req: AuthRequest) => req.user?.organizationId || ""
 

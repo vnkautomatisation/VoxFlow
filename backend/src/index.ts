@@ -24,6 +24,10 @@ import crmRoutes        from './routes/crm/index'
 import onboardingRoutes from './routes/onboarding/index'
 import agentRoutes   from './routes/agent/index'
 import { startRobotWorker } from './services/robot/robot-worker'
+import { syncTelcoStripeProducts, syncAddonStripeProducts, syncRobotStripeProducts, syncRobotCreditProducts } from './services/stripe/setup'
+import { startSmsOverageJob } from './jobs/smsOverageBilling'
+import { startRobotJobs } from './jobs/robotJobs'
+import robotCampaignRoutes from './routes/robot/campaigns'
 import webhookRoutes from './routes/webhooks/index'
 import billingRoutes from './routes/billing/index'
 import clientRoutes  from './routes/client/index'
@@ -65,6 +69,7 @@ app.use('/api/v1/telephony', telephonyRoutes)
 app.use('/api/v1/crm',        crmRoutes)
 app.use('/api/v1/onboarding', onboardingRoutes)
 app.use('/api/v1/agent',    agentRoutes)
+app.use('/api/v1/robot', robotCampaignRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
 app.use('/api/v1/billing', billingRoutes)
 app.use('/api/v1/client',  clientRoutes)
@@ -111,6 +116,16 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Demarre le worker qui poll les campagnes actives dans Redis
 // et place les appels via Twilio REST API.
 try { startRobotWorker() } catch (e: any) { console.warn('[Robot Worker] Start failed:', e.message) }
+
+// ── Stripe Product Sync ─────────────────────────────────
+syncTelcoStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Telco sync failed:', e.message))
+syncAddonStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Addon sync failed:', e.message))
+syncRobotStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Robot sync failed:', e.message))
+syncRobotCreditProducts().catch((e: any) => console.warn('[Stripe Setup] Robot credits sync failed:', e.message))
+
+// ── Cron Jobs ───────────────────────────────────────────
+try { startSmsOverageJob() } catch (e: any) { console.warn('[SMS Overage Job] Start failed:', e.message) }
+try { startRobotJobs() } catch (e: any) { console.warn('[Robot Jobs] Start failed:', e.message) }
 
 app.listen(config.app.port, () => {
   console.log('')

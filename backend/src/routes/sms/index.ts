@@ -1,10 +1,12 @@
 ﻿import { Router, Response } from "express"
 import { authenticate, AuthRequest } from "../../middleware/auth"
+import { requireModule } from "../../middleware/requireModule"
 import { smsService } from "../../services/sms/sms.service"
 import { sendSuccess, sendError } from "../../utils/response"
 
 const router = Router()
 router.use(authenticate)
+router.use(requireModule('sms'))
 
 // GET /api/v1/sms — Liste conversations SMS
 router.get("/", async (req: AuthRequest, res: Response) => {
