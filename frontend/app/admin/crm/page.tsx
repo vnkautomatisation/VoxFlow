@@ -537,18 +537,15 @@ export default function CRMPage() {
 
     const callBack = async (phone: string) => {
         if (!phone) return
-        // 1. Envoyer au dialer Electron via port 9876
+        // 1. Envoyer au dialer sidebar (iframe) via CustomEvent
+        window.dispatchEvent(new CustomEvent('vf:dial', { detail: { phone } }))
+        // 2. Aussi tenter Electron via port 9876
         try {
-            const r = await fetch('http://127.0.0.1:9876/dial', {
+            await fetch('http://127.0.0.1:9876/dial', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone })
             })
-            if (r.ok) return
-        } catch { }
-        // 2. Fallback protocole voxflow://
-        try {
-            window.location.href = `voxflow://dial/${encodeURIComponent(phone)}`
         } catch { }
     }
 

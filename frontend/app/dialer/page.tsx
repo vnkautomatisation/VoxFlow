@@ -1,6 +1,6 @@
 ﻿'use client'
 import './dialer.css'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDialer, fmtT, fmtD, ini, avatarGrad, ACP } from './hooks/useDialer'
 import TrialBanner from '@/components/shared/TrialBanner'
 import CallerIdPicker from '@/components/dialer/CallerIdPicker'
@@ -25,6 +25,25 @@ export default function DialerPage() {
     const d = useDialer()
     const dtmfDisplayRef = useRef<HTMLDivElement>(null)
     const dtmfOverlayRef = useRef<HTMLDivElement>(null)
+
+    // ── Mode embedded (iframe dans le portail admin) ──
+    const [embedded, setEmbedded] = useState(false)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('embedded') === 'true' || window.parent !== window) {
+            setEmbedded(true)
+        }
+        // Ecouter les messages du parent (click-to-call)
+        const handleMsg = (e: MessageEvent) => {
+            if (e.data?.type === 'vf:dial' && e.data.phone) {
+                d.setNum(e.data.phone)
+                setTimeout(() => d.callNum(), 300)
+            }
+        }
+        window.addEventListener('message', handleMsg)
+        return () => window.removeEventListener('message', handleMsg)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // ── Auto-switch de tab si le forfait masque l'onglet courant ──
     // Ex: user STARTER -> upgradé CONFORT -> tab 'dialer' visible
@@ -92,7 +111,7 @@ export default function DialerPage() {
     const active = d.queue.filter(q => q.status === 'active')
 
     return (
-        <div className="popup" id="popup">
+        <div className={`popup${embedded ? ' embedded' : ''}`} id="popup">
 
             {/* ── Trial banner compact (si trial actif) ── */}
             <TrialBanner variant="compact" />
@@ -101,7 +120,7 @@ export default function DialerPage() {
             <div className={`toast ${d.toast ? 'on' : ''}`}>{d.toast}</div>
 
             {/* ════════ LOGIN ════════ */}
-            <div className={`view ${d.view === 'login' ? 'on' : ''}`} id="view-login">
+            <div className={`view ${d.view === 'login' && !embedded ? 'on' : ''}`} id="view-login">
                 <div className="hdr" style={{ justifyContent: 'center' }}>
                     <div className="logo"><div className="logo-dot" /><span style={{ color: '#7b61ff' }}>Vox</span><span style={{ color: '#00d4aa' }}>Flow</span></div>
                 </div>

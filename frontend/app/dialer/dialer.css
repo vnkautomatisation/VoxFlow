@@ -95,6 +95,16 @@ html, body {
     }
 }
 
+/* Mode embedded (iframe dans portail admin) — pleine largeur, pas de coins */
+.popup.embedded {
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
 /* ── TOAST ── */
 .toast {
     position: absolute;
