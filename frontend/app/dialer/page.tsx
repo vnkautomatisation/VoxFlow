@@ -309,6 +309,20 @@ export default function DialerPage() {
                     </div>
                 </div>
 
+                {/* Caller ID — toujours visible sous le header */}
+                {d.myNumbers.length > 0 && (
+                    <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--line)', background: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Appeler depuis</span>
+                        <div style={{ flex: 1 }}>
+                            <CallerIdPicker
+                                numbers={d.myNumbers}
+                                value={d.fromNumber}
+                                onChange={d.setFromNumber}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {/* TABS — filtrées selon les features du forfait */}
                 <div className="tabs">
                     {([
@@ -334,11 +348,6 @@ export default function DialerPage() {
                     {/* PANE DIALER */}
                     <div className={`pane ${d.tab === 'dialer' ? 'on' : ''}`} id="pane-dialer">
                         <div className="p12">
-                            <CallerIdPicker
-                                numbers={d.myNumbers}
-                                value={d.fromNumber}
-                                onChange={d.setFromNumber}
-                            />
                             <input className="dinput" id="dinp" value={d.dialNum} placeholder="+1 (514) 000-0000" type="tel"
                                 onChange={e => d.setDialNum(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && d.callNum()} />
