@@ -221,7 +221,7 @@ export default function IVRPage() {
                 </svg>
                 <div className="text-xs text-[#9898b8] leading-relaxed">
                     Les menus IVR définissent le parcours d'appel automatique. Chaque menu peut contenir des nœuds (choix clavier, transferts vers files, messages, messagerie vocale).
-                    Assignez un menu IVR à un numéro DID depuis la page <button className="text-[#7b61ff] hover:underline">Numéros</button>.
+                    Assignez un menu IVR à un numéro DID depuis la page <button onClick={() => router.push('/admin/numbers')} className="text-[#7b61ff] hover:underline">Numeros</button>.
                 </div>
             </div>
 
