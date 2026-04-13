@@ -39,6 +39,7 @@ interface Invoice {
   currency: string
   lines: InvoiceLine[]
   stripe_invoice_id: string | null
+  pdf_url?: string | null
 }
 
 interface DashboardMetrics {
@@ -73,32 +74,27 @@ function fmtDateShort(iso: string | null | undefined): string {
   }
 }
 
-// ─── Styles ─────────────────────────────────────────────────────────────────
-const CARD: React.CSSProperties = {
-  background: '#0f0f1e',
-  border: '1px solid #1e1e3a',
-  borderRadius: 12,
-  padding: '20px 24px',
-  flex: '1 1 0',
-  minWidth: 200,
-}
-
-const TABLE_HEADER: React.CSSProperties = {
-  padding: '12px 16px',
-  fontSize: 11,
-  fontWeight: 600,
-  color: '#5a5a7a',
-  textTransform: 'uppercase',
-  letterSpacing: '.06em',
-  textAlign: 'left',
-  borderBottom: '1px solid #1e1e3a',
-}
-
-const TABLE_CELL: React.CSSProperties = {
-  padding: '14px 16px',
-  fontSize: 13,
-  color: '#c8c8e8',
-  verticalAlign: 'middle',
+// ─── Status badge ───────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'paid') {
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        Payee
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+        Echouee
+      </span>
+    )
+  }
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      En attente
+    </span>
+  )
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -126,27 +122,26 @@ export default function InvoicesPage() {
       ])
 
       // Dashboard metrics
-      if (dashRes.success && dashRes.data) {
-        const m = dashRes.data.metrics || dashRes.data
+      const dashData = dashRes.data || dashRes
+      if (dashData) {
+        const m = dashData.metrics || dashData
         setMetrics({
           next_invoice_amount: m.next_invoice_amount ?? null,
           next_invoice_date: m.next_invoice_date ?? null,
         })
-        const org = dashRes.data.org || {}
+        const org = dashData.org || {}
         setStripeCustomerId(org.stripe_customer_id || null)
 
-        // payment method info if available
-        const pm = dashRes.data.payment_method || m.payment_method || null
+        const pm = dashData.payment_method || m.payment_method || null
         if (pm && pm.last4) {
           setPaymentLast4(pm.last4)
         }
       }
 
       // Invoices
-      if (invRes.success && Array.isArray(invRes.data)) {
-        setInvoices(invRes.data)
-      } else if (Array.isArray(invRes)) {
-        setInvoices(invRes)
+      const invData = invRes.data || invRes
+      if (Array.isArray(invData)) {
+        setInvoices(invData)
       } else {
         setInvoices([])
       }
@@ -180,41 +175,12 @@ export default function InvoicesPage() {
 
   const hasFailed = invoices.some(i => i.status === 'failed')
 
-  // Status badge
-  const statusBadge = (status: string) => {
-    const map: Record<string, { label: string; bg: string; color: string; border: string }> = {
-      paid:    { label: 'Payee',      bg: '#00d4aa14', color: '#00d4aa', border: '#00d4aa33' },
-      pending: { label: 'En attente', bg: '#ffb54714', color: '#ffb547', border: '#ffb54733' },
-      failed:  { label: 'Echouee',    bg: '#ff4d6d14', color: '#ff4d6d', border: '#ff4d6d33' },
-    }
-    const s = map[status] || map.pending
-    return (
-      <span style={{
-        display: 'inline-block',
-        padding: '4px 12px',
-        borderRadius: 20,
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-        fontSize: 11,
-        fontWeight: 600,
-        whiteSpace: 'nowrap',
-      }}>
-        {s.label}
-      </span>
-    )
-  }
-
-  // Loading state
+  // Loading
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <div style={{
-          width: 36, height: 36, border: '3px solid #1e1e3a', borderTopColor: '#7b61ff',
-          borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-        <div style={{ fontSize: 14, color: '#5a5a7a' }}>Chargement des factures...</div>
+      <div className="py-10 text-center">
+        <div className="w-9 h-9 border-[3px] border-[#2e2e44] border-t-[#7b61ff] rounded-full animate-spin mx-auto mb-4" />
+        <div className="text-sm text-[#55557a]">Chargement des factures...</div>
       </div>
     )
   }
@@ -223,40 +189,32 @@ export default function InvoicesPage() {
     <div>
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', top: 20, right: 20, zIndex: 300,
-          padding: '12px 20px', background: '#0f0f1e', border: '1px solid #7b61ff55',
-          borderRadius: 10, fontSize: 13, color: '#c8c8e8',
-          boxShadow: '0 4px 24px #00000066', maxWidth: 380,
-        }}>
+        <div className="fixed top-5 right-5 z-50 px-5 py-3 bg-[#18181f] border border-[#7b61ff]/30 rounded-xl text-sm text-[#eeeef8] shadow-xl max-w-sm">
           {toast}
         </div>
       )}
 
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', margin: 0, marginBottom: 6 }}>Factures</h1>
-        <p style={{ fontSize: 13, color: '#6a6a8a', margin: 0 }}>Consultez et gerez vos factures et paiements.</p>
+      <div className="mb-7">
+        <h1 className="text-xl font-bold text-[#eeeef8] mb-1">Factures</h1>
+        <p className="text-sm text-[#9898b8]">Consultez et gerez vos factures et paiements.</p>
       </div>
 
       {/* Error */}
       {error && (
-        <div style={{
-          marginBottom: 16, padding: '12px 18px', background: '#ff4d6d12',
-          border: '1px solid #ff4d6d44', borderRadius: 10, fontSize: 13, color: '#ff8888',
-        }}>
+        <div className="mb-4 px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-400">
           {error}
         </div>
       )}
 
       {/* 3 Header Cards */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Montant recurrent */}
-        <div style={CARD}>
-          <div style={{ fontSize: 11, color: '#5a5a7a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+        <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+          <div className="text-[10px] uppercase tracking-wider text-[#55557a] mb-2 font-semibold">
             Montant recurrent mensuel
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#e8e8f8' }}>
+          <div className="text-2xl font-extrabold text-[#eeeef8]">
             {metrics.next_invoice_amount != null
               ? `${metrics.next_invoice_amount.toFixed(2).replace('.', ',')} CAD$/mois`
               : '-- CAD$/mois'
@@ -265,56 +223,44 @@ export default function InvoicesPage() {
         </div>
 
         {/* Prochaine facturation */}
-        <div style={CARD}>
-          <div style={{ fontSize: 11, color: '#5a5a7a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+        <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+          <div className="text-[10px] uppercase tracking-wider text-[#55557a] mb-2 font-semibold">
             Prochaine facturation
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#e8e8f8' }}>
-            {metrics.next_invoice_date
-              ? fmtDate(metrics.next_invoice_date)
-              : '--'
-            }
+          <div className="text-2xl font-extrabold text-[#eeeef8]">
+            {metrics.next_invoice_date ? fmtDate(metrics.next_invoice_date) : '--'}
           </div>
         </div>
 
         {/* Mode de paiement */}
-        <div style={CARD}>
-          <div style={{ fontSize: 11, color: '#5a5a7a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+        <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+          <div className="text-[10px] uppercase tracking-wider text-[#55557a] mb-2 font-semibold">
             Mode de paiement
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: stripeCustomerId ? '#e8e8f8' : '#5a5a7a' }}>
+          <div className={`text-2xl font-extrabold ${stripeCustomerId ? 'text-[#eeeef8]' : 'text-[#55557a]'}`}>
             {stripeCustomerId
               ? (paymentLast4 ? `****${paymentLast4}` : 'Carte configuree')
               : 'Non configure'
             }
           </div>
           {!stripeCustomerId && (
-            <div style={{ fontSize: 11, color: '#5a5a7a', marginTop: 6 }}>
+            <div className="text-[11px] text-[#55557a] mt-1">
               Aucun mode de paiement enregistre
             </div>
           )}
         </div>
       </div>
 
-      {/* Red Banner — failed payment */}
+      {/* Red Banner -- failed payment */}
       {hasFailed && (
-        <div style={{
-          marginBottom: 20, padding: '14px 20px',
-          background: '#ff4d6d12', border: '1px solid #ff4d6d44', borderRadius: 10,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          gap: 16, flexWrap: 'wrap',
-        }}>
-          <div style={{ fontSize: 13, color: '#ff8888', fontWeight: 500 }}>
+        <div className="mb-5 px-5 py-3.5 bg-red-500/5 border border-red-500/20 rounded-xl flex justify-between items-center gap-4 flex-wrap">
+          <div className="text-sm text-red-400 font-medium">
             Un paiement a echoue. Veuillez mettre a jour votre carte de paiement.
           </div>
           <button
             onClick={openPortal}
             disabled={portalLoading}
-            style={{
-              padding: '8px 18px', background: '#ff4d6d', border: 'none', borderRadius: 8,
-              color: '#fff', fontSize: 13, fontWeight: 700, cursor: portalLoading ? 'default' : 'pointer',
-              opacity: portalLoading ? 0.6 : 1, whiteSpace: 'nowrap',
-            }}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-bold hover:bg-red-600 disabled:opacity-50 disabled:cursor-default whitespace-nowrap transition-colors"
           >
             {portalLoading ? 'Ouverture...' : 'Mettre a jour'}
           </button>
@@ -322,85 +268,80 @@ export default function InvoicesPage() {
       )}
 
       {/* Gerer carte button */}
-      <div style={{ marginBottom: 24 }}>
+      <div className="mb-6">
         <button
           onClick={openPortal}
           disabled={portalLoading}
-          style={{
-            padding: '10px 22px', background: '#7b61ff', border: 'none', borderRadius: 9,
-            color: '#fff', fontSize: 14, fontWeight: 600, cursor: portalLoading ? 'default' : 'pointer',
-            opacity: portalLoading ? 0.6 : 1, transition: 'opacity .15s',
-          }}
+          className="bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50 disabled:cursor-default transition-colors"
         >
           {portalLoading ? 'Ouverture...' : 'Gerer ma carte de paiement'}
         </button>
       </div>
 
       {/* Invoices Table */}
-      <div style={{
-        background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12, overflow: 'hidden',
-      }}>
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
         {invoices.length === 0 && !error ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#4a4a6a' }}>
-            <div style={{ fontSize: 14, marginBottom: 6 }}>Aucune facture</div>
-            <div style={{ fontSize: 12, color: '#3a3a5a' }}>
+          <div className="py-10 text-center">
+            <div className="text-sm text-[#55557a] mb-1">Aucune facture</div>
+            <div className="text-xs text-[#55557a]/60">
               Vos factures apparaitront ici des la premiere periode de facturation.
             </div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#0a0a18' }}>
-                <th style={TABLE_HEADER}>Date</th>
-                <th style={TABLE_HEADER}>Periode</th>
-                <th style={TABLE_HEADER}>Description</th>
-                <th style={{ ...TABLE_HEADER, textAlign: 'right' }}>Montant</th>
-                <th style={{ ...TABLE_HEADER, textAlign: 'center' }}>Statut</th>
-                <th style={{ ...TABLE_HEADER, textAlign: 'center' }}>PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv, idx) => {
-                const rowBg = idx % 2 === 0 ? '#0a0a18' : '#0f0f1e'
-                const firstLine = inv.lines && inv.lines.length > 0
-                  ? inv.lines[0].description
-                  : 'Facture VoxFlow'
-                return (
-                  <tr
-                    key={inv.id}
-                    style={{ background: rowBg, transition: 'background .12s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#14142a')}
-                    onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
-                  >
-                    <td style={TABLE_CELL}>{fmtDateShort(inv.issued_at)}</td>
-                    <td style={TABLE_CELL}>{inv.period_label || '--'}</td>
-                    <td style={{ ...TABLE_CELL, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {firstLine}
-                    </td>
-                    <td style={{ ...TABLE_CELL, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                      {fmtPrice(inv.total)}
-                    </td>
-                    <td style={{ ...TABLE_CELL, textAlign: 'center' }}>
-                      {statusBadge(inv.status)}
-                    </td>
-                    <td style={{ ...TABLE_CELL, textAlign: 'center' }}>
-                      <button
-                        disabled
-                        title="Bientot disponible"
-                        style={{
-                          padding: '5px 12px', background: '#1a1a2e', border: '1px solid #2a2a4a',
-                          borderRadius: 6, color: '#3a3a5a', fontSize: 11, cursor: 'not-allowed',
-                          opacity: 0.5,
-                        }}
-                      >
-                        PDF
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-[#111118]">
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Date</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Periode</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Description</th>
+                  <th className="px-4 py-3 text-right text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Montant</th>
+                  <th className="px-4 py-3 text-center text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Statut</th>
+                  <th className="px-4 py-3 text-center text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">PDF</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => {
+                  const firstLine = inv.lines && inv.lines.length > 0
+                    ? inv.lines[0].description
+                    : 'Facture VoxFlow'
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="border-b border-[#1f1f2a] hover:bg-[#1f1f2a] transition-colors"
+                    >
+                      <td className="px-4 py-3.5 text-sm text-[#9898b8]">{fmtDateShort(inv.issued_at)}</td>
+                      <td className="px-4 py-3.5 text-sm text-[#9898b8]">{inv.period_label || '--'}</td>
+                      <td className="px-4 py-3.5 text-sm text-[#9898b8] max-w-[260px] truncate">{firstLine}</td>
+                      <td className="px-4 py-3.5 text-sm text-[#eeeef8] text-right font-semibold tabular-nums">{fmtPrice(inv.total)}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <StatusBadge status={inv.status} />
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        {inv.pdf_url ? (
+                          <a
+                            href={inv.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-3 py-1 bg-[#7b61ff]/10 border border-[#7b61ff]/20 rounded-lg text-[#7b61ff] text-xs font-semibold hover:bg-[#7b61ff]/20 transition-colors"
+                          >
+                            PDF
+                          </a>
+                        ) : (
+                          <span
+                            className="inline-block px-3 py-1 bg-[#1f1f2a] border border-[#2e2e44] rounded-lg text-[#55557a] text-xs cursor-not-allowed opacity-50"
+                            title="Bientot disponible"
+                          >
+                            PDF
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
