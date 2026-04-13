@@ -401,9 +401,32 @@ export function useDialer() {
             loadData()
             startPoll()
         } else {
-            S.current.tok = null
-            stopPoll()
-            setView('login')
+            // En mode embedded (iframe), le parent peut ne pas avoir encore set le token
+            // Re-checker toutes les secondes pendant 10s
+            const isEmbedded = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('embedded') === 'true' || window.parent !== window)
+            if (isEmbedded) {
+                let retries = 0
+                const check = setInterval(() => {
+                    retries++
+                    const t = localStorage.getItem('vf_tok')
+                    if (t) {
+                        clearInterval(check)
+                        S.current.tok  = t
+                        S.current.role = localStorage.getItem('vf_role') || 'AGENT'
+                        S.current.url  = localStorage.getItem('vf_url') || DIALER_CONFIG.API_URL
+                        S.current.ext  = localStorage.getItem('vf_ext') || null
+                        S.current.name = localStorage.getItem('vf_name') || ''
+                        setView('main')
+                        loadData()
+                        startPoll()
+                    }
+                    if (retries > 10) clearInterval(check)
+                }, 1000)
+            } else {
+                S.current.tok = null
+                stopPoll()
+                setView('login')
+            }
         }
     }, [isAuth, accessToken, user])
 
