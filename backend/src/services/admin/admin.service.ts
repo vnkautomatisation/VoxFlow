@@ -106,6 +106,15 @@ export class AdminService {
       .select().single()
 
     if (error) throw new Error(error.message)
+
+    // Sync extension vers la table agents aussi
+    if (update.extension !== undefined) {
+      await supabaseAdmin.from("agents")
+        .update({ extension: update.extension || null })
+        .eq("user_id", agentId)
+        .catch(() => {})
+    }
+
     return data
   }
 
