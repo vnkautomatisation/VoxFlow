@@ -741,7 +741,7 @@ router.post("/email-templates/:id/send", authenticate, async (req: AuthRequest, 
             .replace(/\{\{entreprise\}\}/g, contact.company || '')
             .replace(/\{\{email\}\}/g, contact.email || '')
             .replace(/\{\{telephone\}\}/g, contact.phone || '')
-            .replace(/\{\{agent\}\}/g, req.user?.name || 'Agent')
+            .replace(/\{\{agent\}\}/g, (req.user as any)?.name || 'Agent')
             .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('fr-CA'))
 
         const subject = replace(tpl.subject)
@@ -750,20 +750,22 @@ router.post("/email-templates/:id/send", authenticate, async (req: AuthRequest, 
         // Envoyer via le service email si configure
         try {
             const { emailService } = await import("../../services/email/email.service")
-            await emailService.send({ to: contact.email, subject, html: body })
+            await (emailService as any).send({ to: contact.email, subject, html: body })
         } catch {
             // Fallback : log et retour succes (pas d'email reel en dev)
         }
 
         // Logger l'activite
-        await supabaseAdmin.from("contact_activities").insert({
-            organization_id: orgId,
-            contact_id,
-            type: 'EMAIL',
-            description: `Email envoye : ${subject}`,
-            metadata: { template_id: tpl.id, template_name: tpl.name },
-            created_by: req.user?.userId,
-        }).catch(() => {})
+        try {
+            await supabaseAdmin.from("contact_activities").insert({
+                organization_id: orgId,
+                contact_id,
+                type: 'EMAIL',
+                description: `Email envoye : ${subject}`,
+                metadata: { template_id: tpl.id, template_name: tpl.name },
+                created_by: req.user?.userId,
+            })
+        } catch {}
 
         sendSuccess(res, { sent: true, to: contact.email, subject })
     } catch (err: any) { sendError(res, err.message) }
