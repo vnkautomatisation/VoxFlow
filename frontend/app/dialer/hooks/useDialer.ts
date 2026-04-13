@@ -801,9 +801,14 @@ export function useDialer() {
 
     // ── Search ─────────────────────────────────────────────────
     const doSearch = useCallback(async (q: string) => {
-        if (!q || q.length < 2) { setSearchRes([]); return }
         try {
-            const r = await api('/api/v1/crm/contacts?search=' + encodeURIComponent(q) + '&limit=8')
+            if (!q || q.length < 2) {
+                // Sans recherche : charger les derniers contacts
+                const r = await api('/api/v1/crm/contacts?limit=10')
+                if (r.success) setSearchRes(r.data || [])
+                return
+            }
+            const r = await api('/api/v1/crm/contacts?search=' + encodeURIComponent(q) + '&limit=10')
             if (r.success) setSearchRes(r.data || [])
         } catch { }
     }, [api])

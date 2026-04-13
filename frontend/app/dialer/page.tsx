@@ -538,10 +538,10 @@ export default function DialerPage() {
                     </div>
 
                     {/* PANE SEARCH */}
-                    <div className={`pane ${d.tab === 'search' ? 'on' : ''}`} id="pane-search">
+                    <div className={`pane ${d.tab === 'search' ? 'on' : ''}`} id="pane-search" ref={(el) => { if (el && d.tab === 'search' && !d.searchRes.length) d.doSearch('') }}>
                         <div className="p12">
-                            <input className="sinp" placeholder="Nom, téléphone, email, entreprise..." onChange={e => d.doSearch(e.target.value)} />
-                            {!d.searchRes.length ? <div className="empty">Tapez pour rechercher</div> : d.searchRes.map((c, i) => (
+                            <input className="sinp" placeholder="Nom, telephone, email, entreprise..." onChange={e => d.doSearch(e.target.value)} />
+                            {!d.searchRes.length ? <div className="empty">Aucun contact</div> : d.searchRes.map((c, i) => (
                                 <div key={c.id || i} className="coi">
                                     <div className="coav" style={{ background: `linear-gradient(135deg,${ACP[i % ACP.length][0]},${ACP[i % ACP.length][1]})` }}>{ini((c.first_name || '') + ' ' + (c.last_name || ''))}</div>
                                     <div className="coinf"><div className="coname">{c.first_name} {c.last_name}</div><div className="cosub">{[c.company, c.phone, c.email].filter(Boolean).join(' · ')}</div></div>
