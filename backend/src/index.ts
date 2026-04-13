@@ -23,6 +23,7 @@ import telephonyRoutes from './routes/telephony/index'
 import crmRoutes        from './routes/crm/index'
 import onboardingRoutes from './routes/onboarding/index'
 import agentRoutes   from './routes/agent/index'
+import { startRobotWorker } from './services/robot/robot-worker'
 import webhookRoutes from './routes/webhooks/index'
 import billingRoutes from './routes/billing/index'
 import clientRoutes  from './routes/client/index'
@@ -105,6 +106,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // ─── Twilio Voice Routes ────────────────────────────────────────────────────
 // ────────────────────────────────────────────────────────────────────────────
+
+// ── Robot Dialer Worker ─────────────────────────────────────
+// Demarre le worker qui poll les campagnes actives dans Redis
+// et place les appels via Twilio REST API.
+try { startRobotWorker() } catch (e: any) { console.warn('[Robot Worker] Start failed:', e.message) }
 
 app.listen(config.app.port, () => {
   console.log('')
