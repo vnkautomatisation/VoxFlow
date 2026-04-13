@@ -35,37 +35,20 @@ function useApi() {
   }
 }
 
-/* ────────────────────────────── Styles ───────────────────────────── */
-
-const IS: React.CSSProperties = {
-  width: '100%', background: '#080810', border: '1px solid #2a2a4a', borderRadius: 8,
-  padding: '10px 13px', color: '#e8e8f8', fontSize: 13, outline: 'none',
-  boxSizing: 'border-box', fontFamily: 'inherit',
-}
-
-const LABEL: React.CSSProperties = {
-  fontSize: 11, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em',
-  display: 'block', marginBottom: 5, fontWeight: 600,
-}
-
-const CARD: React.CSSProperties = {
-  background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12, padding: '18px 22px',
-}
-
 /* ────────────────────────────── Status helpers ───────────────────── */
+
+function statusBadgeClasses(s: Campaign['status']): { bg: string; text: string; border: string; label: string } {
+  if (s === 'running')   return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: 'En cours' }
+  if (s === 'paused')    return { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500/20',   label: 'En pause' }
+  if (s === 'completed') return { bg: 'bg-sky-500/10',     text: 'text-sky-400',     border: 'border-sky-500/20',     label: 'Termine' }
+  return { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20', label: 'Brouillon' }
+}
 
 function statusColor(s: Campaign['status']): string {
   if (s === 'running') return '#00d4aa'
   if (s === 'paused') return '#ffb547'
   if (s === 'completed') return '#38b6ff'
   return '#6a6a8a'
-}
-
-function statusLabel(s: Campaign['status']): string {
-  if (s === 'running') return 'En cours'
-  if (s === 'paused') return 'En pause'
-  if (s === 'completed') return 'Termine'
-  return 'Brouillon'
 }
 
 /* ────────────────────────────── CSV Parser ───────────────────────── */
@@ -107,35 +90,35 @@ function RobotIcon({ size = 80 }: { size?: number }) {
 
 function NoSubscriptionView() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
-      <div style={{ textAlign: 'center', maxWidth: 480 }}>
-        <div style={{ marginBottom: 24 }}>
+    <div className="flex items-center justify-center min-h-[70vh]">
+      <div className="text-center max-w-[480px]">
+        <div className="mb-6">
           <RobotIcon size={96} />
         </div>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#e8e8f8', margin: '0 0 12px' }}>
+        <h1 className="text-[26px] font-bold text-[#eeeef8] mb-3">
           Robot d'appel masse
         </h1>
-        <p style={{ fontSize: 14, color: '#6a6a8a', lineHeight: 1.7, margin: '0 0 8px' }}>
+        <p className="text-sm text-[#6a6a8a] leading-relaxed mb-2">
           Automatisez vos campagnes d'appels avec notre robot intelligent.
         </p>
-        <p style={{ fontSize: 13, color: '#5a5a7a', lineHeight: 1.6, margin: '0 0 24px' }}>
-          150k appels/h, TTS dynamique, IVR post-robot.
-        </p>
-        <div style={{
-          display: 'inline-block', padding: '10px 20px', background: '#7b61ff12',
-          border: '1px solid #7b61ff33', borderRadius: 10, marginBottom: 24,
-        }}>
-          <span style={{ fontSize: 28, fontWeight: 700, color: '#7b61ff' }}>135</span>
-          <span style={{ fontSize: 14, color: '#7b61ff', marginLeft: 4 }}>CAD$/mois</span>
+        <ul className="text-[13px] text-[#5a5a7a] leading-relaxed mb-6 space-y-1 text-left inline-block">
+          <li>150k appels/h</li>
+          <li>TTS dynamique</li>
+          <li>Message vocal pre-enregistre</li>
+          <li>IVR post-robot</li>
+          <li>RGPD liste noire</li>
+          <li>Export resultats</li>
+        </ul>
+        <div className="mb-6">
+          <div className="inline-block px-5 py-2.5 bg-[#7b61ff]/5 border border-[#7b61ff]/20 rounded-xl">
+            <span className="text-[28px] font-bold text-[#7b61ff]">135</span>
+            <span className="text-sm text-[#7b61ff] ml-1">CAD$/mois</span>
+          </div>
         </div>
         <div>
           <a
-            href="/commander?service=robot"
-            style={{
-              display: 'inline-block', padding: '13px 32px', background: '#7b61ff',
-              border: 'none', borderRadius: 10, color: '#fff', fontSize: 14,
-              fontWeight: 700, cursor: 'pointer', textDecoration: 'none',
-            }}
+            href="/client/plans"
+            className="inline-block px-8 py-3 bg-[#7b61ff] hover:bg-[#6145ff] rounded-lg text-white text-sm font-bold no-underline transition-colors"
           >
             Souscrire au Robot d'appel
           </a>
@@ -232,79 +215,69 @@ function CampaignDrawer({ onClose, onCreate }: {
     setSaving(false)
   }
 
+  const inputCls = 'w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]'
+
   return (
     <>
       {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: '#00000088', zIndex: 300 }}
-      />
+      <div onClick={onClose} className="fixed inset-0 bg-black/50 z-[300]" />
+
       {/* Drawer */}
-      <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 500, maxWidth: '95vw',
-        background: '#0c0c1a', borderLeft: '1px solid #1e1e3a', zIndex: 301,
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
+      <div className="fixed top-0 right-0 bottom-0 w-[500px] max-w-[95vw] bg-[#18181f] border-l border-[#2e2e44] z-[301] flex flex-col overflow-hidden">
         {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #1e1e3a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: '#e8e8f8' }}>Nouvelle campagne robot</div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#5a5a7a', cursor: 'pointer', padding: 4 }}>
+        <div className="px-6 py-5 border-b border-[#2e2e44] flex justify-between items-center">
+          <div className="text-[17px] font-bold text-[#eeeef8]">Nouvelle campagne robot</div>
+          <button onClick={onClose} className="bg-transparent border-none text-[#5a5a7a] hover:text-[#8a8aa8] cursor-pointer p-1 transition-colors">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
         {/* Scrollable body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
           {/* Campaign name */}
           <div>
-            <label style={LABEL}>Nom de la campagne</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Rappel rendez-vous mai" style={IS} />
+            <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Nom de la campagne</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Rappel rendez-vous mai" className={inputCls} />
           </div>
 
           {/* CSV Upload */}
           <div>
-            <label style={LABEL}>Upload CSV</label>
+            <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Upload CSV</label>
             {csvHeaders.length === 0 ? (
               <div
                 onDragOver={e => e.preventDefault()}
                 onDrop={handleCsvDrop}
                 onClick={() => csvInputRef.current?.click()}
-                style={{
-                  border: '2px dashed #2a2a4a', borderRadius: 10, padding: '32px 20px',
-                  textAlign: 'center', cursor: 'pointer', background: '#080810',
-                  transition: 'border-color 0.2s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = '#7b61ff55')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = '#2a2a4a')}
+                className="border-2 border-dashed border-[#2e2e44] rounded-xl px-5 py-8 text-center cursor-pointer bg-[#1f1f2a] hover:border-[#7b61ff]/30 transition-colors"
               >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                <div style={{ fontSize: 13, color: '#6a6a8a', marginBottom: 4 }}>Deposez votre fichier CSV ici</div>
-                <div style={{ fontSize: 11, color: '#4a4a6a' }}>ou cliquez pour parcourir</div>
+                <div className="text-[13px] text-[#6a6a8a] mb-1">Deposez votre fichier CSV ici</div>
+                <div className="text-[11px] text-[#4a4a6a]">ou cliquez pour parcourir</div>
               </div>
             ) : (
-              <div style={{ background: '#080810', border: '1px solid #1e1e3a', borderRadius: 10, padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: '#a0a0c0' }}>
-                    {csvFileName} — {csvTotalRows} contacts detectes
+              <div className="bg-[#1f1f2a] border border-[#2e2e44] rounded-xl p-3.5">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-xs text-[#a0a0c0]">
+                    {csvFileName} -- {csvTotalRows} contacts detectes
                   </div>
                   <button
                     onClick={() => { setCsvHeaders([]); setCsvRows([]); setCsvTotalRows(0); setCsvFileName(''); setPhoneCol(''); setPrenomCol('') }}
-                    style={{ background: 'transparent', border: 'none', color: '#ff4d6d', fontSize: 11, cursor: 'pointer' }}
+                    className="bg-transparent border-none text-red-400 text-[11px] cursor-pointer hover:text-red-300 transition-colors"
                   >
                     Supprimer
                   </button>
                 </div>
                 {/* Preview table */}
-                <div style={{ overflowX: 'auto', marginBottom: 14 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <div className="overflow-x-auto mb-3.5">
+                  <table className="w-full border-collapse text-[11px]">
                     <thead>
                       <tr>
                         {csvHeaders.map(h => (
-                          <th key={h} style={{ padding: '6px 10px', borderBottom: '1px solid #1e1e3a', color: '#7b61ff', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                          <th key={h} className="px-2.5 py-1.5 border-b border-[#2e2e44] text-[#7b61ff] font-semibold text-left whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -312,7 +285,7 @@ function CampaignDrawer({ onClose, onCreate }: {
                       {csvRows.map((row, i) => (
                         <tr key={i}>
                           {csvHeaders.map(h => (
-                            <td key={h} style={{ padding: '5px 10px', borderBottom: '1px solid #12122a', color: '#8a8aa8', whiteSpace: 'nowrap' }}>{row[h]}</td>
+                            <td key={h} className="px-2.5 py-1.5 border-b border-[#1f1f2a] text-[#8a8aa8] whitespace-nowrap">{row[h]}</td>
                           ))}
                         </tr>
                       ))}
@@ -320,17 +293,17 @@ function CampaignDrawer({ onClose, onCreate }: {
                   </table>
                 </div>
                 {/* Column mapping */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label style={{ ...LABEL, fontSize: 10 }}>Colonne telephone (obligatoire)</label>
-                    <select value={phoneCol} onChange={e => setPhoneCol(e.target.value)} style={IS}>
+                    <label className="block text-[10px] text-[#6a6a8a] uppercase tracking-wider mb-1 font-semibold">Colonne telephone (obligatoire)</label>
+                    <select value={phoneCol} onChange={e => setPhoneCol(e.target.value)} className={inputCls}>
                       <option value="">-- Selectionner --</option>
                       {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ ...LABEL, fontSize: 10 }}>Colonne prenom (optionnel)</label>
-                    <select value={prenomCol} onChange={e => setPrenomCol(e.target.value)} style={IS}>
+                    <label className="block text-[10px] text-[#6a6a8a] uppercase tracking-wider mb-1 font-semibold">Colonne prenom (optionnel)</label>
+                    <select value={prenomCol} onChange={e => setPrenomCol(e.target.value)} className={inputCls}>
                       <option value="">-- Aucun --</option>
                       {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
@@ -342,28 +315,27 @@ function CampaignDrawer({ onClose, onCreate }: {
               ref={csvInputRef}
               type="file"
               accept=".csv"
-              style={{ display: 'none' }}
+              className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvUpload(f) }}
             />
           </div>
 
           {/* Message type radio */}
           <div>
-            <label style={LABEL}>Type de message</label>
-            <div style={{ display: 'flex', gap: 10 }}>
+            <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Type de message</label>
+            <div className="flex gap-2.5">
               {([['tts', 'TTS (Text-to-Speech)'], ['audio', 'Audio (MP3 pre-enregistre)']] as const).map(([val, lab]) => (
-                <label key={val} style={{
-                  flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
-                  background: messageType === val ? '#7b61ff12' : '#080810',
-                  border: `1px solid ${messageType === val ? '#7b61ff44' : '#2a2a4a'}`,
-                  borderRadius: 8, cursor: 'pointer', fontSize: 12, color: messageType === val ? '#c0b0ff' : '#6a6a8a',
-                }}>
+                <label key={val} className={`flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-lg cursor-pointer text-xs border transition-colors ${
+                  messageType === val
+                    ? 'bg-[#7b61ff]/5 border-[#7b61ff]/25 text-[#c0b0ff]'
+                    : 'bg-[#1f1f2a] border-[#2e2e44] text-[#6a6a8a]'
+                }`}>
                   <input
                     type="radio"
                     name="messageType"
                     checked={messageType === val}
                     onChange={() => setMessageType(val)}
-                    style={{ accentColor: '#7b61ff' }}
+                    className="accent-[#7b61ff]"
                   />
                   {lab}
                 </label>
@@ -373,21 +345,21 @@ function CampaignDrawer({ onClose, onCreate }: {
 
           {/* TTS or Audio */}
           {messageType === 'tts' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex flex-col gap-3">
               <div>
-                <label style={LABEL}>Message vocal TTS</label>
+                <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Message vocal TTS</label>
                 <textarea
                   value={ttsText}
                   onChange={e => { if (e.target.value.length <= 500) setTtsText(e.target.value) }}
                   rows={4}
                   placeholder="Bonjour {prenom}, ceci est un rappel automatise..."
-                  style={{ ...IS, resize: 'vertical', lineHeight: 1.6 }}
+                  className={`${inputCls} resize-y leading-relaxed`}
                 />
-                <div style={{ fontSize: 11, color: '#4a4a6a', marginTop: 4, textAlign: 'right' }}>{ttsText.length}/500</div>
+                <div className="text-[11px] text-[#4a4a6a] mt-1 text-right">{ttsText.length}/500</div>
               </div>
               <div>
-                <label style={LABEL}>Langue</label>
-                <select value={ttsLang} onChange={e => setTtsLang(e.target.value)} style={IS}>
+                <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Langue</label>
+                <select value={ttsLang} onChange={e => setTtsLang(e.target.value)} className={inputCls}>
                   <option value="FR">Francais</option>
                   <option value="EN">English</option>
                 </select>
@@ -395,31 +367,28 @@ function CampaignDrawer({ onClose, onCreate }: {
             </div>
           ) : (
             <div>
-              <label style={LABEL}>Fichier audio MP3 (max 5 Mo)</label>
+              <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Fichier audio MP3 (max 5 Mo)</label>
               {!audioFile ? (
                 <div
                   onClick={() => audioInputRef.current?.click()}
-                  style={{
-                    border: '2px dashed #2a2a4a', borderRadius: 10, padding: '24px 20px',
-                    textAlign: 'center', cursor: 'pointer', background: '#080810',
-                  }}
+                  className="border-2 border-dashed border-[#2e2e44] rounded-xl px-5 py-6 text-center cursor-pointer bg-[#1f1f2a] hover:border-[#7b61ff]/30 transition-colors"
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="1.5" strokeLinecap="round" style={{ marginBottom: 6 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="1.5" strokeLinecap="round" className="mx-auto mb-1.5">
                     <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
                   </svg>
-                  <div style={{ fontSize: 12, color: '#6a6a8a' }}>Cliquez pour choisir un fichier MP3</div>
+                  <div className="text-xs text-[#6a6a8a]">Cliquez pour choisir un fichier MP3</div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#080810', border: '1px solid #1e1e3a', borderRadius: 8 }}>
-                  <span style={{ fontSize: 12, color: '#a0a0c0' }}>{audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} Mo)</span>
-                  <button onClick={() => setAudioFile(null)} style={{ background: 'transparent', border: 'none', color: '#ff4d6d', fontSize: 11, cursor: 'pointer' }}>Retirer</button>
+                <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#1f1f2a] border border-[#2e2e44] rounded-lg">
+                  <span className="text-xs text-[#a0a0c0]">{audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} Mo)</span>
+                  <button onClick={() => setAudioFile(null)} className="bg-transparent border-none text-red-400 text-[11px] cursor-pointer hover:text-red-300 transition-colors">Retirer</button>
                 </div>
               )}
               <input
                 ref={audioInputRef}
                 type="file"
                 accept=".mp3,audio/mpeg"
-                style={{ display: 'none' }}
+                className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0]
                   if (f && f.size <= 5 * 1024 * 1024) setAudioFile(f)
@@ -431,8 +400,8 @@ function CampaignDrawer({ onClose, onCreate }: {
 
           {/* After action */}
           <div>
-            <label style={LABEL}>Action apres reponse</label>
-            <select value={afterAction} onChange={e => setAfterAction(e.target.value)} style={IS}>
+            <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Action apres reponse</label>
+            <select value={afterAction} onChange={e => setAfterAction(e.target.value)} className={inputCls}>
               <option value="hangup">Raccrocher</option>
               <option value="ivr">Transfert IVR</option>
               <option value="agent">Transfert agent</option>
@@ -441,17 +410,17 @@ function CampaignDrawer({ onClose, onCreate }: {
 
           {/* Schedule */}
           <div>
-            <label style={LABEL}>Planification</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} style={IS} />
-              <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} style={IS} />
+            <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Planification</label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className={inputCls} />
+              <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className={inputCls} />
             </div>
           </div>
 
           {/* Timezone */}
           <div>
-            <label style={LABEL}>Fuseau horaire</label>
-            <select value={timezone} onChange={e => setTimezone(e.target.value)} style={IS}>
+            <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">Fuseau horaire</label>
+            <select value={timezone} onChange={e => setTimezone(e.target.value)} className={inputCls}>
               <option value="America/Toronto">America/Toronto</option>
               <option value="America/Montreal">America/Montreal</option>
               <option value="America/Vancouver">America/Vancouver</option>
@@ -461,25 +430,22 @@ function CampaignDrawer({ onClose, onCreate }: {
 
           {/* Error */}
           {err && (
-            <div style={{ padding: '8px 14px', borderRadius: 8, background: '#ff4d6d18', border: '1px solid #ff4d6d33', fontSize: 12, color: '#ff4d6d' }}>
+            <div className="px-3.5 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
               {err}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #1e1e3a', display: 'flex', gap: 10 }}>
+        <div className="px-6 py-4 border-t border-[#2e2e44] flex gap-2.5">
           <button
             onClick={submit}
             disabled={saving}
-            style={{
-              flex: 1, padding: 12, background: saving ? '#5a4abf' : '#7b61ff', border: 'none',
-              borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            }}
+            className="flex-1 py-3 bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg text-[13px] font-bold transition-colors disabled:opacity-60"
           >
             {saving ? 'Creation...' : 'Creer la campagne'}
           </button>
-          <button onClick={onClose} style={{ padding: '12px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 9, color: '#5a5a7a', fontSize: 13, cursor: 'pointer' }}>
+          <button onClick={onClose} className="px-5 py-3 bg-transparent border border-[#2e2e44] rounded-lg text-[#5a5a7a] text-[13px] hover:border-[#3e3e54] transition-colors">
             Annuler
           </button>
         </div>
@@ -573,44 +539,35 @@ export default function RobotPage() {
     .reduce((s, c) => s + (c.contacts_count || 0), 0)
   const avgResponse = 23.5
 
-  /* ── Loading ── */
+  /* -- Loading -- */
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 36, height: 36, border: '3px solid #1e1e3a', borderTopColor: '#7b61ff',
-            borderRadius: '50%', margin: '0 auto 14px',
-            animation: 'robotSpin 0.8s linear infinite',
-          }} />
-          <div style={{ fontSize: 13, color: '#4a4a6a' }}>Chargement...</div>
-          <style>{`@keyframes robotSpin { to { transform: rotate(360deg) } }`}</style>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-9 h-9 border-[3px] border-[#1e1e3a] border-t-[#7b61ff] rounded-full mx-auto mb-3.5 animate-spin" />
+          <div className="text-[13px] text-[#4a4a6a]">Chargement...</div>
         </div>
       </div>
     )
   }
 
-  /* ── No subscription ── */
+  /* -- No subscription -- */
   if (!hasRobot) {
     return <NoSubscriptionView />
   }
 
-  /* ── Active subscription ── */
+  /* -- Active subscription -- */
   return (
     <div>
       {/* Page header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div className="flex justify-between items-start mb-6 flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', margin: '0 0 6px' }}>Robot d'appel</h1>
-          <p style={{ fontSize: 13, color: '#6a6a8a', margin: 0 }}>Gerez vos campagnes d'appels automatises.</p>
+          <h1 className="text-[22px] font-bold text-[#eeeef8] mb-1.5">Robot d'appel</h1>
+          <p className="text-[13px] text-[#6a6a8a]">Gerez vos campagnes d'appels automatises.</p>
         </div>
         <button
           onClick={() => setShowDrawer(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px',
-            background: '#7b61ff', border: 'none', borderRadius: 9, color: '#fff',
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          }}
+          className="flex items-center gap-2 bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold transition-colors"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -621,35 +578,32 @@ export default function RobotPage() {
 
       {/* Error */}
       {error && (
-        <div style={{ padding: '12px 16px', background: '#ff4d6d10', border: '1px solid #ff4d6d33', borderRadius: 10, color: '#ff4d6d', fontSize: 13, marginBottom: 16 }}>
+        <div className="px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 text-[13px] mb-4">
           {error}
         </div>
       )}
 
       {/* Stats cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Campagnes totales', value: totalCampaigns, color: '#7b61ff' },
-          { label: 'Contacts ce mois', value: contactsThisMonth.toLocaleString('fr-CA'), color: '#38b6ff' },
-          { label: 'Taux reponse moyen', value: avgResponse + '%', color: '#00d4aa' },
+          { label: 'Campagnes totales', value: totalCampaigns, color: 'text-[#7b61ff]' },
+          { label: 'Contacts ce mois', value: contactsThisMonth.toLocaleString('fr-CA'), color: 'text-sky-400' },
+          { label: 'Taux reponse moyen', value: avgResponse + '%', color: 'text-emerald-400' },
         ].map(s => (
-          <div key={s.label} style={CARD}>
-            <div style={{ fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{s.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
+          <div key={s.label} className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+            <div className="text-[10px] text-[#4a4a6a] uppercase tracking-wider mb-1.5">{s.label}</div>
+            <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Campaigns table */}
-      <div style={{ ...CARD, padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
+        <table className="w-full border-collapse">
           <thead>
-            <tr style={{ borderBottom: '1px solid #1e1e3a' }}>
+            <tr className="border-b border-[#1f1f2a]">
               {['Nom', 'Date', 'Contacts', 'Livres %', 'Repondus %', 'Statut', 'Actions'].map(h => (
-                <th key={h} style={{
-                  padding: '12px 16px', fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase',
-                  letterSpacing: '.06em', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap',
-                }}>
+                <th key={h} className="px-4 py-3 text-[10px] text-[#4a4a6a] uppercase tracking-wider font-semibold text-left whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -658,7 +612,7 @@ export default function RobotPage() {
           <tbody>
             {campaigns.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ padding: '40px 16px', textAlign: 'center', color: '#4a4a6a', fontSize: 13 }}>
+                <td colSpan={7} className="px-4 py-10 text-center text-[#4a4a6a] text-[13px]">
                   Aucune campagne. Cliquez sur "Nouvelle campagne" pour commencer.
                 </td>
               </tr>
@@ -668,41 +622,29 @@ export default function RobotPage() {
               // Simulated percentages
               const deliveredPct = c.status === 'completed' ? 98 : c.status === 'running' ? 62 : c.status === 'paused' ? 45 : 0
               const answeredPct = c.status === 'completed' ? 24 : c.status === 'running' ? 18 : c.status === 'paused' ? 12 : 0
+              const badge = statusBadgeClasses(c.status)
 
               return (
-                <tr key={c.id} style={{ borderBottom: '1px solid #12122a' }}>
-                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#c8c8e8', fontWeight: 600 }}>{c.name}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 12, color: '#6a6a8a' }}>{date}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#a0a0c0' }}>{(c.contacts_count || 0).toLocaleString('fr-CA')}</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#a0a0c0' }}>{deliveredPct}%</td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#a0a0c0' }}>{answeredPct}%</td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
-                      background: statusColor(c.status) + '15',
-                      color: statusColor(c.status),
-                      border: `1px solid ${statusColor(c.status)}33`,
-                    }}>
+                <tr key={c.id} className="border-b border-[#1f1f2a] hover:bg-[#1f1f2a] transition-colors">
+                  <td className="px-4 py-3.5 text-[13px] text-[#c8c8e8] font-semibold">{c.name}</td>
+                  <td className="px-4 py-3.5 text-xs text-[#6a6a8a]">{date}</td>
+                  <td className="px-4 py-3.5 text-[13px] text-[#a0a0c0]">{(c.contacts_count || 0).toLocaleString('fr-CA')}</td>
+                  <td className="px-4 py-3.5 text-[13px] text-[#a0a0c0]">{deliveredPct}%</td>
+                  <td className="px-4 py-3.5 text-[13px] text-[#a0a0c0]">{answeredPct}%</td>
+                  <td className="px-4 py-3.5">
+                    <span className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                       {c.status === 'running' && (
-                        <span style={{
-                          width: 6, height: 6, borderRadius: '50%', background: '#00d4aa',
-                          animation: 'robotPulse 1.5s ease-in-out infinite',
-                        }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       )}
-                      {statusLabel(c.status)}
+                      {badge.label}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <td className="px-4 py-3.5">
+                    <div className="flex gap-1.5 flex-wrap">
                       {/* Detail */}
                       <a
                         href={`/client/robot/${c.id}`}
-                        style={{
-                          padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                          background: '#7b61ff18', border: '1px solid #7b61ff33', color: '#a695ff',
-                          textDecoration: 'none', fontWeight: 600,
-                        }}
+                        className="px-2.5 py-1 text-[11px] rounded-md bg-[#7b61ff]/10 border border-[#7b61ff]/20 text-[#a695ff] no-underline font-semibold hover:bg-[#7b61ff]/20 transition-colors"
                       >
                         Detail
                       </a>
@@ -710,10 +652,7 @@ export default function RobotPage() {
                       {(c.status === 'draft' || c.status === 'paused') && (
                         <button
                           onClick={() => patchCampaign(c.id, { status: 'running' })}
-                          style={{
-                            padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                            background: '#00d4aa18', border: '1px solid #00d4aa33', color: '#00d4aa', fontWeight: 600,
-                          }}
+                          className="px-2.5 py-1 text-[11px] rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition-colors"
                         >
                           Lancer
                         </button>
@@ -722,10 +661,7 @@ export default function RobotPage() {
                       {c.status === 'running' && (
                         <button
                           onClick={() => patchCampaign(c.id, { status: 'paused' })}
-                          style={{
-                            padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                            background: '#ffb54718', border: '1px solid #ffb54733', color: '#ffb547', fontWeight: 600,
-                          }}
+                          className="px-2.5 py-1 text-[11px] rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold hover:bg-amber-500/20 transition-colors"
                         >
                           Arreter
                         </button>
@@ -733,10 +669,7 @@ export default function RobotPage() {
                       {/* Dupliquer */}
                       <button
                         onClick={() => duplicateCampaign(c)}
-                        style={{
-                          padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                          background: '#38b6ff18', border: '1px solid #38b6ff33', color: '#38b6ff', fontWeight: 600,
-                        }}
+                        className="px-2.5 py-1 text-[11px] rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400 font-semibold hover:bg-sky-500/20 transition-colors"
                       >
                         Dupliquer
                       </button>
@@ -748,9 +681,6 @@ export default function RobotPage() {
           </tbody>
         </table>
       </div>
-
-      {/* Pulse animation */}
-      <style>{`@keyframes robotPulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.3 } }`}</style>
 
       {/* Drawer */}
       {showDrawer && <CampaignDrawer onClose={() => setShowDrawer(false)} onCreate={createCampaign} />}
