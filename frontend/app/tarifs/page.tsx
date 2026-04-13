@@ -283,7 +283,7 @@ export default function TarifsPage() {
   }
 
   return (
-    <div style={{ background: BG, color: '#fff', fontFamily: FONT, minHeight: '100vh' }}>
+    <div style={{ background: BG, color: '#fff', fontFamily: FONT, height: '100vh', overflowY: 'auto' }}>
       {/* ============================================================ */}
       {/*  NAV                                                          */}
       {/* ============================================================ */}

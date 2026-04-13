@@ -1013,7 +1013,7 @@ export default function CommanderPage() {
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#080810', display: 'flex',
+        height: '100vh', background: '#080810', display: 'flex',
         alignItems: 'center', justifyContent: 'center',
         fontFamily: "'DM Sans', ui-sans-serif, system-ui, sans-serif",
       }}>
@@ -1028,7 +1028,7 @@ export default function CommanderPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', background: '#080810',
+      height: '100vh', overflowY: 'auto', background: '#080810',
       fontFamily: "'DM Sans', ui-sans-serif, system-ui, sans-serif",
       display: 'flex',
     }}>
