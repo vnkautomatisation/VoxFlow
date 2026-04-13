@@ -33,11 +33,15 @@ export default function DialerPage() {
         if (params.get('embedded') === 'true' || window.parent !== window) {
             setEmbedded(true)
         }
-        // Ecouter les messages du parent (click-to-call)
+        // Ecouter les messages du parent (click-to-call + sync donnees)
         const handleMsg = (e: MessageEvent) => {
             if (e.data?.type === 'vf:dial' && e.data.phone) {
                 d.setNum(e.data.phone)
                 setTimeout(() => d.callNum(), 300)
+            }
+            // Sync : le portail demande au dialer de recharger ses donnees
+            if (e.data?.type === 'vf:refresh') {
+                d.refreshData?.()
             }
         }
         window.addEventListener('message', handleMsg)
