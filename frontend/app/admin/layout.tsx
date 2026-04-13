@@ -1,5 +1,6 @@
 'use client'
-import DialerFAB from '@/components/shared/DialerFAB'
+import dynamic from 'next/dynamic'
+const DialerSidebar = dynamic(() => import('@/components/shared/DialerSidebar'), { ssr: false })
 import TrialBanner from '@/components/shared/TrialBanner'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
@@ -350,7 +351,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
             </nav>
 
-            <DialerFAB />
+            <DialerSidebar />
             <TrialBanner />
             <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
