@@ -128,50 +128,13 @@ export default function DialerSidebar() {
           background: '#111118',
         }}
       >
-        {/* Header sidebar */}
-        <div style={{
-          height: 49,
-          borderBottom: '1px solid #2e2e44',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
-          background: '#18181f',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: '#00d4aa',
-              boxShadow: '0 0 6px #00d4aa',
-            }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#eeeef8', fontFamily: "'DM Sans',sans-serif" }}>
-              Dialer
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <kbd style={{
-              fontSize: 9, color: '#55557a', background: '#1f1f2a',
-              border: '1px solid #2e2e44', borderRadius: 4,
-              padding: '2px 6px', fontFamily: 'monospace',
-            }}>Ctrl+D</kbd>
-            <button onClick={() => setOpen(false)} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#55557a', display: 'flex', alignItems: 'center',
-            }}>
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* iframe dialer */}
+        {/* iframe dialer — pleine hauteur, pas de header doublon */}
         <iframe
           ref={iframeRef}
           src="/dialer?embedded=true"
           style={{
             width: '100%',
-            height: 'calc(100vh - 49px)',
+            height: '100%',
             border: 'none',
             background: '#111118',
           }}
