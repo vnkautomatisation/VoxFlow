@@ -104,6 +104,15 @@ html, body {
     border: none !important;
     box-shadow: none !important;
 }
+.popup.embedded,
+.popup.embedded .pane {
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+}
+.popup.embedded::-webkit-scrollbar,
+.popup.embedded .pane::-webkit-scrollbar {
+    display: none !important;
+}
 
 /* ── TOAST ── */
 .toast {
