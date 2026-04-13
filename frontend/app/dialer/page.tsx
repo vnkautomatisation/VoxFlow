@@ -381,8 +381,8 @@ export default function DialerPage() {
                             {/* Récents */}
                             {d.calls.length > 0 && (
                                 <div id="recents-wrap">
-                                    <div className="slbl" style={{ marginTop: '14px' }}>Récents</div>
-                                    {d.calls.slice(0, 3).map(c => {
+                                    <div className="slbl" style={{ marginTop: '6px' }}>Recents</div>
+                                    {d.calls.slice(0, 2).map(c => {
                                         const name = c.contact ? c.contact.first_name + ' ' + c.contact.last_name : c.direction === 'INBOUND' ? c.from_number : c.to_number
                                         const num = c.direction === 'INBOUND' ? c.from_number : c.to_number
                                         const isMiss = ['NO_ANSWER', 'MISSED'].includes(c.status)
