@@ -44,6 +44,19 @@ export class SupervisionService {
             .eq("organization_id", organizationId)
             .eq("status", "PENDING")
 
+        // Dernier appel par agent (pour detecter inactivite)
+        const { data: lastCallsPerAgent } = await supabaseAdmin
+            .from("calls")
+            .select("agent_id, started_at")
+            .eq("organization_id", organizationId)
+            .order("started_at", { ascending: false })
+            .limit(200)
+
+        const lastCallMap: Record<string, string> = {}
+        for (const c of (lastCallsPerAgent || [])) {
+            if (c.agent_id && !lastCallMap[c.agent_id]) lastCallMap[c.agent_id] = c.started_at
+        }
+
         const agentStatuses = (agents || []).map((a: any) => {
             const user = a.users as any
             const agentCalls = (activeCalls || []).filter((c: any) => c.agent_id === a.user_id)
@@ -64,6 +77,7 @@ export class SupervisionService {
                 callDirection: activeCall?.direction || null,
                 callDuration,
                 callStarted: activeCall?.started_at || null,
+                lastActivityAt: activeCall?.started_at || lastCallMap[a.user_id] || null,
                 contactName: activeCall?.contacts
                     ? (activeCall.contacts as any).first_name + " " + (activeCall.contacts as any).last_name
                     : null,
