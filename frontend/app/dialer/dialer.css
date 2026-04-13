@@ -1557,6 +1557,42 @@ html, body {
     }
 }
 
+/* ── Caller insights chips (popup incoming) ── */
+.inc-insights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: center;
+    margin-top: 10px;
+    max-width: 280px;
+}
+
+.ins-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--tx2);
+    background: var(--ink3);
+    border: 1px solid var(--line);
+    border-radius: var(--rp);
+    padding: 3px 9px;
+    white-space: nowrap;
+}
+
+    .ins-chip.vi {
+        color: var(--violet);
+        background: var(--vi3);
+        border-color: rgba(123,97,255,.25);
+    }
+
+    .ins-chip.tag {
+        color: var(--mint);
+        background: var(--mi3);
+        border-color: rgba(0,212,170,.2);
+    }
+
 .inc-btns {
     display: flex;
     gap: 10px;

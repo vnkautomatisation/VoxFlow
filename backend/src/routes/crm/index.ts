@@ -255,7 +255,7 @@ router.post("/contacts", authenticate, async (req: AuthRequest, res: Response) =
     try {
         const orgId = getOrgId(req)
         const { first_name, last_name, email, phone, company, position,
-            address, city, province, postal_code, country, notes, status, tags } = req.body
+            address, city, province, postal_code, country, notes, status, tags, custom_fields } = req.body
 
         if (!first_name && !last_name && !phone) return sendError(res, "Nom ou telephone requis", 400)
 
@@ -279,6 +279,7 @@ router.post("/contacts", authenticate, async (req: AuthRequest, res: Response) =
                 country: country || region.country || "Canada",
                 notes: notes || null,
                 status: status || "lead",
+                custom_fields: custom_fields || {},
             })
             .select()
             .single()
@@ -301,7 +302,7 @@ router.patch("/contacts/:id", authenticate, async (req: AuthRequest, res: Respon
         const orgId = getOrgId(req)
         const updates: any = {}
         const fields = ["first_name", "last_name", "email", "phone", "company", "position",
-            "address", "city", "province", "postal_code", "country", "notes", "status"]
+            "address", "city", "province", "postal_code", "country", "notes", "status", "custom_fields"]
         fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
         updates.updated_at = new Date().toISOString()
 
