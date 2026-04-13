@@ -29,18 +29,17 @@ const ACP = ['#2d1a80', '#1a356b', '#1a4d3a', '#4d1a5a', '#4d2a1a', '#1a3a4d', '
 const ini = (name: string) => (name || 'A').split(' ').map((n: string) => n[0] || '').join('').substring(0, 2).toUpperCase()
 
 // Statuts temps reel (presence) — PAS le statut du compte
-// ONLINE = connecte et pret a recevoir des appels
-// BUSY = en appel actif
-// BREAK = en pause volontaire
-// OFFLINE = deconnecte ou pas encore connecte
-// ACTIVE/INACTIVE = statut du COMPTE (affiche separement)
 const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; bg: string }> = {
-    ONLINE: { label: 'Disponible', dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    BUSY: { label: 'En appel', dot: 'bg-rose-400', text: 'text-rose-400', bg: 'bg-rose-400/10' },
-    BREAK: { label: 'En pause', dot: 'bg-amber-400', text: 'text-amber-400', bg: 'bg-amber-400/10' },
-    OFFLINE: { label: 'Hors ligne', dot: 'bg-zinc-500', text: 'text-zinc-500', bg: 'bg-zinc-500/10' },
-    INACTIVE: { label: 'Desactive', dot: 'bg-zinc-700', text: 'text-zinc-600', bg: 'bg-zinc-700/10' },
+    ONLINE:   { label: 'Disponible', dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    BUSY:     { label: 'En appel',   dot: 'bg-rose-400',    text: 'text-rose-400',    bg: 'bg-rose-400/10' },
+    BREAK:    { label: 'En pause',   dot: 'bg-amber-400',   text: 'text-amber-400',   bg: 'bg-amber-400/10' },
+    AWAY:     { label: 'Absent',     dot: 'bg-orange-400',  text: 'text-orange-400',  bg: 'bg-orange-400/10' },
+    OFFLINE:  { label: 'Hors ligne', dot: 'bg-zinc-500',    text: 'text-zinc-500',    bg: 'bg-zinc-500/10' },
+    INACTIVE: { label: 'Desactive',  dot: 'bg-zinc-700',    text: 'text-zinc-600',    bg: 'bg-zinc-700/10' },
 }
+
+// Seuil d'inactivite : si ONLINE sans appel depuis 15 min = AWAY
+const AWAY_THRESHOLD_MS = 15 * 60 * 1000
 
 interface Agent {
     id: string; name: string; email: string; role: string
@@ -199,10 +198,20 @@ export default function AgentsPage() {
     const filtered = agents.filter(a => {
         const q = search.toLowerCase()
         const matchSearch = !q || a.name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.extension?.includes(q)
-        // Statut presence : agentStatus vient du snapshot supervision
-        // Si pas de snapshot, l'agent est OFFLINE (pas "Actif")
-        // status = compte (ACTIVE/INACTIVE), agentStatus = presence (ONLINE/OFFLINE/BUSY/BREAK)
-        const st = a.status === 'INACTIVE' ? 'INACTIVE' : a.current_call ? 'BUSY' : (a.agentStatus || 'OFFLINE')
+        // Statut presence temps reel
+        const getPresence = (ag: Agent) => {
+            if (ag.status === 'INACTIVE') return 'INACTIVE'
+            if (ag.current_call) return 'BUSY'
+            if (!ag.agentStatus || ag.agentStatus === 'OFFLINE') return 'OFFLINE'
+            if (ag.agentStatus === 'BREAK') return 'BREAK'
+            // ONLINE mais inactif depuis longtemps = AWAY
+            if (ag.agentStatus === 'ONLINE' && (ag as any).lastActivityAt) {
+                const idle = Date.now() - new Date((ag as any).lastActivityAt).getTime()
+                if (idle > AWAY_THRESHOLD_MS) return 'AWAY'
+            }
+            return ag.agentStatus
+        }
+        const st = getPresence(a)
         const matchStatus = filterStatus === 'all' || st === filterStatus
         return matchSearch && matchStatus
     })
@@ -327,7 +336,17 @@ export default function AgentsPage() {
                     </thead>
                     <tbody>
                         {filtered.map((a, i) => {
-                            const st = a.status === 'INACTIVE' ? 'INACTIVE' : a.current_call ? 'BUSY' : (a.agentStatus || 'OFFLINE')
+                            const st = (() => {
+                                if (a.status === 'INACTIVE') return 'INACTIVE'
+                                if (a.current_call) return 'BUSY'
+                                if (!a.agentStatus || a.agentStatus === 'OFFLINE') return 'OFFLINE'
+                                if (a.agentStatus === 'BREAK') return 'BREAK'
+                                if (a.agentStatus === 'ONLINE' && (a as any).lastActivityAt) {
+                                    const idle = Date.now() - new Date((a as any).lastActivityAt).getTime()
+                                    if (idle > AWAY_THRESHOLD_MS) return 'AWAY'
+                                }
+                                return a.agentStatus
+                            })()
                             const sc = STATUS_CONFIG[st] || STATUS_CONFIG.OFFLINE
                             const color = ACP[i % ACP.length]
                             return (
