@@ -584,12 +584,13 @@ router.get("/appointments", authenticate, async (req: AuthRequest, res: Response
 router.post("/appointments", authenticate, async (req: AuthRequest, res: Response) => {
     try {
         const orgId = getOrgId(req)
-        const { title, description, starts_at, ends_at, contact_id, agent_id, location, reminder_minutes, status } = req.body
+        const { title, description, starts_at, ends_at, contact_id, agent_id, location, reminder_minutes, status, type, notes } = req.body
         if (!title || !starts_at || !ends_at) return sendError(res, "Titre et dates requis", 400)
         const { data, error } = await supabaseAdmin.from("appointments").insert({
             organization_id: orgId, title, description, starts_at, ends_at, status: status || 'SCHEDULED',
             contact_id: contact_id || null, agent_id: agent_id || req.user?.userId || null,
             location: location || null, reminder_minutes: reminder_minutes ?? 15,
+            type: type || 'CALL', notes: notes || null,
         }).select().single()
         if (error) throw error
         sendSuccess(res, data, 201)
@@ -599,7 +600,7 @@ router.post("/appointments", authenticate, async (req: AuthRequest, res: Respons
 router.patch("/appointments/:id", authenticate, async (req: AuthRequest, res: Response) => {
     try {
         const orgId = getOrgId(req)
-        const fields = ["title","description","starts_at","ends_at","status","location","contact_id","agent_id","reminder_minutes"]
+        const fields = ["title","description","starts_at","ends_at","status","location","contact_id","agent_id","reminder_minutes","type","notes"]
         const updates: any = {}
         fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f] })
         const { data, error } = await supabaseAdmin.from("appointments")

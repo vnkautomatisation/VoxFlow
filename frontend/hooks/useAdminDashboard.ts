@@ -201,12 +201,12 @@ export function useAdminDashboard() {
   }, [loadAll])
 
   const deactivateAgent = async (agentId: string) => {
-    await apiFetch(`/api/v1/admin/agent/${agentId}/deactivate`).catch(() => {})
+    await apiFetch(`/api/v1/admin/agents/${agentId}`, { method: 'DELETE' }).catch(() => {})
     loadAll()
   }
 
   const createAgent = async (data: { email: string; name: string; password: string; extension?: string }) => {
-    const r = await apiFetch('/api/v1/admin/agent/create', {
+    const r = await apiFetch('/api/v1/admin/agents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -216,7 +216,7 @@ export function useAdminDashboard() {
   }
 
   const createQueue = async (name: string, strategy: string) => {
-    await apiFetch('/api/v1/admin/queue/create', {
+    await apiFetch('/api/v1/admin/queues', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, strategy }),
