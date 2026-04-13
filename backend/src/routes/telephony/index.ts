@@ -680,7 +680,11 @@ router.get("/twiml/voicemail", (req: Request, res: Response) => {
 })
 
 // ── TwiML IVR (menu interactif) ──────────────────────────────
-// GET /twiml/ivr/:id — racine du menu IVR (play welcome + gather DTMF)
+// GET /twiml/ivr/:id — racine du menu IVR
+// Si flow_json existe (react-flow builder), compile le flow en TwiML.
+// Sinon fallback sur l'ancien format nodes (twilioService.generateIvrTwiML).
+import { compileFlowToTwiML } from "../../services/ivr/ivr-compiler"
+
 router.get("/twiml/ivr/:id", async (req: Request, res: Response) => {
     try {
         const ivrId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
@@ -688,16 +692,23 @@ router.get("/twiml/ivr/:id", async (req: Request, res: Response) => {
 
         const { data: ivr } = await supabaseAdmin
             .from("ivr_configs")
-            .select("id, name, welcome_message, timeout, max_retries, nodes")
+            .select("id, name, welcome_message, timeout, max_retries, nodes, flow_json")
             .eq("id", ivrId)
             .maybeSingle()
 
         res.set("Content-Type", "text/xml")
         if (!ivr) {
-            // Fallback si IVR inexistant — voicemail générique
             res.send(twilioService.generateVoicemailTwiML(orgId))
             return
         }
+
+        // Priorite au flow_json (react-flow builder) si present
+        if (ivr.flow_json && typeof ivr.flow_json === 'object' && (ivr.flow_json as any).nodes?.length) {
+            res.send(compileFlowToTwiML(ivr.flow_json as any, { orgId, ivrId }))
+            return
+        }
+
+        // Fallback ancien format
         res.send(twilioService.generateIvrTwiML(ivr, orgId))
     } catch (err: any) {
         res.set("Content-Type", "text/xml")
