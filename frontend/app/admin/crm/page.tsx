@@ -3,6 +3,9 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { PromptModal, ConfirmModal } from '@/components/shared/VFModal'
+import dynamic from 'next/dynamic'
+const CRMCalendar = dynamic(() => import('@/components/crm/Calendar'), { ssr: false })
+import { generateQuotePDF } from '@/components/crm/QuotePDF'
 
 const API = () => typeof window !== 'undefined' ? localStorage.getItem('vf_url') || 'http://localhost:4000' : 'http://localhost:4000'
 const TOK = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') || '' : ''
@@ -1017,27 +1020,24 @@ export default function CRMPage() {
                     onCancel={() => setShowNewField(false)} />
             )}
 
-            {/* ── VUE CALENDRIER ── */}
+            {/* ── VUE CALENDRIER (react-big-calendar) ── */}
             {view === 'calendar' && (
                 <div>
                     <div className="flex items-center justify-between mb-4">
                         <div className="text-sm font-bold text-[#eeeef8]">Rendez-vous</div>
                         <button onClick={() => setShowNewAppt(true)} className="text-xs bg-[#00d4aa] text-white px-3 py-1.5 rounded-lg font-bold">+ Rendez-vous</button>
                     </div>
-                    {loadingCal && <div className="text-xs text-[#55557a] text-center py-8">Chargement...</div>}
-                    {!loadingCal && appointments.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun rendez-vous</div>}
-                    <div className="space-y-2">
-                        {appointments.map((a: any) => (
-                            <div key={a.id} className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-3 flex items-center justify-between">
-                                <div>
-                                    <div className="text-sm font-semibold text-[#eeeef8]">{a.title}</div>
-                                    <div className="text-[10px] text-[#55557a]">{new Date(a.starts_at).toLocaleString('fr-CA')} - {new Date(a.ends_at).toLocaleTimeString('fr-CA', {hour:'2-digit',minute:'2-digit'})}</div>
-                                    {a.location && <div className="text-[10px] text-[#7b61ff]">{a.location}</div>}
-                                </div>
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${a.status==='SCHEDULED'?'bg-[#7b61ff]/15 text-[#7b61ff]':a.status==='CONFIRMED'?'bg-[#00d4aa]/15 text-[#00d4aa]':a.status==='CANCELLED'?'bg-[#ff4d6d]/15 text-[#ff4d6d]':'bg-[#55557a]/15 text-[#55557a]'}`}>{a.status}</span>
-                            </div>
-                        ))}
-                    </div>
+                    {loadingCal ? (
+                        <div className="text-xs text-[#55557a] text-center py-8">Chargement...</div>
+                    ) : (
+                        <CRMCalendar
+                            appointments={appointments}
+                            onCreate={(start, end) => {
+                                // Pre-remplir le modal avec les dates selectionnees
+                                setShowNewAppt(true)
+                            }}
+                        />
+                    )}
                 </div>
             )}
 
@@ -1058,7 +1058,10 @@ export default function CRMPage() {
                                     <div className="text-sm font-semibold text-[#eeeef8]">{q.number}</div>
                                     <div className="text-[10px] text-[#55557a]">{new Date(q.created_at).toLocaleDateString('fr-CA')} - {q.total?.toFixed?.(2) || q.total} CAD</div>
                                 </div>
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${q.status==='DRAFT'?'bg-[#55557a]/15 text-[#55557a]':q.status==='SENT'?'bg-[#38b6ff]/15 text-[#38b6ff]':q.status==='ACCEPTED'?'bg-[#00d4aa]/15 text-[#00d4aa]':'bg-[#ff4d6d]/15 text-[#ff4d6d]'}`}>{q.status}</span>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => generateQuotePDF(q)} className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#7b61ff]/15 text-[#7b61ff] hover:bg-[#7b61ff]/25">PDF</button>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${q.status==='DRAFT'?'bg-[#55557a]/15 text-[#55557a]':q.status==='SENT'?'bg-[#38b6ff]/15 text-[#38b6ff]':q.status==='ACCEPTED'?'bg-[#00d4aa]/15 text-[#00d4aa]':'bg-[#ff4d6d]/15 text-[#ff4d6d]'}`}>{q.status}</span>
+                                </div>
                             </div>
                         ))}
                     </div>
