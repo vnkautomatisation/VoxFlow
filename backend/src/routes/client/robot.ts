@@ -2,6 +2,7 @@ import { Router, Response } from "express"
 import { AuthRequest } from "../../middleware/auth"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
+import { robotQueue } from "../../services/robot/robot-queue"
 
 // ══════════════════════════════════════════════════════════════
 //  /api/v1/client/robot — robot dialer + leads (migration 032)
@@ -160,6 +161,8 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
 })
 
 // ── POST /:id/launch ─────────────────────────────────────────
+// Active la campagne ET enqueue les leads PENDING dans Redis
+// pour que le robot-worker les traite.
 router.post("/:id/launch", async (req: AuthRequest, res: Response) => {
   try {
     const orgId = getOrgId(req)
@@ -168,19 +171,33 @@ router.post("/:id/launch", async (req: AuthRequest, res: Response) => {
       return sendError(res, "Campagne introuvable", 404)
     }
 
+    // Charger les leads PENDING pour les enqueue
+    const { data: pendingLeads } = await supabaseAdmin
+      .from("campaign_leads")
+      .select("id")
+      .eq("campaign_id", id)
+      .eq("status", "PENDING")
+    const leadIds = (pendingLeads || []).map((l: any) => l.id)
+
+    // Enqueue dans Redis
+    if (leadIds.length > 0) {
+      await robotQueue.enqueue(id, leadIds)
+    }
+
     const { data, error } = await supabaseAdmin
       .from("robot_campaigns")
       .update({ status: "ACTIVE", started_at: new Date().toISOString() })
       .eq("id", id)
       .select().single()
     if (error) throw error
-    sendSuccess(res, data)
+    sendSuccess(res, { ...data, enqueued: leadIds.length })
   } catch (err: any) {
     sendError(res, err.message)
   }
 })
 
 // ── POST /:id/pause ──────────────────────────────────────────
+// Pause la campagne ET vide la queue Redis (les leads restent PENDING en DB).
 router.post("/:id/pause", async (req: AuthRequest, res: Response) => {
   try {
     const orgId = getOrgId(req)
@@ -188,6 +205,9 @@ router.post("/:id/pause", async (req: AuthRequest, res: Response) => {
     if (!await ensureCampaignOwnership(id, orgId)) {
       return sendError(res, "Campagne introuvable", 404)
     }
+
+    // Vider la queue Redis
+    await robotQueue.clear(id)
 
     const { data, error } = await supabaseAdmin
       .from("robot_campaigns")
@@ -287,6 +307,47 @@ router.get("/:id/stats", async (req: AuthRequest, res: Response) => {
       .single()
     if (error || !data) return sendError(res, "Campagne introuvable", 404)
     sendSuccess(res, data)
+  } catch (err: any) {
+    sendError(res, err.message)
+  }
+})
+
+// ── GET /:id/export — export CSV des resultats ──────────────
+router.get("/:id/export", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const id = String(req.params.id)
+    if (!await ensureCampaignOwnership(id, orgId)) {
+      return sendError(res, "Campagne introuvable", 404)
+    }
+
+    // Charger la campagne + tous les leads
+    const { data: campaign } = await supabaseAdmin
+      .from("robot_campaigns")
+      .select("name")
+      .eq("id", id)
+      .single()
+
+    const { data: leads } = await supabaseAdmin
+      .from("campaign_leads")
+      .select("phone_number, name, status, attempts, last_attempt_at, keypress, notes")
+      .eq("campaign_id", id)
+      .order("created_at")
+
+    // Generer le CSV
+    const header = "Telephone,Nom,Statut,Tentatives,Dernier appel,Touche,Notes"
+    const rows = (leads || []).map((l: any) =>
+      [l.phone_number, l.name || "", l.status, l.attempts, l.last_attempt_at || "", l.keypress || "", (l.notes || "").replace(/"/g, '""')]
+        .map(v => `"${v}"`)
+        .join(",")
+    )
+    const csv = [header, ...rows].join("\n")
+
+    const filename = `campagne-${(campaign?.name || id).replace(/[^a-zA-Z0-9]/g, "_")}-${new Date().toISOString().slice(0, 10)}.csv`
+    res.setHeader("Content-Type", "text/csv; charset=utf-8")
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
+    // BOM UTF-8 pour Excel
+    res.send("\uFEFF" + csv)
   } catch (err: any) {
     sendError(res, err.message)
   }
