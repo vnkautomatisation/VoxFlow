@@ -86,6 +86,59 @@ router.post("/listen/:id",  (req: AuthRequest, res: Response) => handleJoin(req,
 router.post("/whisper/:id", (req: AuthRequest, res: Response) => handleJoin(req, res, "whisper"))
 router.post("/barge/:id",   (req: AuthRequest, res: Response) => handleJoin(req, res, "barge"))
 
+// ── Chat superviseur-agent (migration 036) ─────────────────
+// POST /api/v1/supervision/chat/:agentId — envoyer un message
+router.post("/chat/:agentId", async (req: AuthRequest, res: Response) => {
+  try {
+    const agentId = String(req.params.agentId)
+    const content = String(req.body?.content || '').trim()
+    if (!content) return sendError(res, "Contenu requis", 400)
+
+    const orgId = String(req.user?.organizationId || '')
+    const { data, error } = await supabaseAdmin
+      .from("supervisor_messages")
+      .insert({
+        organization_id: orgId,
+        from_user_id:    req.user!.userId,
+        to_user_id:      agentId,
+        call_id:         req.body?.call_id || null,
+        content,
+      })
+      .select().single()
+    if (error) throw error
+    sendSuccess(res, data, 201)
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+// GET /api/v1/supervision/chat/:agentId — lire les messages recents
+router.get("/chat/:agentId", async (req: AuthRequest, res: Response) => {
+  try {
+    const agentId = String(req.params.agentId)
+    const limit   = Math.min(parseInt(String(req.query.limit || "20")), 100)
+    const { data, error } = await supabaseAdmin
+      .from("supervisor_messages")
+      .select("id, from_user_id, to_user_id, content, call_id, read_at, created_at")
+      .or(`to_user_id.eq.${agentId},from_user_id.eq.${agentId}`)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    sendSuccess(res, (data || []).reverse())
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+// PATCH /api/v1/supervision/chat/:msgId/read — marquer lu
+router.patch("/chat/:msgId/read", async (req: AuthRequest, res: Response) => {
+  try {
+    const { error } = await supabaseAdmin
+      .from("supervisor_messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", req.params.msgId)
+      .eq("to_user_id", req.user!.userId)
+    if (error) throw error
+    sendSuccess(res, { read: true })
+  } catch (err: any) { sendError(res, err.message) }
+})
+
 // GET /api/v1/supervision/log -- Historique
 router.get("/log", async (req: AuthRequest, res: Response) => {
   try {
