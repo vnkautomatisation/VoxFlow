@@ -6,7 +6,18 @@ const LS_KEY = 'vf_dialer_open'
 export default function DialerSidebar() {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [inboxCount, setInboxCount] = useState(0)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  // Ecouter les notifications inbox pour le badge
+  useEffect(() => {
+    const fn = (e: Event) => {
+      const count = (e as CustomEvent).detail?.count || 0
+      setInboxCount(count)
+    }
+    window.addEventListener('vf:inbox-count', fn)
+    return () => window.removeEventListener('vf:inbox-count', fn)
+  }, [])
 
   useEffect(() => {
     setMounted(true)

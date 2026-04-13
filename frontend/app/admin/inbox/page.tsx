@@ -62,7 +62,12 @@ export default function InboxPage() {
     finally { setLoading(false) }
   }, [token, channel, status])
 
-  useEffect(() => { if (token) load() }, [token, channel, status])
+  useEffect(() => {
+    if (token) load()
+    // Poll toutes les 5s pour messages instantanes
+    const poll = setInterval(() => { if (token) load() }, 5000)
+    return () => clearInterval(poll)
+  }, [token, channel, status])
 
   // Fetch agents lazily quand le drawer s'ouvre la première fois
   useEffect(() => {

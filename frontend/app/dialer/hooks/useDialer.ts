@@ -428,7 +428,8 @@ export function useDialer() {
                 setView('login')
             }
         }
-    }, [isAuth, accessToken, user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuth, accessToken, user, loadData, startPoll, stopPoll])
 
 
     // ── Données ────────────────────────────────────────────────

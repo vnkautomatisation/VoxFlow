@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { usePlanPoller } from '@/hooks/usePlanPoller'
 import { useDialerSync } from '@/hooks/useDialerSync'
+import { useInboxNotifications } from '@/hooks/useInboxNotifications'
 
 const NAV_GROUPS = [
     {
@@ -63,6 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // faits par le OWNER (upgrade/downgrade du forfait de l'org).
     usePlanPoller()
     useDialerSync() // Heartbeat presence + sync token avec dialer
+    useInboxNotifications() // Notifications messages inbox en temps reel
     const [mounted, setMounted] = useState(false)
     const [openGroup, setOpenGroup] = useState<string | null>(null)
     const [mobileOpen, setMobileOpen] = useState(false)
