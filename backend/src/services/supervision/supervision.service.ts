@@ -86,10 +86,14 @@ export class SupervisionService {
                 ? Math.floor((now.getTime() - new Date(activeCall.started_at).getTime()) / 1000)
                 : 0
 
-            // Si last_seen_at est vieux de +2 min et pas en appel, l'agent est OFFLINE
+            // Presence reelle basee sur le heartbeat
+            // - Si pas de last_seen_at (jamais de heartbeat) et pas en appel → OFFLINE
+            // - Si last_seen_at > 2 min et pas en appel → OFFLINE
+            // - Sinon → le status de la DB
             const lastSeen = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0
+            const neverSeen = !a.last_seen_at
             const isStale = lastSeen > 0 && (now.getTime() - lastSeen) > 2 * 60 * 1000
-            const realStatus = (!activeCall && isStale && a.status === 'ONLINE') ? 'OFFLINE' : a.status
+            const realStatus = (!activeCall && (neverSeen || isStale)) ? 'OFFLINE' : (a.status || 'OFFLINE')
 
             return {
                 agentId: a.user_id,
