@@ -44,9 +44,9 @@ router.post("/agents", async (req: AuthRequest, res: Response) => {
   try {
     const orgId = getOrgId(req)
     if (!orgId) return sendError(res, "Organisation requise", 400)
-    const { name, email, password, role } = req.body
+    const { name, email, password, role, extension } = req.body
     if (!name || !email || !password) return sendError(res, "Nom, email et mot de passe requis", 400)
-    sendSuccess(res, await adminService.createAgent(orgId, { name, email, password, role }), 201)
+    sendSuccess(res, await adminService.createAgent(orgId, { name, email, password, role, extension }), 201)
   } catch (err: any) { sendError(res, err.message, 400) }
 })
 
@@ -96,6 +96,30 @@ router.delete("/queues/:id", async (req: AuthRequest, res: Response) => {
     const orgId   = getOrgId(req)
     const queueId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
     sendSuccess(res, await adminService.deleteQueue(queueId, orgId))
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+// ── QUEUE AGENTS ─────────────────────────────────────────────
+router.post("/queues/:id/agents", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const queueId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    const { agentId, skillLevel } = req.body
+    if (!agentId) return sendError(res, "agentId requis", 400)
+    const { data, error } = await (await import("../../config/supabase")).supabaseAdmin
+      .from("queue_agents").upsert({ queue_id: queueId, agent_id: agentId, skill_level: skillLevel || 1, organization_id: orgId }, { onConflict: "queue_id,agent_id" }).select().single()
+    if (error) throw error
+    sendSuccess(res, data, 201)
+  } catch (err: any) { sendError(res, err.message) }
+})
+
+router.delete("/queues/:queueId/agents/:agentId", async (req: AuthRequest, res: Response) => {
+  try {
+    const { queueId, agentId } = req.params
+    const { error } = await (await import("../../config/supabase")).supabaseAdmin
+      .from("queue_agents").delete().eq("queue_id", queueId).eq("agent_id", agentId)
+    if (error) throw error
+    sendSuccess(res, { removed: true })
   } catch (err: any) { sendError(res, err.message) }
 })
 
