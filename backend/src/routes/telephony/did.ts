@@ -61,11 +61,62 @@ export async function didCountriesHandler(_req: Request, res: Response) {
 }
 router.get('/countries', didCountriesHandler)
 
+// ── Canadian area codes by province ──────────────────────
+const CA_REGIONS = [
+  { region: 'Quebec — Montreal', areaCode: '514', friendlyName: 'Montreal (514)' },
+  { region: 'Quebec — Montreal', areaCode: '438', friendlyName: 'Montreal (438)' },
+  { region: 'Quebec — Rive-Sud/Laval', areaCode: '450', friendlyName: 'Rive-Sud/Laval (450)' },
+  { region: 'Quebec — Quebec City', areaCode: '418', friendlyName: 'Quebec City (418)' },
+  { region: 'Quebec — Gatineau', areaCode: '819', friendlyName: 'Gatineau/Outaouais (819)' },
+  { region: 'Ontario — Toronto', areaCode: '416', friendlyName: 'Toronto (416)' },
+  { region: 'Ontario — Toronto', areaCode: '647', friendlyName: 'Toronto (647)' },
+  { region: 'Ontario — GTA', areaCode: '905', friendlyName: 'GTA/Hamilton (905)' },
+  { region: 'Ontario — Ottawa', areaCode: '613', friendlyName: 'Ottawa (613)' },
+  { region: 'Ontario — London', areaCode: '519', friendlyName: 'London/Kitchener (519)' },
+  { region: 'Ontario — Sudbury/North', areaCode: '705', friendlyName: 'Sudbury/Barrie (705)' },
+  { region: 'Ontario — Thunder Bay', areaCode: '807', friendlyName: 'Thunder Bay (807)' },
+  { region: 'Colombie-Britannique — Vancouver', areaCode: '604', friendlyName: 'Vancouver (604)' },
+  { region: 'Colombie-Britannique — Victoria', areaCode: '250', friendlyName: 'Victoria/Interior (250)' },
+  { region: 'Alberta — Calgary', areaCode: '403', friendlyName: 'Calgary (403)' },
+  { region: 'Alberta — Edmonton', areaCode: '780', friendlyName: 'Edmonton (780)' },
+  { region: 'Manitoba — Winnipeg', areaCode: '204', friendlyName: 'Winnipeg (204)' },
+  { region: 'Saskatchewan — Regina', areaCode: '306', friendlyName: 'Regina/Saskatoon (306)' },
+  { region: 'Nouveau-Brunswick', areaCode: '506', friendlyName: 'Nouveau-Brunswick (506)' },
+  { region: 'Nouvelle-Ecosse/IPE', areaCode: '902', friendlyName: 'Halifax/Charlottetown (902)' },
+  { region: 'Terre-Neuve', areaCode: '709', friendlyName: 'St. John\'s (709)' },
+  { region: 'Territoires du Nord', areaCode: '867', friendlyName: 'Yukon/TNO/Nunavut (867)' },
+]
+
+const US_REGIONS = [
+  { region: 'New York', areaCode: '212', friendlyName: 'New York City (212)' },
+  { region: 'New York', areaCode: '718', friendlyName: 'New York — Brooklyn/Queens (718)' },
+  { region: 'California', areaCode: '213', friendlyName: 'Los Angeles (213)' },
+  { region: 'California', areaCode: '415', friendlyName: 'San Francisco (415)' },
+  { region: 'California', areaCode: '310', friendlyName: 'Los Angeles — West (310)' },
+  { region: 'Texas', areaCode: '214', friendlyName: 'Dallas (214)' },
+  { region: 'Texas', areaCode: '713', friendlyName: 'Houston (713)' },
+  { region: 'Illinois', areaCode: '312', friendlyName: 'Chicago (312)' },
+  { region: 'Florida', areaCode: '305', friendlyName: 'Miami (305)' },
+  { region: 'Florida', areaCode: '407', friendlyName: 'Orlando (407)' },
+  { region: 'Massachusetts', areaCode: '617', friendlyName: 'Boston (617)' },
+  { region: 'Washington', areaCode: '206', friendlyName: 'Seattle (206)' },
+  { region: 'Georgia', areaCode: '404', friendlyName: 'Atlanta (404)' },
+  { region: 'Pennsylvania', areaCode: '215', friendlyName: 'Philadelphia (215)' },
+  { region: 'DC', areaCode: '202', friendlyName: 'Washington DC (202)' },
+  { region: 'Arizona', areaCode: '602', friendlyName: 'Phoenix (602)' },
+  { region: 'Colorado', areaCode: '303', friendlyName: 'Denver (303)' },
+  { region: 'Michigan', areaCode: '313', friendlyName: 'Detroit (313)' },
+]
+
 // ── GET /regions/:countryCode ────────────────────────────
 router.get('/regions/:countryCode', async (req: Request, res: Response) => {
   try {
     const code = String(req.params.countryCode).toUpperCase()
     const type = String(req.query.type || 'local')
+
+    // Use hardcoded regions for CA and US (complete and reliable)
+    if (code === 'CA' && type === 'local') return res.json({ success: true, data: CA_REGIONS })
+    if (code === 'US' && type === 'local') return res.json({ success: true, data: US_REGIONS })
 
     if (!twilioClient) {
       return res.json({ success: true, data: [{ region: 'Default', areaCode: '', friendlyName: code }] })
