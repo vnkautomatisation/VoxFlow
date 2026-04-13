@@ -56,46 +56,7 @@ export default function DialerSidebar() {
       {/* ── Boutons FAB — widget + Electron ── */}
       {!open && (
         <>
-        {/* Bouton fenetre separee — au-dessus du bouton principal */}
-        <button
-          onClick={async () => {
-            // 1. Tenter Electron
-            try {
-              const tok = localStorage.getItem('vf_tok') || ''
-              const url = localStorage.getItem('vf_url') || 'http://localhost:4000'
-              const r = await fetch('http://127.0.0.1:9876/auth-sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'open', token: tok, url }),
-                signal: AbortSignal.timeout(1500),
-              })
-              if (r.ok) return // Electron a repondu, app ouverte
-            } catch {}
-            // 2. Fallback : popup fenetre separee
-            window.open('/dialer', 'voxflow-dialer', `width=380,height=800,left=${screen.availWidth - 404},top=24,menubar=no,toolbar=no`)
-          }}
-          style={{
-            position: 'fixed',
-            bottom: 88,
-            right: 32,
-            zIndex: 9998,
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background: '#18181f',
-            border: '1px solid #2e2e44',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-          }}
-          title="Ouvrir dans une fenetre separee"
-        >
-          <svg width="14" height="14" fill="none" stroke="#9898b8" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
-        </button>
+        {/* Pas de bouton fenetre separee — le widget integre suffit */}
 
         {/* Bouton principal — ouvrir le widget */}
         <button
