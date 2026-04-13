@@ -10,7 +10,7 @@ export class SupervisionService {
 
         const { data: agents } = await supabaseAdmin
             .from("agents")
-            .select("user_id, status, users!inner(id, name, email)")
+            .select("user_id, status, last_seen_at, users!inner(id, name, email)")
             .eq("organization_id", organizationId)
 
         const { data: activeCalls } = await supabaseAdmin
@@ -65,11 +65,16 @@ export class SupervisionService {
                 ? Math.floor((now.getTime() - new Date(activeCall.started_at).getTime()) / 1000)
                 : 0
 
+            // Si last_seen_at est vieux de +2 min et pas en appel, l'agent est OFFLINE
+            const lastSeen = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0
+            const isStale = lastSeen > 0 && (now.getTime() - lastSeen) > 2 * 60 * 1000
+            const realStatus = (!activeCall && isStale && a.status === 'ONLINE') ? 'OFFLINE' : a.status
+
             return {
                 agentId: a.user_id,
                 name: user?.name || "Agent",
                 email: user?.email || "",
-                status: a.status,
+                status: realStatus,
                 callStatus: activeCall ? activeCall.status : null,
                 callId: activeCall?.id || null,
                 callFrom: activeCall?.from_number || null,

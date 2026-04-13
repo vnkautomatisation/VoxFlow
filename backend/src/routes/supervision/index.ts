@@ -147,4 +147,16 @@ router.get("/log", async (req: AuthRequest, res: Response) => {
   } catch (err: any) { sendError(res, err.message) }
 })
 
+// POST /api/v1/supervision/heartbeat -- Agent ping (toutes les 30s depuis le dialer)
+router.post("/heartbeat", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId
+    const { status } = req.body // ONLINE, BREAK, etc.
+    const update: any = { last_seen_at: new Date().toISOString() }
+    if (status) update.status = status
+    await supabaseAdmin.from("agents").update(update).eq("user_id", userId)
+    sendSuccess(res, { ok: true })
+  } catch (err: any) { sendError(res, err.message) }
+})
+
 export default router
