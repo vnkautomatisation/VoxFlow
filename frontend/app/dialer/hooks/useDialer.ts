@@ -369,7 +369,6 @@ export function useDialer() {
         const name = localStorage.getItem('vf_name') || ''
 
         if (tok) {
-            // Token présent dans localStorage → connecté
             S.current.tok  = tok
             S.current.role = role
             S.current.url  = url
@@ -378,6 +377,14 @@ export function useDialer() {
             setView('main')
             loadData()
             startPoll()
+            // Re-check role apres 2s (le portail parent peut le setter en retard)
+            setTimeout(() => {
+                const freshRole = localStorage.getItem('vf_role') || role
+                if (freshRole !== S.current.role) {
+                    S.current.role = freshRole
+                    loadData()
+                }
+            }, 2000)
         } else if (isAuth && accessToken && user) {
             // Portail connecté (même contexte) → sync complet depuis Zustand
             S.current.tok  = accessToken
@@ -414,7 +421,7 @@ export function useDialer() {
         try {
             const [qr, ar] = await Promise.all([
                 api('/api/v1/queues'),
-                isAdmin() ? api('/api/v1/supervision/snapshot') : Promise.resolve({ success: false }),
+                api('/api/v1/supervision/snapshot').catch(() => ({ success: false })),
             ])
             if (qr.success) setQueue(qr.data || [])
             // Agents : snapshot = source de verite pour les statuts temps reel
