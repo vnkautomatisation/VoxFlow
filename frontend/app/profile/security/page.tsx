@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { securityApi } from "@/lib/securityApi"
+import { ConfirmModal } from "@/components/shared/VFModal"
 import {
   Shield, Smartphone, Key, Activity,
   CheckCircle, XCircle, Clock, Globe,
@@ -78,10 +79,13 @@ export default function SecurityPage() {
     finally { setSaving(false); setTimeout(() => setMsg(""), 3000) }
   }
 
+  const [showDisable2FA, setShowDisable2FA] = useState(false)
+
   const handleDisable2FA = async () => {
-    if (!token || !confirm("Desactiver le 2FA ?")) return
+    if (!token) return
     const res = await securityApi.disable2FA(token)
     if (res.success) { load() }
+    setShowDisable2FA(false)
   }
 
   const handleRevokeSession = async (id: string) => {
@@ -153,7 +157,7 @@ export default function SecurityPage() {
                       </div>
                     </div>
                     {twoFA.enabled ? (
-                      <button onClick={handleDisable2FA}
+                      <button onClick={() => setShowDisable2FA(true)}
                         className="border border-red-800 text-red-400 hover:bg-red-900/20 px-3 py-1.5 rounded-lg text-sm"
                       >Desactiver</button>
                     ) : (
@@ -333,6 +337,11 @@ export default function SecurityPage() {
               </div>
             )}
           </>
+        )}
+
+        {showDisable2FA && (
+          <ConfirmModal title="Desactiver le 2FA ?" message="Votre compte sera moins protege." confirmLabel="Desactiver" danger
+            onConfirm={handleDisable2FA} onCancel={() => setShowDisable2FA(false)} />
         )}
       </div>
     </div>

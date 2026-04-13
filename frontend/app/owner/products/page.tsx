@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { PromptModal, ConfirmModal } from '@/components/shared/VFModal'
 
 const API = () => localStorage.getItem('vf_url') || 'http://localhost:4000'
 const TOK = () => localStorage.getItem('vf_tok') || ''
@@ -11,6 +12,8 @@ const api = async (path: string, opts: RequestInit = {}) => {
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [showNew, setShowNew] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -20,19 +23,15 @@ export default function ProductsPage() {
   }
   useEffect(() => { load() }, [])
 
-  const create = async () => {
-    const sku = prompt('SKU (ex: CA-LOCAL-MTL)')
-    if (!sku) return
-    const name = prompt('Nom du produit')
-    if (!name) return
-    const price = prompt('Prix mensuel (cents CAD)', '500')
-    await api('/api/v1/owner/products', { method: 'POST', body: JSON.stringify({ sku, name, category: 'PHONE_NUMBER', country: 'CA', price_monthly: Number(price) || 500 }) })
+  const create = async (vals: Record<string, string>) => {
+    await api('/api/v1/owner/products', { method: 'POST', body: JSON.stringify({ sku: vals.sku, name: vals.name, category: 'PHONE_NUMBER', country: vals.country || 'CA', price_monthly: Number(vals.price) || 500 }) })
+    setShowNew(false)
     load()
   }
 
   const del = async (id: string) => {
-    if (!confirm('Desactiver ce produit ?')) return
     await api(`/api/v1/owner/products/${id}`, { method: 'DELETE' })
+    setDeleting(null)
     load()
   }
 
@@ -45,7 +44,7 @@ export default function ProductsPage() {
           <h1 className="text-xl font-bold text-[#eeeef8]">Catalogue produits</h1>
           <p className="text-xs text-[#55557a]">{products.length} produits</p>
         </div>
-        <button onClick={create} className="text-xs bg-[#7b61ff] text-white px-4 py-2 rounded-lg font-bold">+ Produit</button>
+        <button onClick={() => setShowNew(true)} className="text-xs bg-[#7b61ff] text-white px-4 py-2 rounded-lg font-bold">+ Produit</button>
       </div>
       <div className="space-y-2">
         {products.map((p: any) => (
@@ -65,12 +64,38 @@ export default function ProductsPage() {
                 <div className="text-sm font-bold text-[#7b61ff]">{((p.price_monthly || 0) / 100).toFixed(2)} CAD</div>
                 <div className="text-[9px] text-[#55557a]">/mois</div>
               </div>
-              <button onClick={() => del(p.id)} className="text-[10px] text-[#ff4d6d55] hover:text-[#ff4d6d]">Desactiver</button>
+              <button onClick={() => setDeleting(p.id)} className="text-[10px] text-[#ff4d6d55] hover:text-[#ff4d6d]">Desactiver</button>
             </div>
           </div>
         ))}
         {products.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun produit dans le catalogue</div>}
       </div>
+
+      {showNew && (
+        <PromptModal
+          title="Nouveau produit"
+          fields={[
+            { key: 'sku', label: 'SKU', placeholder: 'CA-LOCAL-MTL', required: true },
+            { key: 'name', label: 'Nom du produit', placeholder: 'Numero local Montreal', required: true },
+            { key: 'country', label: 'Pays', placeholder: 'CA', defaultValue: 'CA' },
+            { key: 'price', label: 'Prix mensuel (cents CAD)', placeholder: '500', defaultValue: '500', type: 'number' },
+          ]}
+          submitLabel="Creer"
+          onSubmit={create}
+          onCancel={() => setShowNew(false)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmModal
+          title="Desactiver ce produit ?"
+          message="Le produit ne sera plus visible dans le catalogue client."
+          confirmLabel="Desactiver"
+          danger
+          onConfirm={() => del(deleting)}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
     </div>
   )
 }

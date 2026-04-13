@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { PromptModal } from '@/components/shared/VFModal'
 
 const API = () => localStorage.getItem('vf_url') || 'http://localhost:4000'
 const TOK = () => localStorage.getItem('vf_tok') || ''
@@ -21,18 +22,21 @@ export default function ExtensionPoolPage() {
   }
   useEffect(() => { load() }, [filter])
 
-  const allocate = async () => {
-    const orgId = prompt('Organization ID a allouer (ex: org_test_001)')
-    if (!orgId) return
-    const r = await api('/api/v1/owner/extension-pool/allocate', { method: 'POST', body: JSON.stringify({ organization_id: orgId }) })
-    if (r.success) { alert(`Extension ${r.data.extension_number} allouee`); load() }
-    else alert(r.error || 'Erreur')
+  const [showAllocate, setShowAllocate] = useState(false)
+  const [showRelease, setShowRelease] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const allocate = async (vals: Record<string, string>) => {
+    const r = await api('/api/v1/owner/extension-pool/allocate', { method: 'POST', body: JSON.stringify({ organization_id: vals.orgId }) })
+    setShowAllocate(false)
+    if (r.success) { setResult(`Extension ${r.data.extension_number} allouee`); load() }
+    else setResult(r.error || 'Erreur')
+    setTimeout(() => setResult(null), 3000)
   }
 
-  const release = async () => {
-    const ext = prompt('Numero extension a liberer (ex: 201)')
-    if (!ext) return
-    await api('/api/v1/owner/extension-pool/release', { method: 'POST', body: JSON.stringify({ extension_number: ext }) })
+  const release = async (vals: Record<string, string>) => {
+    await api('/api/v1/owner/extension-pool/release', { method: 'POST', body: JSON.stringify({ extension_number: vals.ext }) })
+    setShowRelease(false)
     load()
   }
 
@@ -46,8 +50,8 @@ export default function ExtensionPoolPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={allocate} className="text-xs bg-[#00d4aa] text-white px-4 py-2 rounded-lg font-bold">Allouer</button>
-          <button onClick={release} className="text-xs bg-[#ff4d6d]/15 text-[#ff4d6d] border border-[#ff4d6d]/30 px-4 py-2 rounded-lg font-bold">Liberer</button>
+          <button onClick={() => setShowAllocate(true)} className="text-xs bg-[#00d4aa] text-white px-4 py-2 rounded-lg font-bold">Allouer</button>
+          <button onClick={() => setShowRelease(true)} className="text-xs bg-[#ff4d6d]/15 text-[#ff4d6d] border border-[#ff4d6d]/30 px-4 py-2 rounded-lg font-bold">Liberer</button>
         </div>
       </div>
 
@@ -76,6 +80,19 @@ export default function ExtensionPoolPage() {
         </div>
       )}
       {!loading && data.slots.length > 200 && <div className="text-[10px] text-[#55557a] text-center mt-2">Affiche 200 / {data.slots.length}</div>}
+
+      {result && <div className="fixed bottom-6 right-6 bg-[#18181f] border border-[#2e2e44] rounded-xl px-4 py-2.5 text-sm text-[#eeeef8] shadow-xl z-50">{result}</div>}
+
+      {showAllocate && (
+        <PromptModal title="Allouer une extension" fields={[
+          { key: 'orgId', label: 'Organization ID', placeholder: 'org_test_001', required: true },
+        ]} submitLabel="Allouer" onSubmit={allocate} onCancel={() => setShowAllocate(false)} />
+      )}
+      {showRelease && (
+        <PromptModal title="Liberer une extension" fields={[
+          { key: 'ext', label: 'Numero extension', placeholder: '201', required: true },
+        ]} submitLabel="Liberer" onSubmit={release} onCancel={() => setShowRelease(false)} />
+      )}
     </div>
   )
 }
