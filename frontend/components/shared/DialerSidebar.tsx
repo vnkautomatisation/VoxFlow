@@ -56,20 +56,23 @@ export default function DialerSidebar() {
       {/* ── Boutons FAB — widget + Electron ── */}
       {!open && (
         <>
-        {/* Bouton Electron (app desktop) — au-dessus du bouton principal */}
+        {/* Bouton fenetre separee — au-dessus du bouton principal */}
         <button
-          onClick={() => {
-            const tok = localStorage.getItem('vf_tok') || ''
-            const url = localStorage.getItem('vf_url') || 'http://localhost:4000'
-            // Tenter de lancer Electron
-            fetch('http://127.0.0.1:9876/auth-sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'open', token: tok, url }),
-            }).catch(() => {
-              // Fallback : ouvrir dans une fenetre popup
-              window.open('/dialer', '_blank', `width=380,height=800,left=${screen.availWidth - 404},top=24`)
-            })
+          onClick={async () => {
+            // 1. Tenter Electron
+            try {
+              const tok = localStorage.getItem('vf_tok') || ''
+              const url = localStorage.getItem('vf_url') || 'http://localhost:4000'
+              const r = await fetch('http://127.0.0.1:9876/auth-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'open', token: tok, url }),
+                signal: AbortSignal.timeout(1500),
+              })
+              if (r.ok) return // Electron a repondu, app ouverte
+            } catch {}
+            // 2. Fallback : popup fenetre separee
+            window.open('/dialer', 'voxflow-dialer', `width=380,height=800,left=${screen.availWidth - 404},top=24,menubar=no,toolbar=no`)
           }}
           style={{
             position: 'fixed',
@@ -87,10 +90,10 @@ export default function DialerSidebar() {
             justifyContent: 'center',
             transition: 'all 0.2s',
           }}
-          title="Ouvrir dans l'app desktop"
+          title="Ouvrir dans une fenetre separee"
         >
           <svg width="14" height="14" fill="none" stroke="#9898b8" strokeWidth="2" viewBox="0 0 24 24">
-            <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
           </svg>
         </button>
 
