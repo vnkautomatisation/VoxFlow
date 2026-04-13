@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { authenticate, AuthRequest } from '../../middleware/auth'
+import telephonyRouter from './telephony'
 
 const router = Router()
 
@@ -8,6 +9,9 @@ const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 )
+
+// ── Telephony billing sub-router ──────────────────────────
+router.use('/telephony', authenticate, telephonyRouter)
 
 // ── Auth middleware selectif ───────────────────────────────
 const PUBLIC_PATHS = new Set(['/plans', '/modules', '/webhook'])
