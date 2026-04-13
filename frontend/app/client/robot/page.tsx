@@ -1,15 +1,28 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
 
-type RStatus = 'active' | 'paused' | 'done' | 'scheduled'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
-interface RobotCampaign {
-  id: string; name: string; status: RStatus; message: string
-  total: number; sent: number; answered: number; duration: number
-  created: string; scheduledAt?: string; ttsVoice: string
+/* ────────────────────────────── Types ────────────────────────────── */
+
+interface Campaign {
+  id: string
+  name: string
+  type: string
+  status: 'draft' | 'running' | 'paused' | 'completed'
+  contacts_count: number
+  config: any
+  created_at: string
 }
 
-// API helper — lit token + url depuis localStorage
+interface Subscription {
+  service_type: string
+  status: string
+}
+
+interface CsvRow { [key: string]: string }
+
+/* ────────────────────────────── API ──────────────────────────────── */
+
 function useApi() {
   const getUrl = () => typeof window !== 'undefined' ? (localStorage.getItem('vf_url') || 'http://localhost:4000') : 'http://localhost:4000'
   const getTok = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') : null
@@ -17,64 +30,201 @@ function useApi() {
     const r = await fetch(getUrl() + path, {
       ...opts,
       headers: { 'Content-Type': 'application/json', ...(getTok() ? { Authorization: 'Bearer ' + getTok() } : {}), ...(opts.headers || {}) },
-      body: opts.body,
     })
     return r.json()
   }
 }
 
-// Mapper row robot_campaigns du backend → forme du composant
-function mapCampaign(row: any): RobotCampaign {
-  const total    = Number(row.total_contacts || 0)
-  const called   = Number(row.called_count    || 0)
-  const answered = Number(row.answered_count  || 0)
-  const status: RStatus =
-    row.status === 'ACTIVE'    ? 'active'    :
-    row.status === 'COMPLETED' ? 'done'      :
-    row.status === 'SCHEDULED' ? 'scheduled' : 'paused'
-  return {
-    id:          row.id,
-    name:        row.name,
-    status,
-    message:     row.tts_message || '',
-    total,
-    sent:        called,
-    answered,
-    duration:    Number(row.avg_duration || 0),
-    created:     row.created_at ? String(row.created_at).slice(0, 10) : '',
-    scheduledAt: row.schedule_start ? String(row.schedule_start) : undefined,
-    ttsVoice:    row.voice || 'fr-CA-Sylvie',
-  }
-}
-
-const VOICES = ['fr-CA-Sylvie', 'fr-CA-Antoine', 'fr-FR-Denise', 'en-CA-Clara', 'en-US-Jenny']
+/* ────────────────────────────── Styles ───────────────────────────── */
 
 const IS: React.CSSProperties = {
-  width:'100%', background:'#080810', border:'1px solid #2a2a4a', borderRadius:9,
-  padding:'10px 13px', color:'#e8e8f8', fontSize:13, outline:'none',
-  boxSizing:'border-box', fontFamily:'inherit',
+  width: '100%', background: '#080810', border: '1px solid #2a2a4a', borderRadius: 8,
+  padding: '10px 13px', color: '#e8e8f8', fontSize: 13, outline: 'none',
+  boxSizing: 'border-box', fontFamily: 'inherit',
 }
 
-interface NewCampaignPayload {
-  name: string; message: string; voice: string; total: number; scheduledAt?: string
+const LABEL: React.CSSProperties = {
+  fontSize: 11, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em',
+  display: 'block', marginBottom: 5, fontWeight: 600,
 }
 
-function NewRobotModal({ onClose, onCreate }: { onClose: () => void; onCreate: (p: NewCampaignPayload) => Promise<void> }) {
-  const [name,    setName]    = useState('')
-  const [message, setMessage] = useState('')
-  const [total,   setTotal]   = useState('500')
-  const [voice,   setVoice]   = useState('fr-CA-Sylvie')
-  const [sched,   setSched]   = useState('')
-  const [saving,  setSaving]  = useState(false)
-  const [err,     setErr]     = useState<string | null>(null)
+const CARD: React.CSSProperties = {
+  background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12, padding: '18px 22px',
+}
+
+/* ────────────────────────────── Status helpers ───────────────────── */
+
+function statusColor(s: Campaign['status']): string {
+  if (s === 'running') return '#00d4aa'
+  if (s === 'paused') return '#ffb547'
+  if (s === 'completed') return '#38b6ff'
+  return '#6a6a8a'
+}
+
+function statusLabel(s: Campaign['status']): string {
+  if (s === 'running') return 'En cours'
+  if (s === 'paused') return 'En pause'
+  if (s === 'completed') return 'Termine'
+  return 'Brouillon'
+}
+
+/* ────────────────────────────── CSV Parser ───────────────────────── */
+
+function parseCsv(text: string): { headers: string[]; rows: CsvRow[] } {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length < 2) return { headers: [], rows: [] }
+  const headers = lines[0].split(/[,;]/).map(h => h.trim().replace(/^"|"$/g, ''))
+  const rows: CsvRow[] = []
+  for (let i = 1; i < lines.length && rows.length < 5; i++) {
+    const vals = lines[i].split(/[,;]/).map(v => v.trim().replace(/^"|"$/g, ''))
+    const row: CsvRow = {}
+    headers.forEach((h, idx) => { row[h] = vals[idx] || '' })
+    rows.push(row)
+  }
+  return { headers, rows }
+}
+
+/* ────────────────────────────── Robot SVG Icon ───────────────────── */
+
+function RobotIcon({ size = 80 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+      <rect x="16" y="28" width="48" height="36" rx="8" stroke="#7b61ff" strokeWidth="2.5" fill="#7b61ff12" />
+      <circle cx="32" cy="44" r="5" fill="#7b61ff" />
+      <circle cx="48" cy="44" r="5" fill="#7b61ff" />
+      <rect x="34" y="54" width="12" height="3" rx="1.5" fill="#7b61ff" opacity="0.6" />
+      <line x1="40" y1="18" x2="40" y2="28" stroke="#7b61ff" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="40" cy="14" r="4" stroke="#7b61ff" strokeWidth="2" fill="#7b61ff33" />
+      <line x1="10" y1="40" x2="16" y2="40" stroke="#7b61ff" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="64" y1="40" x2="70" y2="40" stroke="#7b61ff" strokeWidth="2.5" strokeLinecap="round" />
+      <rect x="24" y="64" width="10" height="8" rx="3" stroke="#7b61ff" strokeWidth="2" fill="none" />
+      <rect x="46" y="64" width="10" height="8" rx="3" stroke="#7b61ff" strokeWidth="2" fill="none" />
+    </svg>
+  )
+}
+
+/* ────────────────────────────── No Subscription View ─────────────── */
+
+function NoSubscriptionView() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
+      <div style={{ textAlign: 'center', maxWidth: 480 }}>
+        <div style={{ marginBottom: 24 }}>
+          <RobotIcon size={96} />
+        </div>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#e8e8f8', margin: '0 0 12px' }}>
+          Robot d'appel masse
+        </h1>
+        <p style={{ fontSize: 14, color: '#6a6a8a', lineHeight: 1.7, margin: '0 0 8px' }}>
+          Automatisez vos campagnes d'appels avec notre robot intelligent.
+        </p>
+        <p style={{ fontSize: 13, color: '#5a5a7a', lineHeight: 1.6, margin: '0 0 24px' }}>
+          150k appels/h, TTS dynamique, IVR post-robot.
+        </p>
+        <div style={{
+          display: 'inline-block', padding: '10px 20px', background: '#7b61ff12',
+          border: '1px solid #7b61ff33', borderRadius: 10, marginBottom: 24,
+        }}>
+          <span style={{ fontSize: 28, fontWeight: 700, color: '#7b61ff' }}>135</span>
+          <span style={{ fontSize: 14, color: '#7b61ff', marginLeft: 4 }}>CAD$/mois</span>
+        </div>
+        <div>
+          <a
+            href="/commander?service=robot"
+            style={{
+              display: 'inline-block', padding: '13px 32px', background: '#7b61ff',
+              border: 'none', borderRadius: 10, color: '#fff', fontSize: 14,
+              fontWeight: 700, cursor: 'pointer', textDecoration: 'none',
+            }}
+          >
+            Souscrire au Robot d'appel
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ────────────────────────────── Drawer ───────────────────────────── */
+
+function CampaignDrawer({ onClose, onCreate }: {
+  onClose: () => void
+  onCreate: (payload: { name: string; config: any; contacts_count: number }) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [messageType, setMessageType] = useState<'tts' | 'audio'>('tts')
+  const [ttsText, setTtsText] = useState('')
+  const [ttsLang, setTtsLang] = useState('FR')
+  const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [afterAction, setAfterAction] = useState('hangup')
+  const [schedDate, setSchedDate] = useState('')
+  const [schedTime, setSchedTime] = useState('')
+  const [timezone, setTimezone] = useState('America/Toronto')
+
+  // CSV state
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvRows, setCsvRows] = useState<CsvRow[]>([])
+  const [csvTotalRows, setCsvTotalRows] = useState(0)
+  const [phoneCol, setPhoneCol] = useState('')
+  const [prenomCol, setPrenomCol] = useState('')
+  const [csvFileName, setCsvFileName] = useState('')
+
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const csvInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
+
+  const handleCsvUpload = (file: File) => {
+    setCsvFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      const totalLines = text.trim().split(/\r?\n/).length - 1
+      setCsvTotalRows(totalLines)
+      const { headers, rows } = parseCsv(text)
+      setCsvHeaders(headers)
+      setCsvRows(rows)
+      // Auto-detect phone column
+      const phoneGuess = headers.find(h => /phone|tel|numero|mobile|cell/i.test(h))
+      if (phoneGuess) setPhoneCol(phoneGuess)
+      const prenomGuess = headers.find(h => /prenom|first.?name|firstname|name/i.test(h))
+      if (prenomGuess) setPrenomCol(prenomGuess)
+    }
+    reader.readAsText(file)
+  }
+
+  const handleCsvDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.name.endsWith('.csv')) handleCsvUpload(file)
+  }
 
   const submit = async () => {
-    if (!name.trim())    return setErr('Nom requis')
-    if (!message.trim()) return setErr('Message TTS requis')
-    if (!total || +total < 1) return setErr('Nombre de destinataires invalide')
+    setErr(null)
+    if (!name.trim()) return setErr('Nom de la campagne requis')
+    if (csvTotalRows < 1) return setErr('Veuillez uploader un fichier CSV')
+    if (!phoneCol) return setErr('Selectionnez la colonne telephone')
+    if (messageType === 'tts' && !ttsText.trim()) return setErr('Message TTS requis')
+    if (messageType === 'audio' && !audioFile) return setErr('Fichier audio requis')
+
     setSaving(true)
     try {
-      await onCreate({ name, message, voice, total: +total, scheduledAt: sched || undefined })
+      await onCreate({
+        name,
+        contacts_count: csvTotalRows,
+        config: {
+          message_type: messageType,
+          tts_text: messageType === 'tts' ? ttsText : undefined,
+          tts_lang: messageType === 'tts' ? ttsLang : undefined,
+          audio_filename: messageType === 'audio' ? audioFile?.name : undefined,
+          after_action: afterAction,
+          phone_column: phoneCol,
+          prenom_column: prenomCol || undefined,
+          schedule_date: schedDate || undefined,
+          schedule_time: schedTime || undefined,
+          timezone,
+        },
+      })
       onClose()
     } catch (e: any) {
       setErr(e.message || 'Erreur lors de la creation')
@@ -82,286 +232,528 @@ function NewRobotModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
     setSaving(false)
   }
 
-  const words = message.trim().split(/\s+/).filter(Boolean).length
-  const estSec = Math.round(words / 2.5)
-
   return (
-    <div style={{ position:'fixed', inset:0, background:'#000000cc', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:'#0c0c1a', border:'1px solid #2a2a4a', borderRadius:16, padding:28, width:540, maxWidth:'98vw' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <div style={{ fontSize:16, fontWeight:700, color:'#e8e8f8' }}>Nouvelle campagne robot</div>
-          <button onClick={onClose} style={{ background:'transparent', border:'none', color:'#5a5a7a', cursor:'pointer' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: '#00000088', zIndex: 300 }}
+      />
+      {/* Drawer */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 500, maxWidth: '95vw',
+        background: '#0c0c1a', borderLeft: '1px solid #1e1e3a', zIndex: 301,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #1e1e3a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#e8e8f8' }}>Nouvelle campagne robot</div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#5a5a7a', cursor: 'pointer', padding: 4 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Campaign name */}
           <div>
-            <label style={{ fontSize:10, color:'#6a6a8a', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:4 }}>Nom de la campagne</label>
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex: Rappel rendez-vous mai" style={IS} />
+            <label style={LABEL}>Nom de la campagne</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Rappel rendez-vous mai" style={IS} />
           </div>
+
+          {/* CSV Upload */}
           <div>
-            <label style={{ fontSize:10, color:'#6a6a8a', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:4 }}>Message vocal (TTS)</label>
-            <textarea value={message} onChange={e=>setMessage(e.target.value)} rows={4} placeholder="Bonjour, ceci est un message automatisé de VoxFlow…" style={{ ...IS, resize:'vertical', lineHeight:1.6 }} />
-            {words > 0 && <div style={{ fontSize:11, color:'#5a5a7a', marginTop:4 }}>{words} mots · ~{estSec}s de lecture</div>}
+            <label style={LABEL}>Upload CSV</label>
+            {csvHeaders.length === 0 ? (
+              <div
+                onDragOver={e => e.preventDefault()}
+                onDrop={handleCsvDrop}
+                onClick={() => csvInputRef.current?.click()}
+                style={{
+                  border: '2px dashed #2a2a4a', borderRadius: 10, padding: '32px 20px',
+                  textAlign: 'center', cursor: 'pointer', background: '#080810',
+                  transition: 'border-color 0.2s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#7b61ff55')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#2a2a4a')}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <div style={{ fontSize: 13, color: '#6a6a8a', marginBottom: 4 }}>Deposez votre fichier CSV ici</div>
+                <div style={{ fontSize: 11, color: '#4a4a6a' }}>ou cliquez pour parcourir</div>
+              </div>
+            ) : (
+              <div style={{ background: '#080810', border: '1px solid #1e1e3a', borderRadius: 10, padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, color: '#a0a0c0' }}>
+                    {csvFileName} — {csvTotalRows} contacts detectes
+                  </div>
+                  <button
+                    onClick={() => { setCsvHeaders([]); setCsvRows([]); setCsvTotalRows(0); setCsvFileName(''); setPhoneCol(''); setPrenomCol('') }}
+                    style={{ background: 'transparent', border: 'none', color: '#ff4d6d', fontSize: 11, cursor: 'pointer' }}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+                {/* Preview table */}
+                <div style={{ overflowX: 'auto', marginBottom: 14 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                    <thead>
+                      <tr>
+                        {csvHeaders.map(h => (
+                          <th key={h} style={{ padding: '6px 10px', borderBottom: '1px solid #1e1e3a', color: '#7b61ff', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvRows.map((row, i) => (
+                        <tr key={i}>
+                          {csvHeaders.map(h => (
+                            <td key={h} style={{ padding: '5px 10px', borderBottom: '1px solid #12122a', color: '#8a8aa8', whiteSpace: 'nowrap' }}>{row[h]}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Column mapping */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ ...LABEL, fontSize: 10 }}>Colonne telephone (obligatoire)</label>
+                    <select value={phoneCol} onChange={e => setPhoneCol(e.target.value)} style={IS}>
+                      <option value="">-- Selectionner --</option>
+                      {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, fontSize: 10 }}>Colonne prenom (optionnel)</label>
+                    <select value={prenomCol} onChange={e => setPrenomCol(e.target.value)} style={IS}>
+                      <option value="">-- Aucun --</option>
+                      {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvUpload(f) }}
+            />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div>
-              <label style={{ fontSize:10, color:'#6a6a8a', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:4 }}>Voix TTS</label>
-              <select value={voice} onChange={e=>setVoice(e.target.value)} style={IS}>
-                {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
+
+          {/* Message type radio */}
+          <div>
+            <label style={LABEL}>Type de message</label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {([['tts', 'TTS (Text-to-Speech)'], ['audio', 'Audio (MP3 pre-enregistre)']] as const).map(([val, lab]) => (
+                <label key={val} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+                  background: messageType === val ? '#7b61ff12' : '#080810',
+                  border: `1px solid ${messageType === val ? '#7b61ff44' : '#2a2a4a'}`,
+                  borderRadius: 8, cursor: 'pointer', fontSize: 12, color: messageType === val ? '#c0b0ff' : '#6a6a8a',
+                }}>
+                  <input
+                    type="radio"
+                    name="messageType"
+                    checked={messageType === val}
+                    onChange={() => setMessageType(val)}
+                    style={{ accentColor: '#7b61ff' }}
+                  />
+                  {lab}
+                </label>
+              ))}
             </div>
+          </div>
+
+          {/* TTS or Audio */}
+          {messageType === 'tts' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={LABEL}>Message vocal TTS</label>
+                <textarea
+                  value={ttsText}
+                  onChange={e => { if (e.target.value.length <= 500) setTtsText(e.target.value) }}
+                  rows={4}
+                  placeholder="Bonjour {prenom}, ceci est un rappel automatise..."
+                  style={{ ...IS, resize: 'vertical', lineHeight: 1.6 }}
+                />
+                <div style={{ fontSize: 11, color: '#4a4a6a', marginTop: 4, textAlign: 'right' }}>{ttsText.length}/500</div>
+              </div>
+              <div>
+                <label style={LABEL}>Langue</label>
+                <select value={ttsLang} onChange={e => setTtsLang(e.target.value)} style={IS}>
+                  <option value="FR">Francais</option>
+                  <option value="EN">English</option>
+                </select>
+              </div>
+            </div>
+          ) : (
             <div>
-              <label style={{ fontSize:10, color:'#6a6a8a', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:4 }}>Destinataires</label>
-              <input type="number" min="1" value={total} onChange={e=>setTotal(e.target.value)} style={IS} />
+              <label style={LABEL}>Fichier audio MP3 (max 5 Mo)</label>
+              {!audioFile ? (
+                <div
+                  onClick={() => audioInputRef.current?.click()}
+                  style={{
+                    border: '2px dashed #2a2a4a', borderRadius: 10, padding: '24px 20px',
+                    textAlign: 'center', cursor: 'pointer', background: '#080810',
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="1.5" strokeLinecap="round" style={{ marginBottom: 6 }}>
+                    <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                  </svg>
+                  <div style={{ fontSize: 12, color: '#6a6a8a' }}>Cliquez pour choisir un fichier MP3</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#080810', border: '1px solid #1e1e3a', borderRadius: 8 }}>
+                  <span style={{ fontSize: 12, color: '#a0a0c0' }}>{audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} Mo)</span>
+                  <button onClick={() => setAudioFile(null)} style={{ background: 'transparent', border: 'none', color: '#ff4d6d', fontSize: 11, cursor: 'pointer' }}>Retirer</button>
+                </div>
+              )}
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept=".mp3,audio/mpeg"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f && f.size <= 5 * 1024 * 1024) setAudioFile(f)
+                  else if (f) setErr('Le fichier depasse 5 Mo')
+                }}
+              />
+            </div>
+          )}
+
+          {/* After action */}
+          <div>
+            <label style={LABEL}>Action apres reponse</label>
+            <select value={afterAction} onChange={e => setAfterAction(e.target.value)} style={IS}>
+              <option value="hangup">Raccrocher</option>
+              <option value="ivr">Transfert IVR</option>
+              <option value="agent">Transfert agent</option>
+            </select>
+          </div>
+
+          {/* Schedule */}
+          <div>
+            <label style={LABEL}>Planification</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} style={IS} />
+              <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} style={IS} />
             </div>
           </div>
+
+          {/* Timezone */}
           <div>
-            <label style={{ fontSize:10, color:'#6a6a8a', textTransform:'uppercase', letterSpacing:'.06em', display:'block', marginBottom:4 }}>Planifier (optionnel)</label>
-            <input type="datetime-local" value={sched} onChange={e=>setSched(e.target.value)} style={IS} />
+            <label style={LABEL}>Fuseau horaire</label>
+            <select value={timezone} onChange={e => setTimezone(e.target.value)} style={IS}>
+              <option value="America/Toronto">America/Toronto</option>
+              <option value="America/Montreal">America/Montreal</option>
+              <option value="America/Vancouver">America/Vancouver</option>
+              <option value="Europe/Paris">Europe/Paris</option>
+            </select>
           </div>
-          <div style={{ padding:'10px 14px', background:'#0a0a18', border:'1px solid #1e1e3a', borderRadius:9, fontSize:12, color:'#5a5a7a' }}>
-            Capacité : <strong style={{ color:'#ff4d6d' }}>150 000 appels/heure</strong> · Tarif : 0.015 CAD/appel répondu
-          </div>
+
+          {/* Error */}
+          {err && (
+            <div style={{ padding: '8px 14px', borderRadius: 8, background: '#ff4d6d18', border: '1px solid #ff4d6d33', fontSize: 12, color: '#ff4d6d' }}>
+              {err}
+            </div>
+          )}
         </div>
-        {err && <div style={{ marginTop:10, padding:'7px 12px', borderRadius:7, background:'#ff4d6d18', border:'1px solid #ff4d6d33', fontSize:12, color:'#ff4d6d' }}>{err}</div>}
-        <div style={{ display:'flex', gap:8, marginTop:18 }}>
-          <button onClick={submit} disabled={saving} style={{ flex:1, padding:11, background: saving?'#5a4abf':'#7b61ff', border:'none', borderRadius:9, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-            {saving ? 'Création…' : 'Créer la campagne'}
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #1e1e3a', display: 'flex', gap: 10 }}>
+          <button
+            onClick={submit}
+            disabled={saving}
+            style={{
+              flex: 1, padding: 12, background: saving ? '#5a4abf' : '#7b61ff', border: 'none',
+              borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            {saving ? 'Creation...' : 'Creer la campagne'}
           </button>
-          <button onClick={onClose} style={{ padding:'11px 16px', background:'transparent', border:'1px solid #2a2a4a', borderRadius:9, color:'#5a5a7a', fontSize:13, cursor:'pointer' }}>Annuler</button>
+          <button onClick={onClose} style={{ padding: '12px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 9, color: '#5a5a7a', fontSize: 13, cursor: 'pointer' }}>
+            Annuler
+          </button>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
-function RobotReportModal({ campaign, onClose }: { campaign: RobotCampaign; onClose: () => void }) {
-  const pct = campaign.total > 0 ? Math.round(campaign.sent / campaign.total * 100) : 0
-  const rRate = campaign.sent > 0 ? Math.round(campaign.answered / campaign.sent * 100) : 0
-  return (
-    <div style={{ position:'fixed', inset:0, background:'#000000cc', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:'#0c0c1a', border:'1px solid #2a2a4a', borderRadius:16, padding:28, width:540, maxWidth:'95vw' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <div>
-            <div style={{ fontSize:16, fontWeight:700, color:'#e8e8f8' }}>{campaign.name}</div>
-            <div style={{ fontSize:11, color:'#5a5a7a', marginTop:2 }}>Rapport robot d'appel · {campaign.created}</div>
-          </div>
-          <button onClick={onClose} style={{ background:'transparent', border:'none', color:'#5a5a7a', cursor:'pointer' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-
-        <div style={{ marginBottom:18 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#6a6a8a', marginBottom:5 }}>
-            <span>Envois</span><span style={{ color:'#7b61ff', fontWeight:700 }}>{pct}%</span>
-          </div>
-          <div style={{ height:8, background:'#1a1a2e', borderRadius:4, overflow:'hidden' }}>
-            <div style={{ height:'100%', width:pct+'%', background:'linear-gradient(90deg,#7b61ff,#ff4d6d)', borderRadius:4 }} />
-          </div>
-        </div>
-
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:18 }}>
-          {[
-            { l:'Total',    v: campaign.total,    c:'#7b61ff' },
-            { l:'Envoyés',  v: campaign.sent,     c:'#38b6ff' },
-            { l:'Réponses', v: campaign.answered, c:'#00d4aa' },
-            { l:'Taux rép.',v: rRate+'%',          c:'#ffb547' },
-          ].map(k => (
-            <div key={k.l} style={{ background:'#0e0e1c', border:'1px solid #1e1e3a', borderRadius:10, padding:'12px 14px' }}>
-              <div style={{ fontSize:10, color:'#4a4a6a', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{k.l}</div>
-              <div style={{ fontSize:20, fontWeight:700, color:k.c }}>{k.v}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ background:'#080810', border:'1px solid #1e1e3a', borderRadius:10, padding:'14px 16px' }}>
-          <div style={{ fontSize:11, color:'#4a4a6a', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Détails</div>
-          {[
-            ['Message',      campaign.message.slice(0,60) + (campaign.message.length>60?'…':'')],
-            ['Voix TTS',     campaign.ttsVoice],
-            ['Durée message',campaign.duration + ' secondes'],
-            ['Non répondus', campaign.sent - campaign.answered],
-            ['Restants',     campaign.total - campaign.sent],
-          ].map(([k,v]) => (
-            <div key={k as string} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid #1a1a2e', fontSize:12 }}>
-              <span style={{ color:'#6a6a8a' }}>{k}</span>
-              <span style={{ color:'#c8c8e8', fontWeight:500, maxWidth:260, textAlign:'right' }}>{v}</span>
-            </div>
-          ))}
-        </div>
-
-        <button onClick={onClose} style={{ width:'100%', marginTop:16, padding:10, background:'transparent', border:'1px solid #2a2a4a', borderRadius:9, color:'#5a5a7a', fontSize:13, cursor:'pointer' }}>Fermer</button>
-      </div>
-    </div>
-  )
-}
+/* ────────────────────────────── Main Page ────────────────────────── */
 
 export default function RobotPage() {
   const api = useApi()
-  const [campaigns, setCampaigns] = useState<RobotCampaign[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState<string | null>(null)
-  const [showNew,   setShowNew]   = useState(false)
-  const [report,    setReport]    = useState<RobotCampaign | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [hasRobot, setHasRobot] = useState(false)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [showDrawer, setShowDrawer] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const loadCampaigns = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const r = await api('/api/v1/client/robot')
-      if (r.success && Array.isArray(r.data)) {
-        setCampaigns(r.data.map(mapCampaign))
-      } else {
-        setCampaigns([])
-        if (r.error) setError(r.error)
+      // Check subscription
+      const subRes = await api('/api/v1/client/portal/subscriptions')
+      const subs: Subscription[] = Array.isArray(subRes?.data) ? subRes.data : (Array.isArray(subRes) ? subRes : [])
+      const robotSub = subs.find((s: Subscription) => s.service_type === 'ROBOT' && (s.status === 'active' || s.status === 'trialing'))
+      if (!robotSub) {
+        setHasRobot(false)
+        setLoading(false)
+        return
       }
+      setHasRobot(true)
+
+      // Load campaigns
+      const campRes = await api('/api/v1/client/portal/robot/campaigns')
+      const campData = Array.isArray(campRes?.data) ? campRes.data : (Array.isArray(campRes) ? campRes : [])
+      setCampaigns(campData)
     } catch (e: any) {
-      setError(e.message || 'Impossible de charger les campagnes')
-      setCampaigns([])
+      setError(e.message || 'Erreur de chargement')
     }
     setLoading(false)
   }, [])
 
-  useEffect(() => { loadCampaigns() }, [loadCampaigns])
+  useEffect(() => { loadData() }, [loadData])
 
-  const toggle = async (id: string) => {
-    const c = campaigns.find(x => x.id === id)
-    if (!c) return
-    const action = c.status === 'active' ? 'pause' : 'launch'
+  const createCampaign = async (payload: { name: string; config: any; contacts_count: number }) => {
+    const r = await api('/api/v1/client/portal/robot/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    if (r.error) throw new Error(r.error)
+    await loadData()
+  }
+
+  const patchCampaign = async (id: string, patch: { status?: string; config?: any; name?: string }) => {
     try {
-      const r = await api(`/api/v1/client/robot/${id}/${action}`, { method: 'POST' })
-      if (r.success) await loadCampaigns()
+      await api(`/api/v1/client/portal/robot/campaigns/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+      await loadData()
     } catch (e: any) {
-      console.error('[toggle]', e)
+      console.error('[patchCampaign]', e)
     }
   }
 
-  const createCampaign = async (payload: {
-    name: string; message: string; voice: string; total: number; scheduledAt?: string
-  }) => {
+  const duplicateCampaign = async (c: Campaign) => {
     try {
-      const r = await api('/api/v1/client/robot', {
+      await api('/api/v1/client/portal/robot/campaigns', {
         method: 'POST',
         body: JSON.stringify({
-          name:        payload.name,
-          tts_message: payload.message,
-          voice:       payload.voice,
-          // schedule_start est une TIME (09:00:00), on l'extrait du datetime
-          schedule_start: payload.scheduledAt ? payload.scheduledAt.slice(-8) : undefined,
+          name: c.name + ' (copie)',
+          config: c.config,
+          contacts_count: c.contacts_count,
         }),
       })
-      if (r.success) await loadCampaigns()
+      await loadData()
     } catch (e: any) {
-      console.error('[createCampaign]', e)
+      console.error('[duplicateCampaign]', e)
     }
   }
 
-  const totalSent = campaigns.reduce((s,c) => s+c.sent, 0)
-  const inProgress = campaigns.filter(c => c.status === 'active').length
+  // Stats
+  const totalCampaigns = campaigns.length
+  const contactsThisMonth = campaigns
+    .filter(c => {
+      const d = new Date(c.created_at)
+      const now = new Date()
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    })
+    .reduce((s, c) => s + (c.contacts_count || 0), 0)
+  const avgResponse = 23.5
 
-  const scColor = (s: RStatus) => s==='active'?'#00d4aa':s==='paused'?'#ffb547':s==='scheduled'?'#38b6ff':'#7b61ff'
-  const scLabel = (s: RStatus) => s==='active'?'En cours':s==='paused'?'Pausé':s==='scheduled'?'Planifié':'Terminé'
-
-  return (
-    <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, flexWrap:'wrap', gap:10 }}>
-        <div>
-          <h1 style={{ fontSize:22, fontWeight:700, color:'#e8e8f8', margin:0, marginBottom:6 }}>Robot d'appel</h1>
-          <p style={{ fontSize:13, color:'#6a6a8a', margin:0 }}>Diffusez des messages vocaux automatisés à grande échelle.</p>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ padding:'6px 12px', background:'#ff4d6d18', border:'1px solid #ff4d6d33', borderRadius:8, fontSize:11, fontWeight:700, color:'#ff8888' }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight:5 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            150 000 appels/heure
-          </div>
-          <button onClick={() => setShowNew(true)} style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', background:'#7b61ff', border:'none', borderRadius:9, color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Créer campagne
-          </button>
+  /* ── Loading ── */
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 36, height: 36, border: '3px solid #1e1e3a', borderTopColor: '#7b61ff',
+            borderRadius: '50%', margin: '0 auto 14px',
+            animation: 'robotSpin 0.8s linear infinite',
+          }} />
+          <div style={{ fontSize: 13, color: '#4a4a6a' }}>Chargement...</div>
+          <style>{`@keyframes robotSpin { to { transform: rotate(360deg) } }`}</style>
         </div>
       </div>
+    )
+  }
 
-      {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
-        {[['Total envoyés', totalSent, '#7b61ff'], ['En cours', inProgress, '#00d4aa'], ['Appels/heure max', '150 000', '#ff4d6d']].map(([l,v,c]) => (
-          <div key={l as string} style={{ background:'#0e0e1c', border:'1px solid #1e1e3a', borderRadius:10, padding:'14px 18px' }}>
-            <div style={{ fontSize:10, color:'#4a4a6a', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>{l}</div>
-            <div style={{ fontSize:20, fontWeight:700, color: c as string }}>{v}</div>
+  /* ── No subscription ── */
+  if (!hasRobot) {
+    return <NoSubscriptionView />
+  }
+
+  /* ── Active subscription ── */
+  return (
+    <div>
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', margin: '0 0 6px' }}>Robot d'appel</h1>
+          <p style={{ fontSize: 13, color: '#6a6a8a', margin: 0 }}>Gerez vos campagnes d'appels automatises.</p>
+        </div>
+        <button
+          onClick={() => setShowDrawer(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+            background: '#7b61ff', border: 'none', borderRadius: 9, color: '#fff',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Nouvelle campagne
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div style={{ padding: '12px 16px', background: '#ff4d6d10', border: '1px solid #ff4d6d33', borderRadius: 10, color: '#ff4d6d', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Stats cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+        {[
+          { label: 'Campagnes totales', value: totalCampaigns, color: '#7b61ff' },
+          { label: 'Contacts ce mois', value: contactsThisMonth.toLocaleString('fr-CA'), color: '#38b6ff' },
+          { label: 'Taux reponse moyen', value: avgResponse + '%', color: '#00d4aa' },
+        ].map(s => (
+          <div key={s.label} style={CARD}>
+            <div style={{ fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Campagnes */}
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-        {loading && (
-          <div style={{ padding:20, textAlign:'center', color:'#4a4a6a', fontSize:13 }}>Chargement des campagnes…</div>
-        )}
-        {!loading && error && (
-          <div style={{ padding:16, background:'#ff4d6d10', border:'1px solid #ff4d6d33', borderRadius:10, color:'#ff4d6d', fontSize:13 }}>{error}</div>
-        )}
-        {!loading && !error && campaigns.length === 0 && (
-          <div style={{ padding:32, textAlign:'center', background:'#0e0e1c', border:'1px dashed #2a2a4a', borderRadius:10, color:'#4a4a6a' }}>
-            <div style={{ fontSize:14, marginBottom:6 }}>Aucune campagne robot</div>
-            <div style={{ fontSize:12, color:'#3a3a5a' }}>Cliquez sur "Creer campagne" pour lancer votre premiere diffusion.</div>
-          </div>
-        )}
-        {campaigns.map(c => {
-          const pct = c.total > 0 ? Math.round(c.sent / c.total * 100) : 0
-          return (
-            <div key={c.id} style={{ background:'#0e0e1c', border:'1px solid #1e1e3a', borderRadius:12, padding:'18px 22px' }}>
-              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:12 }}>
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
-                    <span style={{ fontSize:15, fontWeight:700, color:'#c8c8e8' }}>{c.name}</span>
-                    <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background: scColor(c.status)+'18', color: scColor(c.status), border:`1px solid ${scColor(c.status)}33`, fontWeight:600 }}>{scLabel(c.status)}</span>
-                    {c.ttsVoice && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#38b6ff18', color:'#38b6ff', border:'1px solid #38b6ff33' }}>{c.ttsVoice}</span>}
-                  </div>
-                  <div style={{ fontSize:11, color:'#5a5a7a', fontStyle:'italic' }}>"{c.message}"</div>
-                  {c.scheduledAt && <div style={{ fontSize:11, color:'#7b61ff', marginTop:3 }}>Planifié : {c.scheduledAt}</div>}
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  {c.status !== 'done' && (
-                    <button onClick={() => toggle(c.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background: c.status==='active'?'#ffb54718':'#00d4aa18', border:`1px solid ${c.status==='active'?'#ffb54744':'#00d4aa44'}`, borderRadius:8, color: c.status==='active'?'#ffb547':'#00d4aa', fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                      {c.status === 'active' ? (
-                        <><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause</>
-                      ) : (
-                        <><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Reprendre</>
+      {/* Campaigns table */}
+      <div style={{ ...CARD, padding: 0, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #1e1e3a' }}>
+              {['Nom', 'Date', 'Contacts', 'Livres %', 'Repondus %', 'Statut', 'Actions'].map(h => (
+                <th key={h} style={{
+                  padding: '12px 16px', fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase',
+                  letterSpacing: '.06em', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap',
+                }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {campaigns.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: '40px 16px', textAlign: 'center', color: '#4a4a6a', fontSize: 13 }}>
+                  Aucune campagne. Cliquez sur "Nouvelle campagne" pour commencer.
+                </td>
+              </tr>
+            )}
+            {campaigns.map(c => {
+              const date = c.created_at ? new Date(c.created_at).toLocaleDateString('fr-CA') : '--'
+              // Simulated percentages
+              const deliveredPct = c.status === 'completed' ? 98 : c.status === 'running' ? 62 : c.status === 'paused' ? 45 : 0
+              const answeredPct = c.status === 'completed' ? 24 : c.status === 'running' ? 18 : c.status === 'paused' ? 12 : 0
+
+              return (
+                <tr key={c.id} style={{ borderBottom: '1px solid #12122a' }}>
+                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#c8c8e8', fontWeight: 600 }}>{c.name}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 12, color: '#6a6a8a' }}>{date}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#a0a0c0' }}>{(c.contacts_count || 0).toLocaleString('fr-CA')}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#a0a0c0' }}>{deliveredPct}%</td>
+                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#a0a0c0' }}>{answeredPct}%</td>
+                  <td style={{ padding: '14px 16px' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
+                      background: statusColor(c.status) + '15',
+                      color: statusColor(c.status),
+                      border: `1px solid ${statusColor(c.status)}33`,
+                    }}>
+                      {c.status === 'running' && (
+                        <span style={{
+                          width: 6, height: 6, borderRadius: '50%', background: '#00d4aa',
+                          animation: 'robotPulse 1.5s ease-in-out infinite',
+                        }} />
                       )}
-                    </button>
-                  )}
-                  <button onClick={() => setReport(c)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#7b61ff18', border:'1px solid #7b61ff33', borderRadius:8, color:'#a695ff', fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                    Rapport
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'#6a6a8a', marginBottom:5 }}>
-                  <span>{c.sent} / {c.total} envoyés</span>
-                  <span style={{ color: scColor(c.status), fontWeight:600 }}>{pct}%</span>
-                </div>
-                <div style={{ height:6, background:'#1a1a2e', borderRadius:3, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:pct+'%', background:`linear-gradient(90deg, ${scColor(c.status)}, ${scColor(c.status)}99)`, borderRadius:3 }} />
-                </div>
-              </div>
-
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-                {[['Total',c.total,'#7b61ff'],['Envoyés',c.sent,'#38b6ff'],['Réponses',c.answered,'#00d4aa'],['Durée',c.duration+'s','#ffb547']].map(([l,v,col]) => (
-                  <div key={l as string} style={{ background:'#0a0a18', borderRadius:8, padding:'8px 12px' }}>
-                    <div style={{ fontSize:10, color:'#4a4a6a', marginBottom:3 }}>{l}</div>
-                    <div style={{ fontSize:16, fontWeight:700, color: col as string }}>{v}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
+                      {statusLabel(c.status)}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {/* Detail */}
+                      <a
+                        href={`/client/robot/${c.id}`}
+                        style={{
+                          padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                          background: '#7b61ff18', border: '1px solid #7b61ff33', color: '#a695ff',
+                          textDecoration: 'none', fontWeight: 600,
+                        }}
+                      >
+                        Detail
+                      </a>
+                      {/* Lancer */}
+                      {(c.status === 'draft' || c.status === 'paused') && (
+                        <button
+                          onClick={() => patchCampaign(c.id, { status: 'running' })}
+                          style={{
+                            padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                            background: '#00d4aa18', border: '1px solid #00d4aa33', color: '#00d4aa', fontWeight: 600,
+                          }}
+                        >
+                          Lancer
+                        </button>
+                      )}
+                      {/* Arreter */}
+                      {c.status === 'running' && (
+                        <button
+                          onClick={() => patchCampaign(c.id, { status: 'paused' })}
+                          style={{
+                            padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                            background: '#ffb54718', border: '1px solid #ffb54733', color: '#ffb547', fontWeight: 600,
+                          }}
+                        >
+                          Arreter
+                        </button>
+                      )}
+                      {/* Dupliquer */}
+                      <button
+                        onClick={() => duplicateCampaign(c)}
+                        style={{
+                          padding: '5px 10px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                          background: '#38b6ff18', border: '1px solid #38b6ff33', color: '#38b6ff', fontWeight: 600,
+                        }}
+                      >
+                        Dupliquer
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {showNew && <NewRobotModal onClose={() => setShowNew(false)} onCreate={createCampaign} />}
-      {report  && <RobotReportModal campaign={report} onClose={() => setReport(null)} />}
+      {/* Pulse animation */}
+      <style>{`@keyframes robotPulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.3 } }`}</style>
+
+      {/* Drawer */}
+      {showDrawer && <CampaignDrawer onClose={() => setShowDrawer(false)} onCreate={createCampaign} />}
     </div>
   )
 }

@@ -9,23 +9,23 @@ import { usePlanPoller } from '@/hooks/usePlanPoller'
 
 
 const NAV = [
+  { href: '/client',         label: 'Mon compte',        icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
   { href: '/client/plans',   label: 'Mes forfaits',      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> },
-  { href: '/client/numbers', label: 'Numéros DID',       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.79a16 16 0 0 0 6.29 6.29l1.86-1.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
+  { href: '/client/numbers', label: 'Mes numeros',       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.79a16 16 0 0 0 6.29 6.29l1.86-1.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
   { href: '/client/invoices',label: 'Factures',          icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> },
-  { href: '/client/support', label: 'Support',           icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>, badge: 'NEW' },
-  { href: '/client/dialer',  label: 'Predictive Dialer', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
   { href: '/client/robot',   label: "Robot d'appel",     icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="2"/><path d="M12 2v2M12 10v12M8 14H4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4"/></svg> },
+  { href: '/client/support', label: 'Support',           icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
 ]
 
 function useAuth() {
-  const [user, setUser] = useState<{name:string;email:string;org:string} | null>(null)
+  const [user, setUser] = useState<{name:string;email:string;org:string;role:string} | null>(null)
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       const tok = localStorage.getItem('vf_tok')
       if (!tok) return
       const payload = JSON.parse(atob(tok.split('.')[1]))
-      setUser({ name: payload.name || payload.email?.split('@')[0] || 'Admin', email: payload.email || '', org: payload.org_name || 'Mon organisation' })
+      setUser({ name: payload.name || payload.email?.split('@')[0] || 'Admin', email: payload.email || '', org: payload.org_name || 'Mon organisation', role: payload.role || '' })
     } catch {}
   }, [])
   return user
@@ -35,6 +35,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
   const router   = useRouter()
   const user     = useAuth()
+  const userRole = user?.role?.toUpperCase() || ''
   const [collapsed, setCollapsed] = useState(false)
   // Poller /auth/me toutes les 2 min pour détecter les changements de plan
   usePlanPoller()
@@ -113,6 +114,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <span style={{ width:7, height:7, borderRadius:'50%', background:statusColor, display:'inline-block', flexShrink:0 }}/>
               <span style={{ fontSize:11, color:'#5a5a7a' }}>{status==='online'?'En ligne':status==='away'?'Absent':'Hors ligne'}</span>
             </div>
+          )}
+          {!collapsed && userRole === 'ADMIN' && (
+            <Link href="/admin/dashboard" style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 0', color:'#7b61ff', textDecoration:'none', fontSize:11, fontWeight:600, marginBottom:6 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+              Retour portail admin
+            </Link>
           )}
           <button onClick={() => setCollapsed(c=>!c)} style={{ display:'block', width:'100%', padding: collapsed?'6px 0':'6px 0', background:'transparent', border:'none', color:'#3a3a5a', cursor:'pointer', fontSize:11, textAlign:'center', marginBottom:4 }}>
             {collapsed ? '→' : '← Réduire'}
