@@ -164,6 +164,7 @@ router.get("/contacts", authenticate, async (req: AuthRequest, res: Response) =>
         const limit = parseInt(String(req.query.limit || "100"))
         const offset = parseInt(String(req.query.offset || "0"))
         const status = req.query.status as string | undefined
+        const search = String(req.query.search || "").trim()
 
         // Essayer avec tags d'abord, fallback sans si table manquante
         let contacts: any[] = []
@@ -181,6 +182,7 @@ router.get("/contacts", authenticate, async (req: AuthRequest, res: Response) =>
                 .range(offset, offset + limit - 1)
 
             if (status) q = q.eq("status", status)
+            if (search) q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`)
             const { data, error } = await q
             if (error) throw error
 
