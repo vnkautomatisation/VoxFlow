@@ -80,17 +80,19 @@ export class AdminService {
   async updateAgent(agentId: string, organizationId: string, dto: any) {
     // Extraire et hasher le mot de passe séparément
     const { password, queues, ...rest } = dto
-    const update: any = { ...rest, updated_at: new Date().toISOString() }
+    const update: any = { updated_at: new Date().toISOString() }
+
+    // Whitelist des colonnes autorisees sur users
+    const ALLOWED = ['name','first_name','last_name','email','role','status','extension','phone','avatar_url','goals','agent_status','settings']
+    for (const key of ALLOWED) {
+      if (rest[key] !== undefined) update[key] = rest[key]
+    }
 
     // Hasher le mot de passe si fourni
     if (password && password.trim()) {
       const { hashPassword } = await import("../../utils/hash")
       update.password_hash = await hashPassword(password)
     }
-
-    // Supprimer les champs non-colonnes
-    delete update.password
-    delete update.queues
 
     const { data, error } = await supabaseAdmin
       .from("users")

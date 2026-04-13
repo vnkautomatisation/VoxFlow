@@ -27,9 +27,10 @@ const STATUS_LABELS: Record<string, string> = {
 type Tab = 'overview' | 'agents' | 'queues' | 'reports' | 'ivr'
 
 export default function AdminDashboardPage() {
+  const router = useRouter()
   const {
     stats, agents, queues, calls, ivr,
-    loading, period, setPeriod, refresh, deactivateAgent,
+    loading, error, period, setPeriod, refresh, deactivateAgent, createAgent, createQueue,
   } = useAdminDashboard()
 
   const [tab, setTab] = useState<Tab>('overview')
