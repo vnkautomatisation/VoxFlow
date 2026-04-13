@@ -309,17 +309,27 @@ export default function DialerPage() {
                     </div>
                 </div>
 
-                {/* Caller ID — toujours visible sous le header */}
+                {/* Caller ID compact — inline sous le header */}
                 {d.myNumbers.length > 0 && (
-                    <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--line)', background: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Appeler depuis</span>
-                        <div style={{ flex: 1 }}>
-                            <CallerIdPicker
-                                numbers={d.myNumbers}
-                                value={d.fromNumber}
-                                onChange={d.setFromNumber}
-                            />
-                        </div>
+                    <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--line)', background: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <svg width="10" height="10" fill="none" stroke="var(--t3)" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3" /></svg>
+                        <select
+                            value={d.fromNumber}
+                            onChange={e => d.setFromNumber(e.target.value)}
+                            style={{
+                                flex: 1, background: 'transparent', border: 'none',
+                                color: 'var(--t1)', fontSize: 11, fontWeight: 600,
+                                fontFamily: "'JetBrains Mono', monospace",
+                                outline: 'none', cursor: 'pointer',
+                                padding: '2px 0',
+                            }}
+                        >
+                            {d.myNumbers.map((n: any) => (
+                                <option key={n.number} value={n.number} style={{ background: 'var(--ink2)', color: 'var(--t1)' }}>
+                                    {n.number} ({n.country_code})
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 )}
 
