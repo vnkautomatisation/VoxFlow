@@ -493,7 +493,7 @@ const PIPELINE_COLS = [
     { id: 'lost', label: 'Perdu', color: '#ff4d6d', bg: '#2a0d12' },
 ]
 
-const EMPTY_CONTACT = { first_name: '', last_name: '', email: '', phone: '', company: '', position: '', address: '', city: '', province: '', postal_code: '', country: 'Canada', notes: '' }
+const EMPTY_CONTACT = { first_name: '', last_name: '', email: '', phone: '', company: '', position: '', address: '', city: '', province: '', postal_code: '', country: 'Canada', notes: '', custom_fields: {} as Record<string, string> }
 
 export default function CRMPage() {
     const router = useRouter()
@@ -869,7 +869,7 @@ export default function CRMPage() {
                                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
                                     Appeler
                                 </button>
-                                <button onClick={() => { setForm({ first_name: selContact.first_name, last_name: selContact.last_name, email: selContact.email || '', phone: selContact.phone || '', company: selContact.company || '', position: selContact.position || '', address: selContact.address || '', city: selContact.city || '', province: selContact.province || '', postal_code: selContact.postal_code || '', country: selContact.country || 'Canada', notes: selContact.notes || '' }); setModal('edit') }}
+                                <button onClick={() => { setForm({ first_name: selContact.first_name, last_name: selContact.last_name, email: selContact.email || '', phone: selContact.phone || '', company: selContact.company || '', position: selContact.position || '', address: selContact.address || '', city: selContact.city || '', province: selContact.province || '', postal_code: selContact.postal_code || '', country: selContact.country || 'Canada', notes: selContact.notes || '', custom_fields: (selContact as any).custom_fields || {} }); setModal('edit') }}
                                     className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold text-[#9898b8] border border-[#2e2e44] bg-[#1f1f2a] py-2 rounded-lg hover:text-[#eeeef8] transition-colors">
                                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                     Modifier
@@ -1022,6 +1022,47 @@ export default function CRMPage() {
                                     placeholder="Notes sur ce contact..."
                                     rows={3}
                                     className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff] resize-none" />
+                            </div>
+
+                            {/* ── Champs personnalisés (custom_fields JSONB) ── */}
+                            <div className="border-t border-[#2e2e44] pt-4 mt-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#55557a]">Champs personnalises</label>
+                                    <button type="button" onClick={() => {
+                                        const key = prompt('Nom du champ (ex: Langue, Secteur, ID client)')
+                                        if (key && key.trim()) {
+                                            setForm(p => ({
+                                                ...p,
+                                                custom_fields: { ...p.custom_fields, [key.trim()]: '' }
+                                            }))
+                                        }
+                                    }}
+                                        className="text-[10px] text-[#7b61ff] hover:text-[#a695ff] font-bold cursor-pointer bg-transparent border-none">
+                                        + Ajouter un champ
+                                    </button>
+                                </div>
+                                {Object.entries(form.custom_fields || {}).length === 0 && (
+                                    <div className="text-[11px] text-[#35355a] italic py-2">Aucun champ personnalise. Cliquez "+ Ajouter un champ" pour en creer.</div>
+                                )}
+                                {Object.entries(form.custom_fields || {}).map(([key, val]) => (
+                                    <div key={key} className="flex items-center gap-2 mb-2">
+                                        <span className="text-[11px] text-[#9898b8] font-semibold min-w-[90px] truncate" title={key}>{key}</span>
+                                        <input value={val} onChange={e => setForm(p => ({
+                                            ...p,
+                                            custom_fields: { ...p.custom_fields, [key]: e.target.value }
+                                        }))}
+                                            placeholder="Valeur..."
+                                            className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-1.5 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]" />
+                                        <button type="button" onClick={() => setForm(p => {
+                                            const cf = { ...p.custom_fields }
+                                            delete cf[key]
+                                            return { ...p, custom_fields: cf }
+                                        })}
+                                            className="text-[#ff4d6d55] hover:text-[#ff4d6d] text-sm cursor-pointer bg-transparent border-none px-1">
+                                            x
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className="px-6 pb-6 flex gap-3">

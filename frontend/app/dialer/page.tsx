@@ -126,6 +126,25 @@ export default function DialerPage() {
                     <div className="cname">{d.incoming?.co ? d.incoming.co.first_name + ' ' + d.incoming.co.last_name : 'Inconnu'}</div>
                     <div className="cco">{d.incoming?.co?.company || ''}</div>
                     <div className="cnum">{d.incoming?.from || ''}</div>
+
+                    {/* ── Caller insights enrichis (avant de décrocher) ── */}
+                    {d.incoming?.co && (
+                        <div className="inc-insights">
+                            {d.incoming.co.total_calls != null && (
+                                <div className="ins-chip"><svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07" /><circle cx="12" cy="12" r="10" /></svg>{d.incoming.co.total_calls} appels</div>
+                            )}
+                            {d.incoming.co.last_call && (
+                                <div className="ins-chip"><svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>{fmtD(d.incoming.co.last_call)}</div>
+                            )}
+                            {d.incoming.co.pipeline_stage && (
+                                <div className="ins-chip vi">{d.incoming.co.pipeline_stage}</div>
+                            )}
+                            {d.incoming.co.tags?.length ? d.incoming.co.tags.slice(0, 3).map((t: string, i: number) => (
+                                <div key={i} className="ins-chip tag">{t}</div>
+                            )) : null}
+                        </div>
+                    )}
+
                     <div className="inc-btns">
                         <button className="btn-ref" onClick={d.doRefuse}><HangupIcon />Refuser</button>
                         <button className="btn-ans" onClick={d.doAnswer}><PhoneIcon />Décrocher</button>
