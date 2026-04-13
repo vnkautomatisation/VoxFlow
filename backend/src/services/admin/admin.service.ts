@@ -32,9 +32,9 @@ export class AdminService {
   async getAgents(organizationId: string) {
     const { data, error } = await supabaseAdmin
       .from("users")
-      .select("id, email, name, role, status, created_at")
+      .select("id, email, name, role, status, extension, phone, goals, created_at, updated_at")
       .eq("organization_id", organizationId)
-      .neq("role", "ADMIN")
+      .in("role", ["AGENT", "ADMIN", "SUPERVISOR"])
       .order("created_at", { ascending: false })
 
     if (error) throw new Error(error.message)
