@@ -501,7 +501,11 @@ export default function CRMPage() {
     const [contacts, setContacts] = useState<Contact[]>([])
     const [tags, setTags] = useState<Tag[]>([])
     const [loading, setLoading] = useState(true)
-    const [view, setView] = useState<'list' | 'pipeline'>('list')
+    const [view, setView] = useState<'list' | 'pipeline' | 'calendar' | 'quotes' | 'templates'>('list')
+    const [appointments, setAppointments] = useState<any[]>([])
+    const [quotes, setQuotes] = useState<any[]>([])
+    const [templates, setTemplates] = useState<any[]>([])
+    const [loadingCal, setLoadingCal] = useState(false)
     const [search, setSearch] = useState('')
     const [tagFilter, setTagFilter] = useState('')
     const [selContact, setSelContact] = useState<Contact | null>(null)
@@ -557,6 +561,37 @@ export default function CRMPage() {
     }, [isAuth, load])
 
     const openDetail = (c: Contact) => { setSelContact(c); loadHistory(c.id) }
+
+    // ── Loaders calendrier / devis / templates ──────────────
+    const loadCalendar = async () => {
+        setLoadingCal(true)
+        try {
+            const r = await apiFetch('/api/v1/crm/appointments')
+            if (r.success) setAppointments(r.data || [])
+        } catch {} finally { setLoadingCal(false) }
+    }
+    const loadQuotes = async () => {
+        try {
+            const r = await apiFetch('/api/v1/crm/quotes')
+            if (r.success) setQuotes(r.data || [])
+        } catch {}
+    }
+    const loadTemplates = async () => {
+        try {
+            const r = await apiFetch('/api/v1/crm/email-templates')
+            if (r.success) setTemplates(r.data || [])
+        } catch {}
+    }
+    const createAppointment = async (apt: any) => {
+        const r = await apiFetch('/api/v1/crm/appointments', { method: 'POST', body: JSON.stringify(apt) })
+        if (r.success) loadCalendar()
+        return r
+    }
+    const createQuote = async (q: any) => {
+        const r = await apiFetch('/api/v1/crm/quotes', { method: 'POST', body: JSON.stringify(q) })
+        if (r.success) loadQuotes()
+        return r
+    }
 
     const saveContact = async () => {
         setSaving(true)
@@ -661,6 +696,18 @@ export default function CRMPage() {
                             className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-md transition-colors ${view === 'pipeline' ? 'bg-[#7b61ff] text-white' : 'text-[#55557a] hover:text-[#9898b8]'}`}>
                             <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1" /><rect x="10" y="3" width="5" height="12" rx="1" /><rect x="17" y="3" width="5" height="8" rx="1" /></svg>
                             Pipeline
+                        </button>
+                        <button onClick={() => { setView('calendar'); if (!appointments.length) loadCalendar() }}
+                            className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-md transition-colors ${view === 'calendar' ? 'bg-[#00d4aa] text-white' : 'text-[#55557a] hover:text-[#9898b8]'}`}>
+                            Calendrier
+                        </button>
+                        <button onClick={() => { setView('quotes'); if (!quotes.length) loadQuotes() }}
+                            className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-md transition-colors ${view === 'quotes' ? 'bg-[#ffb547] text-white' : 'text-[#55557a] hover:text-[#9898b8]'}`}>
+                            Devis
+                        </button>
+                        <button onClick={() => { setView('templates'); if (!templates.length) loadTemplates() }}
+                            className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-md transition-colors ${view === 'templates' ? 'bg-[#38b6ff] text-white' : 'text-[#55557a] hover:text-[#9898b8]'}`}>
+                            Templates
                         </button>
                     </div>
                     {/* Import CSV */}
@@ -931,6 +978,85 @@ export default function CRMPage() {
                             </div>
                         )
                     })}
+                </div>
+            )}
+
+            {/* ── VUE CALENDRIER ── */}
+            {view === 'calendar' && (
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm font-bold text-[#eeeef8]">Rendez-vous</div>
+                        <button onClick={() => {
+                            const title = prompt('Titre du rendez-vous')
+                            if (!title) return
+                            const starts = prompt('Date debut (YYYY-MM-DD HH:mm)', new Date().toISOString().slice(0,16).replace('T',' '))
+                            if (!starts) return
+                            createAppointment({ title, starts_at: new Date(starts).toISOString(), ends_at: new Date(new Date(starts).getTime()+3600000).toISOString() })
+                        }} className="text-xs bg-[#00d4aa] text-white px-3 py-1.5 rounded-lg font-bold">+ Rendez-vous</button>
+                    </div>
+                    {loadingCal && <div className="text-xs text-[#55557a] text-center py-8">Chargement...</div>}
+                    {!loadingCal && appointments.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun rendez-vous</div>}
+                    <div className="space-y-2">
+                        {appointments.map((a: any) => (
+                            <div key={a.id} className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <div className="text-sm font-semibold text-[#eeeef8]">{a.title}</div>
+                                    <div className="text-[10px] text-[#55557a]">{new Date(a.starts_at).toLocaleString('fr-CA')} - {new Date(a.ends_at).toLocaleTimeString('fr-CA', {hour:'2-digit',minute:'2-digit'})}</div>
+                                    {a.location && <div className="text-[10px] text-[#7b61ff]">{a.location}</div>}
+                                </div>
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${a.status==='SCHEDULED'?'bg-[#7b61ff]/15 text-[#7b61ff]':a.status==='CONFIRMED'?'bg-[#00d4aa]/15 text-[#00d4aa]':a.status==='CANCELLED'?'bg-[#ff4d6d]/15 text-[#ff4d6d]':'bg-[#55557a]/15 text-[#55557a]'}`}>{a.status}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ── VUE DEVIS ── */}
+            {view === 'quotes' && (
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm font-bold text-[#eeeef8]">Devis / Propositions</div>
+                        <button onClick={() => {
+                            createQuote({ items: [{ description: 'Forfait VoxFlow', qty: 1, unit_price: 59 }], notes: '' })
+                        }} className="text-xs bg-[#ffb547] text-[#111118] px-3 py-1.5 rounded-lg font-bold">+ Nouveau devis</button>
+                    </div>
+                    {quotes.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun devis</div>}
+                    <div className="space-y-2">
+                        {quotes.map((q: any) => (
+                            <div key={q.id} className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <div className="text-sm font-semibold text-[#eeeef8]">{q.number}</div>
+                                    <div className="text-[10px] text-[#55557a]">{new Date(q.created_at).toLocaleDateString('fr-CA')} - {q.total?.toFixed?.(2) || q.total} CAD</div>
+                                </div>
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${q.status==='DRAFT'?'bg-[#55557a]/15 text-[#55557a]':q.status==='SENT'?'bg-[#38b6ff]/15 text-[#38b6ff]':q.status==='ACCEPTED'?'bg-[#00d4aa]/15 text-[#00d4aa]':'bg-[#ff4d6d]/15 text-[#ff4d6d]'}`}>{q.status}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ── VUE TEMPLATES EMAIL ── */}
+            {view === 'templates' && (
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm font-bold text-[#eeeef8]">Templates email</div>
+                        <button onClick={async () => {
+                            const name = prompt('Nom du template')
+                            if (!name) return
+                            await apiFetch('/api/v1/crm/email-templates', { method: 'POST', body: JSON.stringify({ name, subject: name, body_html: '<p>Bonjour {{prenom}},</p>' }) })
+                            loadTemplates()
+                        }} className="text-xs bg-[#38b6ff] text-white px-3 py-1.5 rounded-lg font-bold">+ Template</button>
+                    </div>
+                    {templates.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun template</div>}
+                    <div className="space-y-2">
+                        {templates.map((t: any) => (
+                            <div key={t.id} className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-3">
+                                <div className="text-sm font-semibold text-[#eeeef8] mb-1">{t.name}</div>
+                                <div className="text-[10px] text-[#55557a]">Sujet : {t.subject}</div>
+                                <div className="text-[10px] text-[#35355a] mt-1">{t.category}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
