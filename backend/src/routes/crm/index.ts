@@ -778,7 +778,7 @@ router.post("/email-templates/:id/send", authenticate, async (req: AuthRequest, 
         // Envoyer via le service email si configure
         try {
             const { emailService } = await import("../../services/email/email.service")
-            await (emailService as any).send({ to: contact.email, subject, html: body })
+            await emailService.send({ to: contact.email, subject, html: body })
         } catch {
             // Fallback : log et retour succes (pas d'email reel en dev)
         }
