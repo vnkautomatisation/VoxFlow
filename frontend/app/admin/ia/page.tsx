@@ -22,14 +22,14 @@ export default function IAPage() {
   useEffect(() => {
     setMounted(true)
     try {
-      const raw    = localStorage.getItem("voxflow-auth")
-      if (!raw) { window.location.href = "/login"; return }
+      const raw = localStorage.getItem("voxflow-auth")
+      if (!raw) { router.push("/login"); return }
       const parsed = JSON.parse(raw)
       const state  = parsed.state || parsed
-      if (!state.accessToken) { window.location.href = "/login"; return }
+      if (!state.accessToken) { router.push("/login"); return }
       setToken(state.accessToken)
-    } catch { window.location.href = "/login" }
-  }, [])
+    } catch { router.push("/login") }
+  }, [router])
 
   const load = useCallback(async () => {
     if (!token) return

@@ -34,7 +34,7 @@ export default function AgentsTab({ agents, onRefresh }: Props) {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState("")
   const [form, setForm] = useState({
-    name: "", email: "", password: "VoxFlow123!", role: "AGENT"
+    name: "", email: "", password: "", role: "AGENT"
   })
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -44,7 +44,7 @@ export default function AgentsTab({ agents, onRefresh }: Props) {
     try {
       await adminApi.createAgent(accessToken!, form)
       setShowForm(false)
-      setForm({ name: "", email: "", password: "VoxFlow123!", role: "AGENT" })
+      setForm({ name: "", email: "", password: "", role: "AGENT" })
       onRefresh()
     } catch (err: any) {
       setError(err.message)

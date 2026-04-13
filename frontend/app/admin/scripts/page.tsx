@@ -3,11 +3,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 
-const API = () => typeof window !== 'undefined' ? localStorage.getItem('vf_url') || 'http://localhost:4000' : 'http://localhost:4000'
-const TOK = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') || '' : ''
 const apiFetch = async (path: string, opts: RequestInit = {}) => {
-    const r = await fetch(API() + path, {
-        ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOK(), ...(opts.headers || {}) }, body: opts.body,
+    const base = typeof window !== 'undefined' ? localStorage.getItem('vf_url') || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000' : 'http://localhost:4000'
+    const tok = typeof window !== 'undefined' ? localStorage.getItem('vf_tok') || '' : ''
+    const r = await fetch(base + path, {
+        ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, ...(opts.headers || {}) }, body: opts.body,
     }); return r.json()
 }
 

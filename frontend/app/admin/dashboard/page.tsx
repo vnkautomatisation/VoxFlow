@@ -1,6 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAdminDashboard, CallRow, AgentRow } from '../../../hooks/useAdminDashboard'
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts'
 
 const fmtT = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 const fmtD = (dt: string) => {
@@ -69,6 +71,12 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="h-[calc(100vh-49px)] overflow-hidden flex flex-col">
+      {error && (
+        <div className="mx-4 mt-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 px-4 py-2.5 rounded-lg text-xs font-medium flex items-center gap-2">
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+          {error}
+        </div>
+      )}
       <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 flex-shrink-0">
 
         {/* Header — responsive stack sur mobile */}
@@ -266,7 +274,12 @@ export default function AdminDashboardPage() {
                     className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-4 py-2 rounded-lg text-sm">
                     Annuler
                   </button>
-                  <button className="flex-1 bg-[#7b61ff] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#6145ff]">
+                  <button onClick={async () => {
+                    if (!newAgent.email || !newAgent.name) return
+                    await createAgent(newAgent)
+                    setShowNewAgent(false)
+                    setNewAgent({ email: '', name: '', password: '', extension: '' })
+                  }} className="flex-1 bg-[#7b61ff] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#6145ff]">
                     Créer
                   </button>
                 </div>
@@ -360,7 +373,12 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex gap-3 mt-5">
                   <button onClick={() => setShowNewQueue(false)} className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-4 py-2 rounded-lg text-sm">Annuler</button>
-                  <button className="flex-1 bg-[#7b61ff] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#6145ff]">Créer</button>
+                  <button onClick={async () => {
+                    if (!newQueue.name) return
+                    await createQueue(newQueue.name, newQueue.strategy)
+                    setShowNewQueue(false)
+                    setNewQueue({ name: '', strategy: 'ROUND_ROBIN' })
+                  }} className="flex-1 bg-[#7b61ff] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#6145ff]">Créer</button>
                 </div>
               </div>
             </div>
@@ -421,6 +439,63 @@ export default function AdminDashboardPage() {
             <KPI label="Entrants" value={calls.filter(c => c.direction === 'INBOUND').length} color="text-violet-400" />
             <KPI label="Sortants" value={calls.filter(c => c.direction === 'OUTBOUND').length} color="text-amber-400" />
           </div>
+
+          {/* Charts */}
+          {calls.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Area chart - volume par jour */}
+              <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-3">Volume d'appels</div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart data={(() => {
+                    const days: Record<string, number> = {}
+                    calls.forEach(c => { const d = new Date(c.started_at).toLocaleDateString('fr-CA', { day: '2-digit', month: 'short' }); days[d] = (days[d] || 0) + 1 })
+                    return Object.entries(days).slice(-7).map(([d, v]) => ({ day: d, count: v }))
+                  })()}>
+                    <defs><linearGradient id="gVol" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7b61ff" stopOpacity={0.3} /><stop offset="100%" stopColor="#7b61ff" stopOpacity={0} /></linearGradient></defs>
+                    <XAxis dataKey="day" tick={{ fontSize: 9, fill: '#55557a' }} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip contentStyle={{ background: '#18181f', border: '1px solid #2e2e44', borderRadius: 8, fontSize: 11, color: '#eeeef8' }} />
+                    <Area type="monotone" dataKey="count" stroke="#7b61ff" fill="url(#gVol)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Bar chart - entrants vs sortants */}
+              <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-3">Direction</div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={[
+                    { name: 'Entrants', value: calls.filter(c => c.direction === 'INBOUND').length },
+                    { name: 'Sortants', value: calls.filter(c => c.direction === 'OUTBOUND').length },
+                  ]}>
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9898b8' }} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip contentStyle={{ background: '#18181f', border: '1px solid #2e2e44', borderRadius: 8, fontSize: 11, color: '#eeeef8' }} />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      <Cell fill="#7b61ff" />
+                      <Cell fill="#00d4aa" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Pie chart - statuts */}
+              <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-3">Statuts</div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <PieChart>
+                    <Pie data={(() => {
+                      const s: Record<string, number> = {}
+                      calls.forEach(c => { s[c.status] = (s[c.status] || 0) + 1 })
+                      const colors: Record<string, string> = { COMPLETED: '#00d4aa', IN_PROGRESS: '#7b61ff', NO_ANSWER: '#ffb547', MISSED: '#ff4d6d', BUSY: '#ff4d6d', FAILED: '#ff4d6d' }
+                      return Object.entries(s).map(([name, value]) => ({ name, value, fill: colors[name] || '#55557a' }))
+                    })()} dataKey="value" cx="50%" cy="50%" innerRadius={35} outerRadius={55}>
+                    </Pie>
+                    <Tooltip contentStyle={{ background: '#18181f', border: '1px solid #2e2e44', borderRadius: 8, fontSize: 11, color: '#eeeef8' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           {/* Filtres + Table */}
           <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
@@ -499,7 +574,7 @@ export default function AdminDashboardPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-[#9898b8]">{ivr.length} menu{ivr.length > 1 ? 's' : ''} IVR</div>
-            <button className="bg-[#7b61ff] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#6145ff] transition-colors">
+            <button onClick={() => router.push('/admin/ivr')} className="bg-[#7b61ff] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#6145ff] transition-colors">
               + Nouveau menu IVR
             </button>
           </div>

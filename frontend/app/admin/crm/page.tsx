@@ -613,6 +613,23 @@ export default function CRMPage() {
     const [showNewAppt, setShowNewAppt] = useState(false)
     const [showNewTpl, setShowNewTpl] = useState(false)
     const [showNewField, setShowNewField] = useState(false)
+    const [showQuoteModal, setShowQuoteModal] = useState(false)
+    const [showQuotePreview, setShowQuotePreview] = useState<any>(null)
+    const [showTplEditor, setShowTplEditor] = useState<any>(null)
+    const [quoteItems, setQuoteItems] = useState<{ description: string; qty: number; unit_price: number }[]>([{ description: '', qty: 1, unit_price: 0 }])
+    const [quoteContact, setQuoteContact] = useState('')
+    const [quoteNotes, setQuoteNotes] = useState('')
+    const [apptContact, setApptContact] = useState('')
+    const [apptData, setApptData] = useState<any>(null)
+    const [agents, setAgents] = useState<any[]>([])
+
+    // Charger agents pour select
+    useEffect(() => {
+        if (!isAuth) return
+        apiFetch('/api/v1/admin/agents').then(r => {
+            if (r.success || r.data) setAgents(Array.isArray(r.data) ? r.data : [])
+        }).catch(() => {})
+    }, [isAuth])
 
     const deleteContact = async (id: string) => {
         try {
@@ -721,6 +738,26 @@ export default function CRMPage() {
                             Templates
                         </button>
                     </div>
+                    {/* Campagne Robot Dialer */}
+                    <button onClick={async () => {
+                        const selected = filtered.filter(c => c.phone)
+                        if (!selected.length) { showToast('Aucun contact avec telephone', 'err'); return }
+                        try {
+                            const r = await apiFetch('/api/v1/robot/campaigns', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    name: `Campagne CRM — ${new Date().toLocaleDateString('fr-CA')}`,
+                                    leads: selected.map(c => ({ phone: c.phone, first_name: c.first_name, last_name: c.last_name, contact_id: c.id })),
+                                })
+                            })
+                            if (r.success) showToast(`Campagne creee avec ${selected.length} contacts`)
+                            else showToast(r.error || 'Erreur', 'err')
+                        } catch { showToast('Erreur reseau', 'err') }
+                    }}
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 border border-amber-400/30 bg-amber-400/10 px-3 py-2 rounded-lg hover:bg-amber-400/20 transition-colors">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                        Robot Dialer ({filtered.filter(c => c.phone).length})
+                    </button>
                     {/* Import CSV */}
                     <button onClick={() => fileRef.current?.click()} disabled={importing}
                         className="flex items-center gap-1.5 text-[10px] font-bold text-[#9898b8] border border-[#2e2e44] bg-[#18181f] px-3 py-2 rounded-lg hover:text-[#eeeef8] transition-colors disabled:opacity-50">
@@ -944,7 +981,7 @@ export default function CRMPage() {
                                     <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /></svg>
                                     Planifier RDV
                                 </button>
-                                <button onClick={() => { createQuote({ contact_id: selContact.id, items: [{ description: 'Service VoxFlow', qty: 1, unit_price: 59 }] }) }}
+                                <button onClick={() => { setQuoteItems([{ description: '', qty: 1, unit_price: 0 }]); setQuoteContact(selContact.id); setQuoteNotes(''); setShowQuoteModal(true) }}
                                     className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-bold text-[#ffb547] border border-[#ffb547]/20 bg-[#ffb547]/8 py-1.5 rounded-lg hover:bg-[#ffb547]/15 transition-colors">
                                     <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                                     Creer devis
@@ -1011,22 +1048,81 @@ export default function CRMPage() {
                     onConfirm={() => { deleteContact(deleteId); setDeleteId(null) }} onCancel={() => setDeleteId(null)} />
             )}
             {showNewAppt && (
-                <PromptModal title="Nouveau rendez-vous" submitLabel="Creer"
+                <PromptModal title="Nouveau rendez-vous" submitLabel="Planifier" wide
                     fields={[
-                        { key: 'title', label: 'Titre', placeholder: 'Appel de suivi', required: true },
-                        { key: 'starts_at', label: 'Date et heure', type: 'datetime-local', required: true },
-                        { key: 'location', label: 'Lieu (optionnel)', placeholder: 'Bureau, Teams, Telephone...' },
+                        { key: 'title', label: 'Titre', placeholder: 'Appel de suivi, reunion decouverte...', required: true, colSpan: 2 },
+                        { key: 'contact_id', label: 'Contact', type: 'select' as const, required: true, colSpan: 1,
+                          options: contacts.map(c => ({ value: c.id, label: contactName(c) + (c.company ? ` (${c.company})` : '') })),
+                          defaultValue: selContact?.id || '',
+                          placeholder: '-- Choisir un contact --' },
+                        { key: 'agent_id', label: 'Agent assigne', type: 'select' as const, colSpan: 1,
+                          options: agents.map((a: any) => ({ value: a.id, label: a.name || `${a.first_name || ''} ${a.last_name || ''}`.trim() })),
+                          placeholder: '-- Choisir un agent --' },
+                        { key: 'type', label: 'Type', type: 'select' as const, required: true, colSpan: 1,
+                          options: [
+                            { value: 'CALL', label: 'Appel telephonique' },
+                            { value: 'VIDEO', label: 'Visioconference' },
+                            { value: 'MEETING', label: 'Reunion en personne' },
+                            { value: 'VISIT', label: 'Visite client' },
+                          ], defaultValue: 'CALL' },
+                        { key: 'duration', label: 'Duree', type: 'select' as const, required: true, colSpan: 1,
+                          options: [
+                            { value: '15', label: '15 minutes' },
+                            { value: '30', label: '30 minutes' },
+                            { value: '45', label: '45 minutes' },
+                            { value: '60', label: '1 heure' },
+                            { value: '90', label: '1h30' },
+                            { value: '120', label: '2 heures' },
+                          ], defaultValue: '30' },
+                        { key: 'starts_at', label: 'Date et heure', type: 'datetime-local' as const, required: true, colSpan: 1 },
+                        { key: 'location', label: 'Lieu', placeholder: 'Bureau, Teams, Zoom, Telephone...', colSpan: 1 },
+                        { key: 'notes', label: 'Notes', type: 'textarea' as const, placeholder: 'Details du rendez-vous...', rows: 2, colSpan: 2 },
                     ]}
-                    onSubmit={vals => { createAppointment({ title: vals.title, starts_at: new Date(vals.starts_at).toISOString(), ends_at: new Date(new Date(vals.starts_at).getTime()+3600000).toISOString(), location: vals.location }); setShowNewAppt(false) }}
+                    onSubmit={vals => {
+                        const durationMs = parseInt(vals.duration || '30') * 60000
+                        createAppointment({
+                            title: vals.title,
+                            contact_id: vals.contact_id,
+                            agent_id: vals.agent_id || undefined,
+                            type: vals.type,
+                            starts_at: new Date(vals.starts_at).toISOString(),
+                            ends_at: new Date(new Date(vals.starts_at).getTime() + durationMs).toISOString(),
+                            location: vals.location || undefined,
+                            notes: vals.notes || undefined,
+                        })
+                        showToast('Rendez-vous planifie')
+                        setShowNewAppt(false)
+                    }}
                     onCancel={() => setShowNewAppt(false)} />
             )}
             {showNewTpl && (
-                <PromptModal title="Nouveau template email" submitLabel="Creer"
+                <PromptModal title="Nouveau template email" submitLabel="Creer" wide
                     fields={[
-                        { key: 'name', label: 'Nom du template', placeholder: 'Bienvenue, Suivi, Relance...', required: true },
-                        { key: 'subject', label: 'Sujet', placeholder: 'Objet du mail', required: true },
+                        { key: 'name', label: 'Nom du template', placeholder: 'Bienvenue, Suivi, Relance...', required: true, colSpan: 1 },
+                        { key: 'category', label: 'Categorie', type: 'select' as const, colSpan: 1,
+                          options: [
+                            { value: 'welcome', label: 'Bienvenue' },
+                            { value: 'followup', label: 'Suivi' },
+                            { value: 'reminder', label: 'Relance' },
+                            { value: 'quote', label: 'Devis' },
+                            { value: 'invoice', label: 'Facturation' },
+                            { value: 'other', label: 'Autre' },
+                          ] },
+                        { key: 'subject', label: 'Sujet', placeholder: 'Objet du mail — variables : {{prenom}}, {{entreprise}}, {{agent}}', required: true, colSpan: 2 },
+                        { key: 'body_html', label: 'Corps du message (HTML)', type: 'textarea' as const, rows: 8, colSpan: 2,
+                          placeholder: '<p>Bonjour {{prenom}},</p>\n<p>Merci pour votre interet...</p>\n<p>Cordialement,<br/>{{agent}}</p>',
+                          hint: 'Variables disponibles : {{prenom}}, {{nom}}, {{entreprise}}, {{email}}, {{telephone}}, {{agent}}, {{date}}',
+                          required: true },
                     ]}
-                    onSubmit={async vals => { await apiFetch('/api/v1/crm/email-templates', { method: 'POST', body: JSON.stringify({ name: vals.name, subject: vals.subject, body_html: '<p>Bonjour,</p>' }) }); loadTemplates(); setShowNewTpl(false) }}
+                    onSubmit={async vals => {
+                        await apiFetch('/api/v1/crm/email-templates', {
+                            method: 'POST',
+                            body: JSON.stringify({ name: vals.name, subject: vals.subject, body_html: vals.body_html, category: vals.category || 'other' })
+                        })
+                        showToast('Template cree')
+                        loadTemplates()
+                        setShowNewTpl(false)
+                    }}
                     onCancel={() => setShowNewTpl(false)} />
             )}
             {showNewField && (
@@ -1062,24 +1158,244 @@ export default function CRMPage() {
                 <div>
                     <div className="flex items-center justify-between mb-4">
                         <div className="text-sm font-bold text-[#eeeef8]">Devis / Propositions</div>
-                        <button onClick={() => {
-                            createQuote({ items: [{ description: 'Forfait VoxFlow', qty: 1, unit_price: 59 }], notes: '' })
-                        }} className="text-xs bg-[#ffb547] text-[#111118] px-3 py-1.5 rounded-lg font-bold">+ Nouveau devis</button>
+                        <button onClick={() => { setQuoteItems([{ description: '', qty: 1, unit_price: 0 }]); setQuoteContact(''); setQuoteNotes(''); setShowQuoteModal(true) }}
+                            className="text-xs bg-[#ffb547] text-[#111118] px-3 py-1.5 rounded-lg font-bold">+ Nouveau devis</button>
                     </div>
-                    {quotes.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun devis</div>}
+                    {quotes.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun devis — cliquez + Nouveau devis</div>}
                     <div className="space-y-2">
-                        {quotes.map((q: any) => (
-                            <div key={q.id} className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-3 flex items-center justify-between">
-                                <div>
-                                    <div className="text-sm font-semibold text-[#eeeef8]">{q.number}</div>
-                                    <div className="text-[10px] text-[#55557a]">{new Date(q.created_at).toLocaleDateString('fr-CA')} - {q.total?.toFixed?.(2) || q.total} CAD</div>
+                        {quotes.map((q: any) => {
+                            const ct = contacts.find(c => c.id === q.contact_id)
+                            return (
+                                <div key={q.id} onClick={() => setShowQuotePreview(q)}
+                                    className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-4 flex items-center justify-between cursor-pointer hover:border-[#7b61ff]/40 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-[#ffb547]/10 flex items-center justify-center">
+                                            <svg width="18" height="18" fill="none" stroke="#ffb547" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-[#eeeef8]">{q.number}</div>
+                                            <div className="text-[10px] text-[#55557a]">
+                                                {ct ? contactName(ct) : 'Sans contact'} — {new Date(q.created_at).toLocaleDateString('fr-CA')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-right">
+                                            <div className="text-sm font-bold font-mono text-[#eeeef8]">{q.total?.toFixed?.(2) || '0.00'} $</div>
+                                            <div className="text-[9px] text-[#55557a]">{q.items?.length || 0} item{(q.items?.length || 0) > 1 ? 's' : ''}</div>
+                                        </div>
+                                        <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${q.status==='DRAFT'?'bg-[#55557a]/15 text-[#55557a]':q.status==='SENT'?'bg-[#38b6ff]/15 text-[#38b6ff]':q.status==='ACCEPTED'?'bg-[#00d4aa]/15 text-[#00d4aa]':'bg-[#ff4d6d]/15 text-[#ff4d6d]'}`}>
+                                            {q.status === 'DRAFT' ? 'Brouillon' : q.status === 'SENT' ? 'Envoye' : q.status === 'ACCEPTED' ? 'Accepte' : 'Refuse'}
+                                        </span>
+                                        <svg width="14" height="14" fill="none" stroke="#55557a" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => generateQuotePDF(q)} className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#7b61ff]/15 text-[#7b61ff] hover:bg-[#7b61ff]/25">PDF</button>
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${q.status==='DRAFT'?'bg-[#55557a]/15 text-[#55557a]':q.status==='SENT'?'bg-[#38b6ff]/15 text-[#38b6ff]':q.status==='ACCEPTED'?'bg-[#00d4aa]/15 text-[#00d4aa]':'bg-[#ff4d6d]/15 text-[#ff4d6d]'}`}>{q.status}</span>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL CREATION DEVIS ── */}
+            {showQuoteModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowQuoteModal(false)}>
+                    <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+                        <div className="px-6 pt-6 pb-3 border-b border-[#2e2e44] flex-shrink-0">
+                            <div className="font-bold text-[#eeeef8] text-lg">Nouveau devis</div>
+                        </div>
+                        <div className="px-6 py-4 overflow-y-auto flex-1 space-y-4">
+                            {/* Contact */}
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Client *</label>
+                                <select value={quoteContact} onChange={e => setQuoteContact(e.target.value)}
+                                    className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]">
+                                    <option value="">-- Choisir un contact --</option>
+                                    {contacts.map(c => <option key={c.id} value={c.id}>{contactName(c)}{c.company ? ` (${c.company})` : ''}</option>)}
+                                </select>
+                            </div>
+                            {/* Items dynamiques */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#55557a]">Lignes du devis</label>
+                                    <button type="button" onClick={() => setQuoteItems(p => [...p, { description: '', qty: 1, unit_price: 0 }])}
+                                        className="text-[10px] text-[#7b61ff] font-bold hover:text-[#a695ff]">+ Ajouter une ligne</button>
+                                </div>
+                                <div className="space-y-2">
+                                    {quoteItems.map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <input value={item.description} onChange={e => { const n = [...quoteItems]; n[idx].description = e.target.value; setQuoteItems(n) }}
+                                                placeholder="Description du service/produit"
+                                                className="flex-1 bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]" />
+                                            <input type="number" value={item.qty} onChange={e => { const n = [...quoteItems]; n[idx].qty = parseInt(e.target.value) || 1; setQuoteItems(n) }}
+                                                min={1} className="w-16 bg-[#111118] border border-[#2e2e44] rounded-lg px-2 py-2 text-sm text-[#eeeef8] text-center outline-none focus:border-[#7b61ff]" />
+                                            <div className="relative">
+                                                <input type="number" value={item.unit_price} onChange={e => { const n = [...quoteItems]; n[idx].unit_price = parseFloat(e.target.value) || 0; setQuoteItems(n) }}
+                                                    step="0.01" className="w-24 bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff] pr-6" />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#55557a]">$</span>
+                                            </div>
+                                            <div className="w-20 text-right text-sm font-mono text-[#9898b8]">{(item.qty * item.unit_price).toFixed(2)} $</div>
+                                            {quoteItems.length > 1 && (
+                                                <button type="button" onClick={() => setQuoteItems(p => p.filter((_, i) => i !== idx))}
+                                                    className="text-[#ff4d6d55] hover:text-[#ff4d6d] text-sm px-1">x</button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Totaux */}
+                                <div className="mt-3 pt-3 border-t border-[#2e2e44] flex justify-end">
+                                    <div className="text-right space-y-1">
+                                        <div className="text-xs text-[#55557a]">Sous-total : <span className="text-[#9898b8] font-mono">{quoteItems.reduce((s, i) => s + i.qty * i.unit_price, 0).toFixed(2)} $</span></div>
+                                        <div className="text-xs text-[#55557a]">TPS (5%) : <span className="text-[#9898b8] font-mono">{(quoteItems.reduce((s, i) => s + i.qty * i.unit_price, 0) * 0.05).toFixed(2)} $</span></div>
+                                        <div className="text-xs text-[#55557a]">TVQ (9.975%) : <span className="text-[#9898b8] font-mono">{(quoteItems.reduce((s, i) => s + i.qty * i.unit_price, 0) * 0.09975).toFixed(2)} $</span></div>
+                                        <div className="text-sm font-bold text-[#eeeef8]">Total : <span className="text-[#ffb547] font-mono">{(quoteItems.reduce((s, i) => s + i.qty * i.unit_price, 0) * 1.14975).toFixed(2)} CAD</span></div>
+                                    </div>
                                 </div>
                             </div>
-                        ))}
+                            {/* Notes */}
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Notes</label>
+                                <textarea value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)} rows={2}
+                                    placeholder="Conditions, delais, remarques..."
+                                    className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff] resize-none" />
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 flex gap-3 flex-shrink-0 border-t border-[#2e2e44]">
+                            <button onClick={() => setShowQuoteModal(false)}
+                                className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] py-2.5 rounded-xl text-sm font-bold hover:text-[#eeeef8] transition-colors">Annuler</button>
+                            <button onClick={() => {
+                                if (!quoteContact) { showToast('Choisissez un contact', 'err'); return }
+                                if (!quoteItems.some(i => i.description.trim())) { showToast('Ajoutez au moins un item', 'err'); return }
+                                const subtotal = quoteItems.reduce((s, i) => s + i.qty * i.unit_price, 0)
+                                createQuote({
+                                    contact_id: quoteContact,
+                                    items: quoteItems.filter(i => i.description.trim()).map(i => ({ ...i, total: i.qty * i.unit_price })),
+                                    subtotal,
+                                    tax_rate: 14.975,
+                                    tax_amount: subtotal * 0.14975,
+                                    total: subtotal * 1.14975,
+                                    notes: quoteNotes,
+                                })
+                                showToast('Devis cree')
+                                setShowQuoteModal(false)
+                            }}
+                                className="flex-1 bg-[#ffb547] text-[#111118] py-2.5 rounded-xl text-sm font-bold hover:bg-[#ffc564] transition-colors">Creer le devis</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL PREVIEW DEVIS ── */}
+            {showQuotePreview && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowQuotePreview(null)}>
+                    <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-xl shadow-2xl max-h-[90vh] flex flex-col">
+                        <div className="px-6 pt-5 pb-3 border-b border-[#2e2e44] flex items-center justify-between flex-shrink-0">
+                            <div>
+                                <div className="font-bold text-[#eeeef8]">Devis {showQuotePreview.number}</div>
+                                <div className="text-[10px] text-[#55557a]">{new Date(showQuotePreview.created_at).toLocaleDateString('fr-CA')}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${showQuotePreview.status==='DRAFT'?'bg-[#55557a]/15 text-[#55557a]':showQuotePreview.status==='SENT'?'bg-[#38b6ff]/15 text-[#38b6ff]':showQuotePreview.status==='ACCEPTED'?'bg-[#00d4aa]/15 text-[#00d4aa]':'bg-[#ff4d6d]/15 text-[#ff4d6d]'}`}>
+                                    {showQuotePreview.status === 'DRAFT' ? 'Brouillon' : showQuotePreview.status === 'SENT' ? 'Envoye' : showQuotePreview.status === 'ACCEPTED' ? 'Accepte' : 'Refuse'}
+                                </span>
+                                <button onClick={() => setShowQuotePreview(null)} className="text-[#55557a] hover:text-[#9898b8]">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 overflow-y-auto flex-1 space-y-4">
+                            {/* Client */}
+                            {(() => {
+                                const ct = contacts.find(c => c.id === showQuotePreview.contact_id)
+                                return ct ? (
+                                    <div className="flex items-center gap-3 bg-[#1f1f2a] rounded-lg p-3">
+                                        <div className="w-8 h-8 rounded-full bg-[#7b61ff]/20 flex items-center justify-center text-[10px] font-bold text-[#7b61ff]">{contactIni(ct)}</div>
+                                        <div>
+                                            <div className="text-sm font-semibold text-[#eeeef8]">{contactName(ct)}</div>
+                                            <div className="text-[10px] text-[#55557a]">{ct.email || ct.phone || ''}</div>
+                                        </div>
+                                    </div>
+                                ) : null
+                            })()}
+                            {/* Items */}
+                            <div>
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-2">Lignes</div>
+                                <div className="border border-[#2e2e44] rounded-lg overflow-hidden">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-[#1f1f2a]">
+                                                <th className="text-left px-3 py-2 text-[9px] font-bold uppercase text-[#55557a]">Description</th>
+                                                <th className="text-center px-3 py-2 text-[9px] font-bold uppercase text-[#55557a] w-16">Qte</th>
+                                                <th className="text-right px-3 py-2 text-[9px] font-bold uppercase text-[#55557a] w-24">Prix unit.</th>
+                                                <th className="text-right px-3 py-2 text-[9px] font-bold uppercase text-[#55557a] w-24">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(showQuotePreview.items || []).map((item: any, i: number) => (
+                                                <tr key={i} className="border-t border-[#2e2e44]">
+                                                    <td className="px-3 py-2 text-sm text-[#eeeef8]">{item.description}</td>
+                                                    <td className="px-3 py-2 text-sm text-[#9898b8] text-center">{item.qty}</td>
+                                                    <td className="px-3 py-2 text-sm font-mono text-[#9898b8] text-right">{(item.unit_price || 0).toFixed(2)} $</td>
+                                                    <td className="px-3 py-2 text-sm font-mono text-[#eeeef8] text-right">{((item.qty || 1) * (item.unit_price || 0)).toFixed(2)} $</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="mt-3 text-right space-y-0.5">
+                                    <div className="text-xs text-[#55557a]">Sous-total : <span className="font-mono text-[#9898b8]">{(showQuotePreview.subtotal || 0).toFixed(2)} $</span></div>
+                                    <div className="text-xs text-[#55557a]">Taxes ({showQuotePreview.tax_rate || 0}%) : <span className="font-mono text-[#9898b8]">{(showQuotePreview.tax_amount || 0).toFixed(2)} $</span></div>
+                                    <div className="text-base font-bold text-[#ffb547]">{(showQuotePreview.total || 0).toFixed(2)} CAD</div>
+                                </div>
+                            </div>
+                            {showQuotePreview.notes && (
+                                <div className="bg-[#1f1f2a] rounded-lg p-3 border-l-2 border-[#ffb547]/40">
+                                    <div className="text-[9px] font-bold uppercase text-[#55557a] mb-1">Notes</div>
+                                    <div className="text-xs text-[#9898b8]">{showQuotePreview.notes}</div>
+                                </div>
+                            )}
+                        </div>
+                        {/* Actions */}
+                        <div className="px-6 py-4 border-t border-[#2e2e44] flex gap-2 flex-shrink-0">
+                            <button onClick={() => generateQuotePDF(showQuotePreview)}
+                                className="flex items-center gap-1.5 text-xs font-bold text-[#7b61ff] border border-[#7b61ff]/30 bg-[#7b61ff]/10 px-4 py-2 rounded-lg hover:bg-[#7b61ff]/20 transition-colors">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                Telecharger PDF
+                            </button>
+                            {showQuotePreview.status === 'DRAFT' && (
+                                <button onClick={async () => {
+                                    await apiFetch(`/api/v1/crm/quotes/${showQuotePreview.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'SENT' }) })
+                                    showToast('Devis marque comme envoye')
+                                    loadQuotes()
+                                    setShowQuotePreview((p: any) => p ? { ...p, status: 'SENT' } : null)
+                                }}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#38b6ff] border border-[#38b6ff]/30 bg-[#38b6ff]/10 px-4 py-2 rounded-lg hover:bg-[#38b6ff]/20 transition-colors">
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4z" /></svg>
+                                    Marquer envoye
+                                </button>
+                            )}
+                            {(showQuotePreview.status === 'SENT' || showQuotePreview.status === 'DRAFT') && (
+                                <>
+                                    <button onClick={async () => {
+                                        await apiFetch(`/api/v1/crm/quotes/${showQuotePreview.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'ACCEPTED' }) })
+                                        showToast('Devis accepte')
+                                        loadQuotes()
+                                        setShowQuotePreview((p: any) => p ? { ...p, status: 'ACCEPTED' } : null)
+                                    }}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-[#00d4aa] border border-[#00d4aa]/30 bg-[#00d4aa]/10 px-4 py-2 rounded-lg hover:bg-[#00d4aa]/20 transition-colors">
+                                        Accepter
+                                    </button>
+                                    <button onClick={async () => {
+                                        await apiFetch(`/api/v1/crm/quotes/${showQuotePreview.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'REJECTED' }) })
+                                        showToast('Devis refuse')
+                                        loadQuotes()
+                                        setShowQuotePreview((p: any) => p ? { ...p, status: 'REJECTED' } : null)
+                                    }}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-[#ff4d6d] border border-[#ff4d6d]/30 bg-[#ff4d6d]/10 px-4 py-2 rounded-lg hover:bg-[#ff4d6d]/20 transition-colors">
+                                        Refuser
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -1088,18 +1404,113 @@ export default function CRMPage() {
             {view === 'templates' && (
                 <div>
                     <div className="flex items-center justify-between mb-4">
-                        <div className="text-sm font-bold text-[#eeeef8]">Templates email</div>
+                        <div>
+                            <div className="text-sm font-bold text-[#eeeef8]">Templates email</div>
+                            <div className="text-[10px] text-[#55557a] mt-0.5">Variables : {'{{prenom}}'}, {'{{nom}}'}, {'{{entreprise}}'}, {'{{email}}'}, {'{{telephone}}'}, {'{{agent}}'}, {'{{date}}'}</div>
+                        </div>
                         <button onClick={() => setShowNewTpl(true)} className="text-xs bg-[#38b6ff] text-white px-3 py-1.5 rounded-lg font-bold">+ Template</button>
                     </div>
-                    {templates.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun template</div>}
+                    {templates.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun template — cliquez + Template pour en creer</div>}
                     <div className="space-y-2">
                         {templates.map((t: any) => (
-                            <div key={t.id} className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-3">
-                                <div className="text-sm font-semibold text-[#eeeef8] mb-1">{t.name}</div>
-                                <div className="text-[10px] text-[#55557a]">Sujet : {t.subject}</div>
-                                <div className="text-[10px] text-[#35355a] mt-1">{t.category}</div>
+                            <div key={t.id} onClick={() => setShowTplEditor(t)}
+                                className="bg-[#18181f] border border-[#2e2e44] rounded-lg p-4 cursor-pointer hover:border-[#38b6ff]/40 transition-colors">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-[#38b6ff]/10 flex items-center justify-center">
+                                            <svg width="16" height="16" fill="none" stroke="#38b6ff" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22 6 12 13 2 6" /></svg>
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-[#eeeef8]">{t.name}</div>
+                                            <div className="text-[10px] text-[#55557a]">Sujet : {t.subject}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {t.category && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#38b6ff]/10 text-[#38b6ff]">{t.category}</span>}
+                                        <svg width="14" height="14" fill="none" stroke="#55557a" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+                                    </div>
+                                </div>
+                                {t.body_html && (
+                                    <div className="text-[10px] text-[#55557a] truncate mt-1 bg-[#1f1f2a] rounded px-2 py-1 max-w-full">
+                                        {t.body_html.replace(/<[^>]*>/g, '').substring(0, 100)}{t.body_html.length > 100 ? '...' : ''}
+                                    </div>
+                                )}
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL EDITEUR TEMPLATE ── */}
+            {showTplEditor && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowTplEditor(null)}>
+                    <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col">
+                        <div className="px-6 pt-5 pb-3 border-b border-[#2e2e44] flex items-center justify-between flex-shrink-0">
+                            <div className="font-bold text-[#eeeef8]">{showTplEditor.name}</div>
+                            <button onClick={() => setShowTplEditor(null)} className="text-[#55557a] hover:text-[#9898b8]">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-0 h-full min-h-[400px]">
+                                {/* Editeur */}
+                                <div className="border-r border-[#2e2e44] p-4 flex flex-col">
+                                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#55557a] mb-2">Editeur HTML</div>
+                                    <div className="mb-3">
+                                        <label className="block text-[10px] text-[#55557a] mb-1">Sujet</label>
+                                        <input value={showTplEditor.subject} onChange={e => setShowTplEditor((p: any) => ({ ...p, subject: e.target.value }))}
+                                            className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]" />
+                                    </div>
+                                    <textarea value={showTplEditor.body_html || ''} onChange={e => setShowTplEditor((p: any) => ({ ...p, body_html: e.target.value }))}
+                                        className="flex-1 w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2 text-sm text-[#eeeef8] font-mono outline-none focus:border-[#7b61ff] resize-none min-h-[250px]"
+                                        placeholder="<p>Bonjour {{prenom}},</p>" />
+                                    <div className="mt-2 text-[9px] text-[#55557a]">Variables : {'{{prenom}} {{nom}} {{entreprise}} {{email}} {{telephone}} {{agent}} {{date}}'}</div>
+                                </div>
+                                {/* Preview */}
+                                <div className="p-4 flex flex-col">
+                                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#55557a] mb-2">Apercu</div>
+                                    <div className="flex-1 bg-white rounded-lg p-4 overflow-auto">
+                                        <div className="text-xs text-gray-500 mb-2 pb-2 border-b border-gray-200">
+                                            <strong>De :</strong> agent@voxflow.io<br />
+                                            <strong>A :</strong> client@exemple.com<br />
+                                            <strong>Sujet :</strong> {(showTplEditor.subject || '').replace(/\{\{prenom\}\}/g, 'Jean').replace(/\{\{nom\}\}/g, 'Tremblay').replace(/\{\{entreprise\}\}/g, 'Acme Inc.').replace(/\{\{agent\}\}/g, 'Marie').replace(/\{\{date\}\}/g, new Date().toLocaleDateString('fr-CA'))}
+                                        </div>
+                                        <div className="text-sm text-gray-800" dangerouslySetInnerHTML={{
+                                            __html: (showTplEditor.body_html || '<p><em>Aucun contenu</em></p>')
+                                                .replace(/\{\{prenom\}\}/g, 'Jean')
+                                                .replace(/\{\{nom\}\}/g, 'Tremblay')
+                                                .replace(/\{\{entreprise\}\}/g, 'Acme Inc.')
+                                                .replace(/\{\{email\}\}/g, 'jean@acme.com')
+                                                .replace(/\{\{telephone\}\}/g, '+1 (514) 555-0000')
+                                                .replace(/\{\{agent\}\}/g, 'Marie')
+                                                .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('fr-CA'))
+                                        }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-[#2e2e44] flex gap-2 flex-shrink-0">
+                            <button onClick={async () => {
+                                await apiFetch(`/api/v1/crm/email-templates/${showTplEditor.id}`, { method: 'DELETE' })
+                                showToast('Template supprime')
+                                loadTemplates()
+                                setShowTplEditor(null)
+                            }}
+                                className="text-xs font-bold text-[#ff4d6d] border border-[#ff4d6d]/30 bg-[#ff4d6d]/10 px-4 py-2 rounded-lg hover:bg-[#ff4d6d]/20 transition-colors">Supprimer</button>
+                            <div className="flex-1" />
+                            <button onClick={() => setShowTplEditor(null)}
+                                className="text-xs font-bold text-[#9898b8] border border-[#2e2e44] bg-[#1f1f2a] px-4 py-2 rounded-lg hover:text-[#eeeef8] transition-colors">Annuler</button>
+                            <button onClick={async () => {
+                                await apiFetch(`/api/v1/crm/email-templates/${showTplEditor.id}`, {
+                                    method: 'PATCH',
+                                    body: JSON.stringify({ subject: showTplEditor.subject, body_html: showTplEditor.body_html })
+                                })
+                                showToast('Template sauvegarde')
+                                loadTemplates()
+                                setShowTplEditor(null)
+                            }}
+                                className="text-xs font-bold text-white bg-[#38b6ff] px-4 py-2 rounded-lg hover:bg-[#2da3e8] transition-colors">Sauvegarder</button>
+                        </div>
                     </div>
                 </div>
             )}

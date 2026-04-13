@@ -3,8 +3,8 @@
 import { useEffect, useCallback, useState } from "react"
 import { Phone } from "lucide-react"
 
-const W = 360
-const H = 700
+const W = 380
+const H = 720
 
 export default function DialerButton() {
   const [tip, setTip]     = useState(false)
@@ -12,7 +12,6 @@ export default function DialerButton() {
   const [open2, setOpen2] = useState(false)
 
   const openDialer = useCallback(() => {
-    // Si deja ouvert => focus
     if (win && !win.closed) { win.focus(); return }
 
     const left = window.screen.availWidth  - W - 24
@@ -25,11 +24,10 @@ export default function DialerButton() {
       `location=no`, `status=no`,
     ].join(",")
 
-    const w = window.open('/dialer', '_blank', 'width=380,height=720')
+    const w = window.open('/dialer', '_blank', feat)
     if (w) { setWin(w); setOpen2(true); w.focus() }
   }, [win])
 
-  // Detecter si la fenetre est fermee
   useEffect(() => {
     if (!win) return
     const id = setInterval(() => {
@@ -38,7 +36,6 @@ export default function DialerButton() {
     return () => clearInterval(id)
   }, [win])
 
-  // Ctrl+D
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "d") {
@@ -51,7 +48,6 @@ export default function DialerButton() {
 
   return (
     <>
-      {/* Position: a GAUCHE du FloatingPhone (right:90 au lieu de right:24) */}
       <button
         onClick={openDialer}
         onMouseEnter={() => setTip(true)}
@@ -60,7 +56,7 @@ export default function DialerButton() {
         style={{
           position:       "fixed",
           bottom:         "24px",
-          right:          "90px",      /* FloatingPhone est a right:24 — on se met a sa gauche */
+          right:          "90px",
           zIndex:         9998,
           width:          "52px",
           height:         "52px",
@@ -83,7 +79,6 @@ export default function DialerButton() {
         <Phone size={20} color="#fff" strokeWidth={2.2} />
       </button>
 
-      {/* Point vert si ouvert */}
       {open2 && (
         <div style={{
           position:      "fixed",
@@ -101,7 +96,6 @@ export default function DialerButton() {
         }} />
       )}
 
-      {/* Tooltip */}
       {tip && (
         <div style={{
           position:      "fixed",
@@ -120,7 +114,7 @@ export default function DialerButton() {
           pointerEvents: "none",
           boxShadow:     "0 4px 16px rgba(0,0,0,.5)",
         }}>
-          {open2 ? "Dialer ouvert ●" : "Dialer"}&nbsp;
+          {open2 ? "Dialer ouvert" : "Dialer"}&nbsp;
           <kbd style={{
             background:   "#2e2e44",
             padding:      "2px 6px",

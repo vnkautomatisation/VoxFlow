@@ -598,6 +598,18 @@ export default function AgentsPage() {
                                 )}
                             </section>
 
+                            {/* Lien supervision */}
+                            <section>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-[#55557a] mb-3 flex items-center gap-2">
+                                    <div className="flex-1 h-px bg-[#2e2e44]" />Supervision<div className="flex-1 h-px bg-[#2e2e44]" />
+                                </div>
+                                <button onClick={() => router.push('/admin/supervision')}
+                                    className="w-full flex items-center justify-center gap-2 text-xs font-bold text-sky-400 border border-sky-400/30 bg-sky-400/5 px-4 py-2.5 rounded-lg hover:bg-sky-400/15 transition-colors">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" /></svg>
+                                    Voir en supervision live
+                                </button>
+                            </section>
+
                             {/* Zone danger */}
                             <section>
                                 <div className="text-[10px] font-bold uppercase tracking-widest text-rose-500/60 mb-3 flex items-center gap-2">
