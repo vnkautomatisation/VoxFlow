@@ -417,41 +417,32 @@ export function useDialer() {
                 isAdmin() ? api('/api/v1/supervision/snapshot') : Promise.resolve({ success: false }),
             ])
             if (qr.success) setQueue(qr.data || [])
-            if (ar.success && ar.data) {
-                const snapAgents = ar.data.agentStatuses || ar.data.agents || ar.data || []
-                if (Array.isArray(snapAgents) && snapAgents.length > 0) {
-                    setAgents(snapAgents.map((a: any) => ({
-                        id: a.agentId || a.id,
-                        name: a.name,
-                        first_name: a.name?.split(' ')[0],
-                        last_name: a.name?.split(' ').slice(1).join(' '),
-                        extension: a.extension || a.ext,
-                        status: a.status || 'OFFLINE',
-                        current_call: !!(a.callId),
-                        current_call_number: a.callFrom || a.callTo || null,
-                        call_duration: a.callDuration || 0,
-                    })))
+            // Toujours charger la liste agents depuis /admin/agents (source de verite)
+            // puis merger avec le snapshot supervision pour les statuts temps reel
+            const agentsFallback = await api('/api/v1/admin/agents').catch(() => ({ success: false, data: [] }))
+            const allAgents: any[] = agentsFallback.success && Array.isArray(agentsFallback.data) ? agentsFallback.data : []
+
+            // Merger avec le snapshot pour les statuts temps reel
+            const snapAgents = ar.success && ar.data ? (ar.data.agentStatuses || ar.data.agents || []) : []
+            const snapMap: Record<string, any> = {}
+            if (Array.isArray(snapAgents)) {
+                for (const s of snapAgents) snapMap[s.agentId || s.id] = s
+            }
+
+            setAgents(allAgents.map((a: any) => {
+                const snap = snapMap[a.id]
+                return {
+                    id: a.id,
+                    name: a.name,
+                    first_name: a.name?.split(' ')[0],
+                    last_name: a.name?.split(' ').slice(1).join(' '),
+                    extension: a.extension,
+                    status: snap ? snap.status : 'OFFLINE',
+                    current_call: snap ? !!(snap.callId) : false,
+                    current_call_number: snap ? (snap.callFrom || snap.callTo || null) : null,
+                    call_duration: snap ? (snap.callDuration || 0) : 0,
                 }
-            }
-            // Fallback : charger agents depuis /admin/agents si snapshot vide
-            if (!ar.success || !(ar.data?.agentStatuses?.length || ar.data?.agents?.length)) {
-                try {
-                    const fallback = await api('/api/v1/admin/agents')
-                    if (fallback.success && Array.isArray(fallback.data)) {
-                        setAgents(fallback.data.map((a: any) => ({
-                            id: a.id,
-                            name: a.name,
-                            first_name: a.name?.split(' ')[0],
-                            last_name: a.name?.split(' ').slice(1).join(' '),
-                            extension: a.extension,
-                            status: a.agentStatus || 'OFFLINE',
-                            current_call: false,
-                            current_call_number: null,
-                            call_duration: 0,
-                        })))
-                    }
-                } catch {}
-            }
+            }))
         } catch { }
         // Charger les numéros de l'org pour le Caller ID picker
         try {
