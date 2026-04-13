@@ -132,6 +132,59 @@ router.delete("/ivr/:id", async (req: AuthRequest, res: Response) => {
   } catch (err: any) { sendError(res, err.message) }
 })
 
+router.post("/ivr/:id/compile", async (req: AuthRequest, res: Response) => {
+  try {
+    const orgId = getOrgId(req)
+    const ivrId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    const ivr = await adminService.getIVRById?.(ivrId, orgId) || (await adminService.getIVRConfigs(orgId))?.find?.((i: any) => i.id === ivrId)
+    if (!ivr) return sendError(res, "IVR introuvable", 404)
+
+    const flow = ivr.flow_json || {}
+    const nodes = flow.nodes || ivr.nodes || []
+    const edges = flow.edges || []
+
+    // Compiler les nodes en TwiML
+    let twiml = '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n'
+
+    const welcomeNode = nodes.find((n: any) => n.type === 'welcome' || n.data?.type === 'welcome')
+    if (welcomeNode) {
+      const msg = welcomeNode.data?.message || ivr.welcome_message || 'Bienvenue'
+      twiml += `  <Say language="fr-CA" voice="Polly.Lea">${msg}</Say>\n`
+    } else if (ivr.welcome_message) {
+      twiml += `  <Say language="fr-CA" voice="Polly.Lea">${ivr.welcome_message}</Say>\n`
+    }
+
+    const menuNodes = nodes.filter((n: any) => n.type === 'menu' || n.data?.type === 'menu')
+    if (menuNodes.length > 0) {
+      twiml += `  <Gather input="dtmf" numDigits="1" timeout="${ivr.timeout || 5}" action="/api/v1/telephony/voice/ivr-gather/${ivrId}">\n`
+      const menuMsg = menuNodes.map((n: any) => {
+        const digit = n.data?.digit || n.digit || '?'
+        const label = n.data?.label || n.label || ''
+        return `Pour ${label}, appuyez sur ${digit}.`
+      }).join(' ')
+      twiml += `    <Say language="fr-CA" voice="Polly.Lea">${menuMsg}</Say>\n`
+      twiml += `  </Gather>\n`
+      twiml += `  <Say language="fr-CA" voice="Polly.Lea">Nous n'avons pas recu votre choix.</Say>\n`
+      twiml += `  <Redirect>/api/v1/telephony/voice/ivr/${ivrId}</Redirect>\n`
+    }
+
+    const queueNodes = nodes.filter((n: any) => n.type === 'queue' || n.data?.type === 'queue')
+    if (queueNodes.length > 0 && menuNodes.length === 0) {
+      const qId = queueNodes[0].data?.queueId || queueNodes[0].data?.target || ''
+      twiml += `  <Enqueue>${qId}</Enqueue>\n`
+    }
+
+    const hangupNode = nodes.find((n: any) => n.type === 'hangup' || n.data?.type === 'hangup')
+    if (hangupNode || nodes.length === 0) {
+      twiml += `  <Hangup />\n`
+    }
+
+    twiml += '</Response>'
+
+    sendSuccess(res, { twiml, nodesCount: nodes.length, edgesCount: edges.length })
+  } catch (err: any) { sendError(res, err.message) }
+})
+
 // ── AUDIO / MUSIQUE D ATTENTE ─────────────────────────────────
 router.get("/audio", async (req: AuthRequest, res: Response) => {
   try {

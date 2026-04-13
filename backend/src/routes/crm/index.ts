@@ -704,4 +704,13 @@ router.patch("/email-templates/:id", authenticate, async (req: AuthRequest, res:
     } catch (err: any) { sendError(res, err.message) }
 })
 
+router.delete("/email-templates/:id", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const { error } = await supabaseAdmin.from("email_templates")
+            .delete().eq("id", req.params.id).eq("organization_id", getOrgId(req))
+        if (error) throw error
+        sendSuccess(res, { deleted: true })
+    } catch (err: any) { sendError(res, err.message) }
+})
+
 export default router
