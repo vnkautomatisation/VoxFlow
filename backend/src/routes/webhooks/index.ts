@@ -38,6 +38,61 @@ router.post("/twilio/status", async (req: Request, res: Response) => {
   sendSuccess(res, { received: true })
 })
 
+// POST /api/v1/webhooks/twilio/dialer-result — Dialer call result
+router.post("/twilio/dialer-result", async (req: Request, res: Response) => {
+  try {
+    const { CallSid, CallStatus, Duration, AnsweredBy } = req.body
+    if (!CallSid) return sendSuccess(res, { received: true })
+
+    const { data: contact } = await supabaseAdmin.from("dialer_contacts")
+      .select("id, campaign_id, organization_id, call_attempts, status")
+      .eq("twilio_call_sid", CallSid).maybeSingle()
+    if (!contact) return sendSuccess(res, { received: true })
+
+    let newStatus = contact.status
+    if (CallStatus === "completed") {
+      newStatus = AnsweredBy === "human" ? "answered_human" : ["machine_start", "machine_end_beep", "machine_end_silence"].includes(AnsweredBy) ? "answered_machine" : "answered_human"
+    } else if (CallStatus === "no-answer") { newStatus = "no_answer" }
+    else if (["failed", "busy"].includes(CallStatus)) { newStatus = "failed" }
+
+    const dur = parseInt(Duration || "0")
+    await supabaseAdmin.from("dialer_contacts").update({
+      status: newStatus, call_duration_seconds: dur, last_attempt_at: new Date().toISOString(),
+      call_attempts: (contact.call_attempts || 0) + 1,
+    }).eq("id", contact.id)
+
+    // Update campaign counters
+    const counterField = newStatus === "answered_human" ? "answered_human" : newStatus === "answered_machine" ? "answered_machine" : newStatus === "no_answer" ? "no_answer" : "failed"
+    const { data: camp } = await supabaseAdmin.from("dialer_campaigns")
+      .select("called, answered_human, answered_machine, no_answer, failed, talk_time_seconds, max_attempts, status, total_contacts")
+      .eq("id", contact.campaign_id).single()
+
+    if (camp) {
+      const c = camp as any
+      await supabaseAdmin.from("dialer_campaigns").update({
+        called: (c.called || 0) + 1, [counterField]: (c[counterField] || 0) + 1,
+        talk_time_seconds: (c.talk_time_seconds || 0) + dur,
+      }).eq("id", contact.campaign_id)
+
+      // Recycle no_answer
+      if (newStatus === "no_answer" && (contact.call_attempts || 0) + 1 < (c.max_attempts || 3) && c.status === "running") {
+        await supabaseAdmin.from("dialer_contacts").update({ status: "pending" }).eq("id", contact.id)
+      }
+
+      // Check completion
+      const { count: pendingCount } = await supabaseAdmin.from("dialer_contacts")
+        .select("id", { count: "exact", head: true }).eq("campaign_id", contact.campaign_id).in("status", ["pending", "calling"])
+      if ((pendingCount || 0) === 0) {
+        await supabaseAdmin.from("dialer_campaigns").update({ status: "completed" }).eq("id", contact.campaign_id)
+      }
+    }
+    sendSuccess(res, { received: true })
+  } catch (err: any) {
+    console.error("[Dialer Webhook] Error:", err.message)
+    sendSuccess(res, { received: true })
+  }
+})
+
 // POST /api/v1/webhooks/twilio/robot-result — Robot call result
 router.post("/twilio/robot-result", async (req: Request, res: Response) => {
   try {
@@ -171,6 +226,23 @@ router.post("/stripe", async (req: Request, res: Response) => {
             .update({ status: "canceled", canceled_at: new Date().toISOString() })
             .eq("id", addonSub.id)
         }
+
+        // Check if this is a dialer subscription
+        const { data: dialerSub } = await supabaseAdmin
+          .from("org_dialer_subscriptions")
+          .select("id, organization_id")
+          .eq("stripe_subscription_id", sub.id)
+          .maybeSingle()
+        if (dialerSub) {
+          await supabaseAdmin.from("org_dialer_subscriptions")
+            .update({ status: "canceled", canceled_at: new Date().toISOString() })
+            .eq("id", dialerSub.id)
+          // Cancel running dialer campaigns
+          await supabaseAdmin.from("dialer_campaigns")
+            .update({ status: "canceled" })
+            .eq("organization_id", dialerSub.organization_id)
+            .in("status", ["running", "scheduled"])
+        }
         break
       }
 
@@ -184,6 +256,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
         if (failedInvoice.subscription) {
           await supabaseAdmin.from("org_addons").update({ status: "past_due" }).eq("stripe_subscription_id", failedInvoice.subscription)
           await supabaseAdmin.from("org_robot_subscriptions").update({ status: "past_due" }).eq("stripe_subscription_id", failedInvoice.subscription)
+          await supabaseAdmin.from("org_dialer_subscriptions").update({ status: "past_due" }).eq("stripe_subscription_id", failedInvoice.subscription)
         }
         break
       }

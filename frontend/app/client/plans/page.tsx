@@ -547,11 +547,9 @@ export default function PlansPage() {
         <RobotTab api={api} flash={flash} />
       )}
 
-      {/* Placeholder tabs */}
-      {serviceTab !== 'telephony' && serviceTab !== 'addons' && serviceTab !== 'robot' && (
-        <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl py-16 text-center">
-          <div className="text-[15px] text-[#55557a]">Section {SERVICE_TABS.find(t => t.key === serviceTab)?.label} — bientot disponible</div>
-        </div>
+      {/* Dialer tab */}
+      {serviceTab === 'dialer' && (
+        <DialerTab api={api} flash={flash} />
       )}
 
       {/* ══════════════════════════════════════════════════ */}
@@ -1315,6 +1313,162 @@ function CreditsModal2({ packs, selected, onSelect, onBuy, onClose, submitting }
           <button onClick={onBuy} disabled={!selected||submitting} className={`px-6 py-2 rounded-lg text-[12px] font-bold border-none cursor-pointer ${selected&&!submitting?'bg-[#7b61ff] text-white':'bg-[#2e2e44] text-[#55557a] cursor-not-allowed'}`}>{submitting?'...':'Acheter'}</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════
+// Dialer Tab
+// ══════════════════════════════════════════════════════════
+interface DialerPlanType {
+  plan_code: string; name: string; description: string
+  price_monthly: number; price_yearly: number; features: string[]
+  destinations: string[]; max_concurrent_calls: number; max_lines_per_agent: number; popular: boolean
+}
+
+function DialerTab({ api, flash }: { api: (path: string, opts?: RequestInit) => Promise<any>; flash: (msg: string, type?: 'success' | 'error') => void }) {
+  const [plans, setPlans] = useState<DialerPlanType[]>([])
+  const [summary, setSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [selectedPlan, setSelectedPlan] = useState('')
+  const [activateModal, setActivateModal] = useState(false)
+  const [cancelModal, setCancelModal] = useState(false)
+  const [cgv, setCgv] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    const [p, s] = await Promise.all([api('/api/v1/billing/dialer/plans'), api('/api/v1/billing/dialer/summary')])
+    if (p.success) { setPlans(p.data || []); if (!selectedPlan) setSelectedPlan((p.data || []).find((x: any) => x.popular)?.plan_code || '') }
+    if (s.success) setSummary(s.data)
+    setLoading(false)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const handleSubscribe = async () => {
+    setSubmitting(true)
+    const res = await api('/api/v1/billing/dialer/subscribe', { method: 'POST', body: JSON.stringify({ planCode: selectedPlan, billingCycle: 'monthly' }) })
+    if (res.success) { flash('Predictive Dialer active'); setActivateModal(false); setCgv(false); loadData() }
+    else flash(res.error || 'Erreur', 'error')
+    setSubmitting(false)
+  }
+
+  const handleCancel = async () => {
+    const res = await api('/api/v1/billing/dialer/cancel', { method: 'DELETE' })
+    if (res.success) { flash('Annulation programmee'); setCancelModal(false); loadData() }
+    else flash(res.error || 'Erreur', 'error')
+  }
+
+  if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-14 bg-[#18181f] rounded-lg animate-pulse" />)}</div>
+
+  const hasActive = summary?.activePlan && summary.status && ['active', 'trialing', 'past_due', 'canceling'].includes(summary.status)
+  const DEST_COLORS: Record<string, string> = { DIALER_CA_US: 'bg-blue-900/60 text-blue-300', DIALER_CA_US_FR: 'bg-purple-900/60 text-purple-300', DIALER_INTL: 'bg-amber-900/60 text-amber-300' }
+
+  return (
+    <div>
+      {/* Banners */}
+      {summary?.status === 'trialing' && summary.trialEndsAt && (
+        <div className="bg-blue-950/50 border border-blue-800/40 rounded-xl px-5 py-3 mb-5 flex items-center gap-3">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span className="text-[13px] text-blue-300 font-semibold">Essai gratuit en cours — {daysUntil(summary.trialEndsAt)} jours restants</span>
+        </div>
+      )}
+      {summary?.status === 'past_due' && (
+        <div className="bg-red-950/60 border border-red-900/50 rounded-xl px-5 py-3 mb-5 flex items-center gap-3">
+          <span className="text-[13px] text-red-300 font-semibold">Paiement en retard — Mettre a jour votre carte</span>
+        </div>
+      )}
+      {summary?.status === 'canceling' && summary.cancelAt && (
+        <div className="bg-orange-950/50 border border-orange-800/40 rounded-xl px-5 py-3 mb-5 flex items-center gap-3">
+          <span className="text-[13px] text-orange-300 font-semibold">Annulation prevue le {fmtDate(summary.cancelAt)}</span>
+        </div>
+      )}
+
+      <div className="bg-blue-950/30 border border-blue-800/20 rounded-lg px-4 py-2.5 mb-5 text-[12px] text-blue-300">
+        Le Predictive Dialer est un service independant. Il fonctionne avec ou sans forfait telephonie.
+      </div>
+
+      {/* Plans table */}
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden mb-6">
+        <div className="grid grid-cols-[25%_40%_20%_15%] px-5 py-2.5 bg-[#111118] border-b border-[#2e2e44] text-[10px] text-[#55557a] uppercase tracking-wider font-semibold">
+          <div>Forfaits</div><div>Details</div><div className="text-right">Prix CAD$/agent/mois</div><div className="text-center">Actif</div>
+        </div>
+        {plans.map(p => {
+          const isActive = hasActive && summary?.activePlan?.plan_code === p.plan_code
+          return (
+            <div key={p.plan_code} onClick={() => setSelectedPlan(p.plan_code)}
+              className={`grid grid-cols-[25%_40%_20%_15%] px-5 py-3.5 border-b border-[#2e2e44]/60 items-center cursor-pointer transition-colors ${selectedPlan === p.plan_code ? 'bg-[#7b61ff]/5' : 'hover:bg-[#1e1e2a]'}`}>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${DEST_COLORS[p.plan_code] || 'bg-[#1e1e3a] text-[#9898b8]'}`}>{p.name}</span>
+                {p.popular && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#7b61ff]/15 text-[#7b61ff]">Populaire</span>}
+              </div>
+              <div className="text-[13px] text-[#9898b8]">{p.destinations.length > 0 ? `Illimite: ${p.destinations.map(d => d.replace(' fixes et mobiles', '')).join(', ')}` : p.description} — {p.max_concurrent_calls} appels simultanes</div>
+              <div className="text-right text-[14px] font-semibold text-[#eeeef8]">{fmtCents(p.price_monthly)} <span className="text-[11px] text-[#55557a] font-normal">CAD$</span></div>
+              <div className="text-center">
+                {isActive ? <span className="text-emerald-400 font-semibold text-[13px]">{summary.nbAgentsActive} agent{summary.nbAgentsActive > 1 ? 's' : ''}</span> : <span className="text-[#55557a]">-</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-end gap-4 mb-4 w-full">
+        <div className="flex-1 grid grid-cols-4 gap-4">
+          <div><div className="text-[10px] text-[#55557a] uppercase tracking-wider font-semibold mb-1">Date d&apos;enregistrement</div><div className="text-[13px] text-[#eeeef8] font-medium">{fmtDate(summary?.registeredAt)}</div></div>
+          <div><div className="text-[10px] text-[#55557a] uppercase tracking-wider font-semibold mb-1">Prochain paiement</div><div className="text-[13px] text-[#eeeef8] font-medium">{fmtDate(summary?.nextPaymentAt)}</div></div>
+          <div><div className="text-[10px] text-[#55557a] uppercase tracking-wider font-semibold mb-1">Forfaits actifs</div><div className="text-[13px] text-[#eeeef8] font-medium">{hasActive ? 1 : 0}</div></div>
+          <div><div className="text-[10px] text-[#55557a] uppercase tracking-wider font-semibold mb-1">Montant recurrent total</div><div className="text-[15px] text-[#7b61ff] font-bold">{fmtCents(summary?.monthlyTotal || 0)} CAD$/mois</div></div>
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          {!hasActive && <button onClick={() => { setActivateModal(true); setCgv(false) }} className="px-5 py-2.5 bg-[#7b61ff] text-white rounded-lg text-[13px] font-bold cursor-pointer border-none hover:bg-[#6145ff]">Souscrire</button>}
+          {hasActive && summary.status === 'active' && <button onClick={() => setCancelModal(true)} className="px-5 py-2.5 bg-red-950/40 border border-red-800/40 text-red-400 rounded-lg text-[13px] font-semibold cursor-pointer hover:bg-red-950/60">Demande d&apos;annulation</button>}
+        </div>
+      </div>
+
+      {/* Activate modal */}
+      {activateModal && (() => {
+        const plan = plans.find(p => p.plan_code === selectedPlan)
+        if (!plan) return null
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setActivateModal(false)}>
+            <div onClick={e => e.stopPropagation()} className="bg-[#0c0c1a] border border-[#2e2e44] rounded-xl w-[600px] max-w-[95vw]">
+              <div className="px-7 pt-6 pb-4 border-b border-[#2e2e44]"><div className="text-[17px] font-bold text-[#eeeef8]">Activer {plan.name}</div><div className="text-[12px] text-[#55557a]">14 jours gratuits</div></div>
+              <div className="px-7 py-5 space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  {plans.map(p => <div key={p.plan_code} onClick={() => setSelectedPlan(p.plan_code)} className={`p-3 rounded-lg cursor-pointer border text-center ${selectedPlan === p.plan_code ? 'border-[#7b61ff] bg-[#7b61ff]/5' : 'border-[#2e2e44] bg-[#111118]'}`}><div className="text-[13px] font-bold text-[#eeeef8]">{p.name}</div><div className="text-[11px] text-[#7b61ff]">{fmtCents(p.price_monthly)} CAD$/agent</div></div>)}
+                </div>
+                <div className="bg-[#111118] rounded-lg p-4 text-[13px]">
+                  <div className="flex justify-between mb-1"><span className="text-[#9898b8]">Destinations</span><span className="text-[#eeeef8]">{plan.destinations.map(d => d.replace(' fixes et mobiles', '')).join(', ')}</span></div>
+                  <div className="flex justify-between mb-1"><span className="text-[#9898b8]">Appels simultanes</span><span className="text-[#eeeef8]">{plan.max_concurrent_calls}</span></div>
+                  <div className="flex justify-between mb-1"><span className="text-[#9898b8]">Lignes/agent</span><span className="text-[#eeeef8]">{plan.max_lines_per_agent}</span></div>
+                  <div className="flex justify-between font-bold border-t border-[#2e2e44] pt-2 mt-2"><span className="text-[#eeeef8]">Prix/agent/mois</span><span className="text-[#7b61ff]">{fmtCents(plan.price_monthly)} CAD$</span></div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={cgv} onChange={e => setCgv(e.target.checked)} className="w-4 h-4 accent-[#7b61ff]" /><span className="text-[12px] text-[#9898b8]">J&apos;accepte les conditions generales de vente</span></label>
+              </div>
+              <div className="px-7 py-4 border-t border-[#2e2e44] flex justify-end gap-3">
+                <button onClick={() => setActivateModal(false)} className="px-5 py-2 bg-[#18181f] border border-[#2e2e44] rounded-lg text-[#9898b8] text-[12px] font-semibold cursor-pointer">Annuler</button>
+                <button onClick={handleSubscribe} disabled={!cgv||submitting} className={`px-6 py-2 rounded-lg text-[12px] font-bold border-none cursor-pointer ${cgv&&!submitting?'bg-[#7b61ff] text-white':'bg-[#2e2e44] text-[#55557a] cursor-not-allowed'}`}>{submitting?'Activation...':'Activer'}</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Cancel modal */}
+      {cancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setCancelModal(false)}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#0c0c1a] border border-[#2e2e44] rounded-xl p-8 w-[460px]">
+            <div className="text-[17px] font-bold text-[#eeeef8] mb-4">Confirmer l&apos;annulation</div>
+            <div className="text-[13px] text-[#9898b8] mb-6">Le Predictive Dialer sera desactive a la fin de la periode. Toutes les campagnes en cours seront annulees.</div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setCancelModal(false)} className="px-5 py-2 bg-[#18181f] border border-[#2e2e44] rounded-lg text-[#9898b8] text-[12px] font-semibold cursor-pointer">Annuler</button>
+              <button onClick={handleCancel} className="px-5 py-2 bg-[#ff4d6d] border-none rounded-lg text-white text-[12px] font-bold cursor-pointer">Confirmer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
