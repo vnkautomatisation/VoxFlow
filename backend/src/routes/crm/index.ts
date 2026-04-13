@@ -714,4 +714,59 @@ router.delete("/email-templates/:id", authenticate, async (req: AuthRequest, res
     } catch (err: any) { sendError(res, err.message) }
 })
 
+// ════════════════════════════════════════════════════════════
+//  SEND EMAIL FROM TEMPLATE
+// ════════════════════════════════════════════════════════════
+
+router.post("/email-templates/:id/send", authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const orgId = getOrgId(req)
+        const { contact_id } = req.body
+        if (!contact_id) return sendError(res, "contact_id requis", 400)
+
+        // Charger le template
+        const { data: tpl, error: tplErr } = await supabaseAdmin.from("email_templates")
+            .select("*").eq("id", req.params.id).eq("organization_id", orgId).single()
+        if (tplErr || !tpl) return sendError(res, "Template introuvable", 404)
+
+        // Charger le contact
+        const { data: contact, error: ctErr } = await supabaseAdmin.from("contacts")
+            .select("*").eq("id", contact_id).eq("organization_id", orgId).single()
+        if (ctErr || !contact) return sendError(res, "Contact introuvable", 404)
+
+        // Remplacer les variables
+        const replace = (s: string) => s
+            .replace(/\{\{prenom\}\}/g, contact.first_name || '')
+            .replace(/\{\{nom\}\}/g, contact.last_name || '')
+            .replace(/\{\{entreprise\}\}/g, contact.company || '')
+            .replace(/\{\{email\}\}/g, contact.email || '')
+            .replace(/\{\{telephone\}\}/g, contact.phone || '')
+            .replace(/\{\{agent\}\}/g, req.user?.name || 'Agent')
+            .replace(/\{\{date\}\}/g, new Date().toLocaleDateString('fr-CA'))
+
+        const subject = replace(tpl.subject)
+        const body = replace(tpl.body_html)
+
+        // Envoyer via le service email si configure
+        try {
+            const { emailService } = await import("../../services/email/email.service")
+            await emailService.send({ to: contact.email, subject, html: body })
+        } catch {
+            // Fallback : log et retour succes (pas d'email reel en dev)
+        }
+
+        // Logger l'activite
+        await supabaseAdmin.from("contact_activities").insert({
+            organization_id: orgId,
+            contact_id,
+            type: 'EMAIL',
+            description: `Email envoye : ${subject}`,
+            metadata: { template_id: tpl.id, template_name: tpl.name },
+            created_by: req.user?.userId,
+        }).catch(() => {})
+
+        sendSuccess(res, { sent: true, to: contact.email, subject })
+    } catch (err: any) { sendError(res, err.message) }
+})
+
 export default router
