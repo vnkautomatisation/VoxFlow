@@ -38,7 +38,7 @@ interface TicketDetail extends Ticket {
   messages: Message[]
 }
 
-// ─── Relative time ──────────────────────────────────────────────────────────
+// ─── Formatters ─────────────────────────────────────────────────────────────
 function relativeTime(iso: string): string {
   if (!iso) return '--'
   const now = Date.now()
@@ -75,51 +75,45 @@ function fmtTime(iso: string): string {
   }
 }
 
-// ─── Badge configs ──────────────────────────────────────────────────────────
-const CATEGORY_COLORS: Record<string, string> = {
-  'Facturation': '#38b6ff',
-  'Technique': '#ff8c42',
-  'Commercial': '#00d4aa',
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  'Normale': '#6a6a8a',
-  'Haute': '#ff8c42',
-  'Urgente': '#ff4d6d',
-}
-
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  'open': { label: 'Ouvert', color: '#00d4aa' },
-  'in_progress': { label: 'En cours', color: '#38b6ff' },
-  'closed': { label: 'Ferme', color: '#6a6a8a' },
-}
-
-// ─── Shared styles ──────────────────────────────────────────────────────────
-const INPUT_STYLE: React.CSSProperties = {
-  width: '100%', background: '#080810', border: '1px solid #2a2a4a', borderRadius: 9,
-  padding: '10px 13px', color: '#e8e8f8', fontSize: 13, outline: 'none',
-  boxSizing: 'border-box', fontFamily: 'inherit',
-}
-
-const TABLE_HEADER: React.CSSProperties = {
-  padding: '12px 16px', fontSize: 11, fontWeight: 600, color: '#5a5a7a',
-  textTransform: 'uppercase', letterSpacing: '.06em', textAlign: 'left',
-  borderBottom: '1px solid #1e1e3a',
-}
-
-const TABLE_CELL: React.CSSProperties = {
-  padding: '14px 16px', fontSize: 13, color: '#c8c8e8', verticalAlign: 'middle',
-}
-
-// ─── Badge component ────────────────────────────────────────────────────────
-function Badge({ label, color }: { label: string; color: string }) {
+// ─── Badge components ───────────────────────────────────────────────────────
+function CategoryBadge({ category }: { category: string }) {
+  const map: Record<string, string> = {
+    Facturation: 'bg-sky-400/10 text-sky-400 border-sky-400/20',
+    Technique: 'bg-orange-400/10 text-orange-400 border-orange-400/20',
+    Commercial: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
+  }
+  const cls = map[category] || 'bg-[#55557a]/10 text-[#9898b8] border-[#55557a]/20'
   return (
-    <span style={{
-      display: 'inline-block', padding: '3px 10px', borderRadius: 20,
-      background: color + '18', color, border: `1px solid ${color}33`,
-      fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-    }}>
-      {label}
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+      {category}
+    </span>
+  )
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const map: Record<string, string> = {
+    Normale: 'bg-[#55557a]/10 text-[#9898b8] border-[#55557a]/20',
+    Haute: 'bg-orange-400/10 text-orange-400 border-orange-400/20',
+    Urgente: 'bg-red-400/10 text-red-400 border-red-400/20',
+  }
+  const cls = map[priority] || 'bg-[#55557a]/10 text-[#9898b8] border-[#55557a]/20'
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+      {priority}
+    </span>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    open: { label: 'Ouvert', cls: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
+    in_progress: { label: 'En cours', cls: 'bg-sky-400/10 text-sky-400 border-sky-400/20' },
+    closed: { label: 'Ferme', cls: 'bg-[#55557a]/10 text-[#9898b8] border-[#55557a]/20' },
+  }
+  const s = map[status] || map.open
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${s.cls}`}>
+      {s.label}
     </span>
   )
 }
@@ -143,8 +137,9 @@ function NewTicketModal({ onClose, onCreated }: { onClose: () => void; onCreated
         method: 'POST',
         body: JSON.stringify({ subject: subject.trim() || 'Sans sujet', category, priority, message: message.trim() }),
       })
-      if (res.error) {
-        setErr(res.error)
+      const d = res.data || res
+      if (d.error) {
+        setErr(d.error)
         setSaving(false)
         return
       }
@@ -158,37 +153,51 @@ function NewTicketModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: '#000000cc', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <div onClick={e => e.stopPropagation()} style={{ background: '#0c0c1a', border: '1px solid #2a2a4a', borderRadius: 16, padding: 28, width: 540, maxWidth: '95vw' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: '#e8e8f8' }}>Nouveau ticket</div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#5a5a7a', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>
+      <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-7 w-[540px] max-w-[95vw]">
+        {/* Modal header */}
+        <div className="flex justify-between items-center mb-5">
+          <div className="text-lg font-bold text-[#eeeef8]">Nouveau ticket</div>
+          <button onClick={onClose} className="text-[#55557a] hover:text-[#9898b8] transition-colors">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="flex flex-col gap-3.5">
           {/* Sujet */}
           <div>
-            <label style={{ fontSize: 10, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>Sujet</label>
-            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Decrivez brievement votre demande" style={INPUT_STYLE} />
+            <label className="block text-[10px] uppercase tracking-wider text-[#55557a] font-semibold mb-1.5">Sujet</label>
+            <input
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              placeholder="Decrivez brievement votre demande"
+              className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]/50 transition-colors"
+            />
           </div>
 
           {/* Categorie + Priorite */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={{ fontSize: 10, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>Categorie</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} style={INPUT_STYLE}>
+              <label className="block text-[10px] uppercase tracking-wider text-[#55557a] font-semibold mb-1.5">Categorie</label>
+              <select
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+                className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]/50 transition-colors"
+              >
                 <option value="Facturation">Facturation</option>
                 <option value="Technique">Technique</option>
                 <option value="Commercial">Commercial</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 10, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>Priorite</label>
-              <select value={priority} onChange={e => setPriority(e.target.value)} style={INPUT_STYLE}>
+              <label className="block text-[10px] uppercase tracking-wider text-[#55557a] font-semibold mb-1.5">Priorite</label>
+              <select
+                value={priority}
+                onChange={e => setPriority(e.target.value)}
+                className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]/50 transition-colors"
+              >
                 <option value="Normale">Normale</option>
                 <option value="Haute">Haute</option>
                 <option value="Urgente">Urgente</option>
@@ -198,49 +207,33 @@ function NewTicketModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
           {/* Description */}
           <div>
-            <label style={{ fontSize: 10, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>Description</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[#55557a] font-semibold mb-1.5">Description</label>
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
               rows={5}
               placeholder="Decrivez votre probleme en detail..."
-              style={{ ...INPUT_STYLE, resize: 'vertical', lineHeight: 1.6 }}
+              className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]/50 transition-colors resize-y leading-relaxed"
             />
-          </div>
-
-          {/* File upload area (UI only) */}
-          <div>
-            <label style={{ fontSize: 10, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>Fichier joint (optionnel)</label>
-            <div style={{
-              border: '2px dashed #2a2a4a', borderRadius: 10, padding: '18px 16px',
-              textAlign: 'center', color: '#4a4a6a', fontSize: 12, cursor: 'pointer',
-              transition: 'border-color .15s',
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a4a6a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', margin: '0 auto 6px' }}>
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              Glissez un fichier ici ou cliquez pour parcourir
-            </div>
           </div>
         </div>
 
+        {/* Error */}
         {err && (
-          <div style={{ marginTop: 12, padding: '8px 14px', borderRadius: 8, background: '#ff4d6d18', border: '1px solid #ff4d6d33', fontSize: 12, color: '#ff4d6d' }}>
+          <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
             {err}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ padding: '11px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 9, color: '#6a6a8a', fontSize: 13, cursor: 'pointer' }}>
+        {/* Actions */}
+        <div className="flex gap-2.5 mt-5">
+          <button onClick={onClose} className="px-4 py-2 bg-transparent border border-[#2e2e44] rounded-lg text-sm text-[#9898b8] hover:border-[#55557a] transition-colors cursor-pointer">
             Annuler
           </button>
           <button
             onClick={submit}
             disabled={saving}
-            style={{
-              flex: 1, padding: 11, background: saving ? '#5a4abf' : '#7b61ff', border: 'none',
-              borderRadius: 9, color: '#fff', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer',
-            }}
+            className="flex-1 bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50 disabled:cursor-default transition-colors"
           >
             {saving ? 'Creation...' : 'Creer le ticket'}
           </button>
@@ -265,10 +258,11 @@ function TicketDetailView({ ticketId, onBack }: { ticketId: string; onBack: () =
     setError(null)
     try {
       const res = await api(`/api/v1/client/portal/support/tickets/${ticketId}`)
-      if (res.error) {
-        setError(res.error)
+      const d = res.data || res
+      if (d.error) {
+        setError(d.error)
       } else {
-        setTicket(res.data || res)
+        setTicket(d)
       }
     } catch (e: any) {
       setError(e.message || 'Impossible de charger le ticket')
@@ -298,92 +292,80 @@ function TicketDetailView({ ticketId, onBack }: { ticketId: string; onBack: () =
     setSending(false)
   }
 
+  // Loading
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <div style={{
-          width: 32, height: 32, border: '3px solid #1e1e3a', borderTopColor: '#7b61ff',
-          borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 14px',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-        <div style={{ fontSize: 13, color: '#5a5a7a' }}>Chargement du ticket...</div>
+      <div className="py-10 text-center">
+        <div className="w-8 h-8 border-[3px] border-[#2e2e44] border-t-[#7b61ff] rounded-full animate-spin mx-auto mb-3.5" />
+        <div className="text-sm text-[#55557a]">Chargement du ticket...</div>
       </div>
     )
   }
 
+  // Error / not found
   if (error || !ticket) {
     return (
       <div>
-        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', color: '#7b61ff', fontSize: 13, cursor: 'pointer', marginBottom: 16, padding: 0 }}>
+        <button onClick={onBack} className="flex items-center gap-1.5 text-[#7b61ff] text-sm hover:underline mb-4 bg-transparent border-none cursor-pointer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           Retour aux tickets
         </button>
-        <div style={{ padding: '16px 20px', background: '#ff4d6d12', border: '1px solid #ff4d6d44', borderRadius: 10, fontSize: 13, color: '#ff8888' }}>
+        <div className="px-5 py-4 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-400">
           {error || 'Ticket introuvable'}
         </div>
       </div>
     )
   }
 
-  const status = STATUS_MAP[ticket.status] || STATUS_MAP['open']
-  const catColor = CATEGORY_COLORS[ticket.category] || '#6a6a8a'
-  const prioColor = PRIORITY_COLORS[ticket.priority] || '#6a6a8a'
-
   return (
     <div>
       {/* Back button */}
-      <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', color: '#7b61ff', fontSize: 13, cursor: 'pointer', marginBottom: 20, padding: 0 }}>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-[#7b61ff] text-sm hover:underline mb-5 bg-transparent border-none cursor-pointer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         Retour aux tickets
       </button>
 
       {/* Ticket header card */}
-      <div style={{ background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12, padding: '20px 24px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5 mb-5">
+        <div className="flex justify-between items-start flex-wrap gap-3">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#e8e8f8', marginBottom: 8 }}>{ticket.subject}</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Badge label={ticket.category} color={catColor} />
-              <Badge label={ticket.priority} color={prioColor} />
-              <Badge label={status.label} color={status.color} />
+            <div className="text-lg font-bold text-[#eeeef8] mb-2">{ticket.subject}</div>
+            <div className="flex gap-2 items-center flex-wrap">
+              <CategoryBadge category={ticket.category} />
+              <PriorityBadge priority={ticket.priority} />
+              <StatusBadge status={ticket.status} />
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#5a5a7a', marginBottom: 4 }}>#{ticket.id.slice(0, 8)}</div>
-            <div style={{ fontSize: 12, color: '#4a4a6a' }}>Cree le {fmtDate(ticket.created_at)}</div>
+          <div className="text-right">
+            <div className="text-[11px] font-mono text-[#55557a] mb-1">#{ticket.id.slice(0, 8)}</div>
+            <div className="text-xs text-[#55557a]">Cree le {fmtDate(ticket.created_at)}</div>
           </div>
         </div>
       </div>
 
       {/* Conversation thread */}
-      <div style={{ background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12, marginBottom: 20 }}>
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #1e1e3a' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#c8c8e8' }}>Conversation</div>
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl mb-5">
+        <div className="px-5 py-4 border-b border-[#2e2e44]">
+          <div className="text-sm font-semibold text-[#eeeef8]">Conversation</div>
         </div>
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 500, overflowY: 'auto' }}>
+        <div className="px-5 py-5 flex flex-col gap-4 max-h-[500px] overflow-y-auto">
           {(!ticket.messages || ticket.messages.length === 0) ? (
-            <div style={{ padding: 20, textAlign: 'center', color: '#3a3a5a', fontSize: 13 }}>
+            <div className="py-5 text-center text-sm text-[#55557a]">
               Aucun message pour le moment.
             </div>
           ) : ticket.messages.map((msg) => {
             const isClient = msg.from_role === 'client'
             return (
-              <div key={msg.id} style={{ display: 'flex', justifyContent: isClient ? 'flex-end' : 'flex-start' }}>
-                <div style={{ maxWidth: '70%' }}>
-                  <div style={{
-                    padding: '12px 16px',
-                    background: isClient ? '#7b61ff22' : '#1a1a2e',
-                    border: isClient ? '1px solid #7b61ff44' : '1px solid #2a2a4a',
-                    borderRadius: isClient ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                    fontSize: 13,
-                    color: '#d0d0e8',
-                    lineHeight: 1.6,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}>
+              <div key={msg.id} className={`flex ${isClient ? 'justify-end' : 'justify-start'}`}>
+                <div className="max-w-[70%]">
+                  <div className={`px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                    isClient
+                      ? 'bg-[#7b61ff]/15 border border-[#7b61ff]/25 rounded-[14px] rounded-br-[4px] text-[#eeeef8]'
+                      : 'bg-[#1f1f2a] border border-[#2e2e44] rounded-[14px] rounded-bl-[4px] text-[#9898b8]'
+                  }`}>
                     {msg.message}
                   </div>
-                  <div style={{ fontSize: 10, color: '#4a4a6a', marginTop: 4, textAlign: isClient ? 'right' : 'left' }}>
+                  <div className={`text-[10px] text-[#55557a] mt-1 ${isClient ? 'text-right' : 'text-left'}`}>
                     {isClient ? 'Vous' : 'Support'} -- {fmtTime(msg.created_at)}
                   </div>
                 </div>
@@ -395,29 +377,24 @@ function TicketDetailView({ ticketId, onBack }: { ticketId: string; onBack: () =
 
         {/* Reply form or closed message */}
         {ticket.status === 'closed' ? (
-          <div style={{ padding: '16px 24px', borderTop: '1px solid #1e1e3a', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#5a5a7a' }}>Ce ticket est ferme.</div>
+          <div className="px-5 py-4 border-t border-[#2e2e44] text-center">
+            <div className="text-sm text-[#55557a]">Ce ticket est ferme.</div>
           </div>
         ) : (
-          <div style={{ padding: '16px 24px', borderTop: '1px solid #1e1e3a' }}>
-            <div style={{ display: 'flex', gap: 10 }}>
+          <div className="px-5 py-4 border-t border-[#2e2e44]">
+            <div className="flex gap-2.5">
               <textarea
                 value={reply}
                 onChange={e => setReply(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply() }}
                 rows={2}
                 placeholder="Votre reponse..."
-                style={{ ...INPUT_STYLE, flex: 1, resize: 'none', lineHeight: 1.5 }}
+                className="flex-1 bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] placeholder-[#55557a] outline-none focus:border-[#7b61ff]/50 transition-colors resize-none leading-relaxed"
               />
               <button
                 onClick={sendReply}
                 disabled={sending || !reply.trim()}
-                style={{
-                  padding: '0 18px', background: sending ? '#5a4abf' : '#7b61ff', border: 'none',
-                  borderRadius: 9, color: '#fff', cursor: sending || !reply.trim() ? 'default' : 'pointer',
-                  opacity: !reply.trim() ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6,
-                  transition: 'opacity .15s',
-                }}
+                className="px-4 bg-[#7b61ff] hover:bg-[#6145ff] rounded-lg text-white flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-default transition-colors"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -445,11 +422,12 @@ export default function SupportPage() {
     setError(null)
     try {
       const res = await api('/api/v1/client/portal/support/tickets')
-      if (res.error) {
-        setError(res.error)
+      const d = res.data || res
+      if (d.error) {
+        setError(d.error)
         setTickets([])
       } else {
-        const data = Array.isArray(res) ? res : (Array.isArray(res.data) ? res.data : [])
+        const data = Array.isArray(d) ? d : []
         setTickets(data)
       }
     } catch (e: any) {
@@ -461,7 +439,7 @@ export default function SupportPage() {
 
   useEffect(() => { loadTickets() }, [loadTickets])
 
-  // If a ticket is selected, show the detail view
+  // Detail view
   if (selectedId) {
     return <TicketDetailView ticketId={selectedId} onBack={() => { setSelectedId(null); loadTickets() }} />
   }
@@ -469,18 +447,14 @@ export default function SupportPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', margin: 0, marginBottom: 6 }}>Support</h1>
-          <p style={{ fontSize: 13, color: '#6a6a8a', margin: 0 }}>Creez et suivez vos demandes de support.</p>
+          <h1 className="text-xl font-bold text-[#eeeef8] mb-1">Support</h1>
+          <p className="text-sm text-[#9898b8]">Creez et suivez vos demandes de support.</p>
         </div>
         <button
           onClick={() => setShowNew(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px',
-            background: '#7b61ff', border: 'none', borderRadius: 9, color: '#fff',
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          }}
+          className="flex items-center gap-1.5 bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold transition-colors"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           Nouveau ticket
@@ -489,93 +463,77 @@ export default function SupportPage() {
 
       {/* Error */}
       {error && (
-        <div style={{ marginBottom: 16, padding: '12px 18px', background: '#ff4d6d12', border: '1px solid #ff4d6d44', borderRadius: 10, fontSize: 13, color: '#ff8888' }}>
+        <div className="mb-4 px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-xl text-sm text-red-400">
           {error}
         </div>
       )}
 
       {/* Ticket table */}
-      <div style={{ background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12, overflow: 'hidden' }}>
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center' }}>
-            <div style={{
-              width: 32, height: 32, border: '3px solid #1e1e3a', borderTopColor: '#7b61ff',
-              borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 14px',
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-            <div style={{ fontSize: 13, color: '#5a5a7a' }}>Chargement des tickets...</div>
+          <div className="py-10 text-center">
+            <div className="w-8 h-8 border-[3px] border-[#2e2e44] border-t-[#7b61ff] rounded-full animate-spin mx-auto mb-3.5" />
+            <div className="text-sm text-[#55557a]">Chargement des tickets...</div>
           </div>
         ) : tickets.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#3a3a5a' }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2a2a4a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', margin: '0 auto 10px' }}>
+          <div className="py-10 text-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2e2e44" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2.5">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <div style={{ fontSize: 14, marginBottom: 4 }}>Aucun ticket</div>
-            <div style={{ fontSize: 12, color: '#2a2a4a' }}>Creez votre premiere demande de support.</div>
+            <div className="text-sm text-[#55557a] mb-1">Aucun ticket</div>
+            <div className="text-xs text-[#55557a]/60">Creez votre premiere demande de support.</div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#0a0a18' }}>
-                <th style={TABLE_HEADER}>#ID</th>
-                <th style={TABLE_HEADER}>Sujet</th>
-                <th style={TABLE_HEADER}>Categorie</th>
-                <th style={TABLE_HEADER}>Priorite</th>
-                <th style={TABLE_HEADER}>Statut</th>
-                <th style={TABLE_HEADER}>Derniere mise a jour</th>
-                <th style={{ ...TABLE_HEADER, textAlign: 'center' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map((t, idx) => {
-                const rowBg = idx % 2 === 0 ? '#0a0a18' : '#0f0f1e'
-                const status = STATUS_MAP[t.status] || STATUS_MAP['open']
-                const catColor = CATEGORY_COLORS[t.category] || '#6a6a8a'
-                const prioColor = PRIORITY_COLORS[t.priority] || '#6a6a8a'
-                return (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-[#111118]">
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">#ID</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Sujet</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Categorie</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Priorite</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Statut</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]">Derniere MAJ</th>
+                  <th className="px-4 py-3 text-center text-[10px] uppercase tracking-wider font-semibold text-[#55557a] border-b border-[#1f1f2a]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((t) => (
                   <tr
                     key={t.id}
-                    style={{ background: rowBg, transition: 'background .12s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#14142a')}
-                    onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
+                    className="border-b border-[#1f1f2a] hover:bg-[#1f1f2a] transition-colors"
                   >
-                    <td style={{ ...TABLE_CELL, fontFamily: 'monospace', fontSize: 12, color: '#5a5a7a' }}>
+                    <td className="px-4 py-3.5 text-xs font-mono text-[#55557a]">
                       {t.id.slice(0, 8)}
                     </td>
-                    <td style={{ ...TABLE_CELL, fontWeight: 600, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td className="px-4 py-3.5 text-sm text-[#eeeef8] font-semibold max-w-[260px] truncate">
                       {t.subject}
                     </td>
-                    <td style={TABLE_CELL}>
-                      <Badge label={t.category} color={catColor} />
+                    <td className="px-4 py-3.5">
+                      <CategoryBadge category={t.category} />
                     </td>
-                    <td style={TABLE_CELL}>
-                      <Badge label={t.priority} color={prioColor} />
+                    <td className="px-4 py-3.5">
+                      <PriorityBadge priority={t.priority} />
                     </td>
-                    <td style={TABLE_CELL}>
-                      <Badge label={status.label} color={status.color} />
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={t.status} />
                     </td>
-                    <td style={{ ...TABLE_CELL, fontSize: 12, color: '#5a5a7a' }}>
+                    <td className="px-4 py-3.5 text-xs text-[#55557a]">
                       {relativeTime(t.updated_at)}
                     </td>
-                    <td style={{ ...TABLE_CELL, textAlign: 'center' }}>
+                    <td className="px-4 py-3.5 text-center">
                       <button
                         onClick={() => setSelectedId(t.id)}
-                        style={{
-                          padding: '6px 16px', background: 'transparent', border: '1px solid #2a2a4a',
-                          borderRadius: 7, color: '#7b61ff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                          transition: 'border-color .15s, background .15s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#7b61ff55'; e.currentTarget.style.background = '#7b61ff12' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a4a'; e.currentTarget.style.background = 'transparent' }}
+                        className="px-3 py-1 bg-transparent border border-[#2e2e44] rounded-lg text-xs font-semibold text-[#7b61ff] hover:border-[#7b61ff]/30 hover:bg-[#7b61ff]/5 transition-colors cursor-pointer"
                       >
                         Voir
                       </button>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

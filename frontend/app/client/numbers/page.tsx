@@ -75,7 +75,7 @@ const COUNTRY_OPTIONS = [
   { code: 'EE', label: 'Estonie', dotColors: ['#0072ce', '#000000'] },
 ]
 
-// Default regions per country (main areas) — for countries not listed, user enters area code manually
+// Default regions per country (main areas) -- for countries not listed, user enters area code manually
 const REGIONS_BY_COUNTRY: Record<string, { label: string; areaCode: string; addressRequired: boolean; delay: string; documentsRequired: string }[]> = {
   CA: [
     { label: 'Quebec - Montreal', areaCode: '514', addressRequired: false, delay: '1-3 jours', documentsRequired: 'Aucun' },
@@ -205,38 +205,25 @@ function findActionLabel(value: string): string {
     const o = g.options.find(o => o.value === value)
     if (o) return o.label
   }
-  return value || '—'
-}
-
-/* ────────────────────────────── Styles ───────────────────────────── */
-
-const IS: React.CSSProperties = {
-  width: '100%', background: '#080810', border: '1px solid #2a2a4a',
-  borderRadius: 8, padding: '9px 12px', color: '#e8e8f8', fontSize: 13,
-  outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
-}
-
-const OVERLAY: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: '#000000bb', zIndex: 50,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-}
-
-const CARD: React.CSSProperties = {
-  background: '#0f0f1e', border: '1px solid #1e1e3a', borderRadius: 12,
+  return value || '--'
 }
 
 /* ────────────────────────────── Helpers ──────────────────────────── */
 
 function CountryDot({ code, size = 10 }: { code: string; size?: number }) {
   const c = COUNTRY_OPTIONS.find(c => c.code === code)
-  if (!c) return <span style={{ fontSize: 11, color: '#6a6a8a' }}>{code}</span>
+  if (!c) return <span className="text-xs text-[#6a6a8a]">{code}</span>
   if (c.dotColors.length === 1) {
-    return <span style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: c.dotColors[0], flexShrink: 0 }} />
+    return (
+      <span
+        className="inline-block rounded-full shrink-0"
+        style={{ width: size, height: size, background: c.dotColors[0] }}
+      />
+    )
   }
-  // Multi-color (FR flag style)
   const segW = size / c.dotColors.length
   return (
-    <span style={{ display: 'inline-flex', borderRadius: '50%', overflow: 'hidden', width: size, height: size, flexShrink: 0 }}>
+    <span className="inline-flex rounded-full overflow-hidden shrink-0" style={{ width: size, height: size }}>
       {c.dotColors.map((col, i) => (
         <span key={i} style={{ width: segW, height: size, background: col }} />
       ))}
@@ -245,22 +232,26 @@ function CountryDot({ code, size = 10 }: { code: string; size?: number }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; color: string }> = {
-    active:       { label: 'Actif',          color: '#00d4aa' },
-    provisioning: { label: 'Provisionnement', color: '#ff9f43' },
-    released:     { label: 'Libere',         color: '#6a6a8a' },
+  const map: Record<string, { label: string; bg: string; text: string; border: string }> = {
+    active:       { label: 'Actif',           bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+    provisioning: { label: 'Provisionnement', bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500/20' },
+    released:     { label: 'Libere',          bg: 'bg-gray-500/10',    text: 'text-gray-400',    border: 'border-gray-500/20' },
   }
-  const s = map[status] || { label: status, color: '#6a6a8a' }
+  const s = map[status] || { label: status, bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20' }
   return (
-    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: s.color + '18', color: s.color, border: `1px solid ${s.color}33` }}>
+    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${s.bg} ${s.text} ${s.border}`}>
       {s.label}
     </span>
   )
 }
 
-function GroupedActionSelect({ value, onChange, style }: { value: string; onChange: (v: string) => void; style?: React.CSSProperties }) {
+function GroupedActionSelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ ...IS, ...style }}>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className={`w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff] ${className || ''}`}
+    >
       <option value="">-- Choisir une action --</option>
       {ACTION_GROUPS.map(g => (
         <optgroup key={g.category} label={g.category}>
@@ -275,8 +266,8 @@ function GroupedActionSelect({ value, onChange, style }: { value: string; onChan
 
 function FL({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, color: '#6a6a8a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{label}</label>
+    <div className="mb-4">
+      <label className="block text-[11px] text-[#6a6a8a] uppercase tracking-wider mb-1.5 font-semibold">{label}</label>
       {children}
     </div>
   )
@@ -311,7 +302,7 @@ export default function NumbersPage() {
   const [wizOrdering, setWizOrdering] = useState(false)
   const [wizDone, setWizDone]         = useState(false)
 
-  /* ── Load ── */
+  /* -- Load -- */
 
   const loadNumbers = useCallback(async () => {
     setLoading(true)
@@ -330,7 +321,7 @@ export default function NumbersPage() {
 
   useEffect(() => { loadNumbers() }, [loadNumbers])
 
-  /* ── Edit ── */
+  /* -- Edit -- */
 
   const openEdit = (n: DIDNumber) => {
     setEditNum(n)
@@ -352,7 +343,7 @@ export default function NumbersPage() {
     setEditSaving(false)
   }
 
-  /* ── Release ── */
+  /* -- Release -- */
 
   const confirmRelease = async () => {
     if (!releaseNum) return
@@ -365,7 +356,7 @@ export default function NumbersPage() {
     setReleasing(false)
   }
 
-  /* ── Wizard ── */
+  /* -- Wizard -- */
 
   const resetWizard = () => {
     setWizardOpen(false); setWizardStep(1); setWizCountry('CA')
@@ -398,50 +389,50 @@ export default function NumbersPage() {
     setWizOrdering(false)
   }
 
-  /* ── Render ── */
+  /* -- Render -- */
 
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
+      <div className="flex items-start justify-between mb-7 flex-wrap gap-3">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', margin: 0, marginBottom: 6 }}>Numeros DID</h1>
-          <p style={{ fontSize: 13, color: '#6a6a8a', margin: 0 }}>Gerez vos numeros de telephone, assignez-les a vos extensions, IVR ou groupes.</p>
+          <h1 className="text-[22px] font-bold text-[#eeeef8] mb-1.5">Numeros DID</h1>
+          <p className="text-[13px] text-[#6a6a8a]">Gerez vos numeros de telephone, assignez-les a vos extensions, IVR ou groupes.</p>
         </div>
         <button
           onClick={() => { resetWizard(); setWizardOpen(true) }}
-          style={{ padding: '10px 22px', background: '#7b61ff', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          className="bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold"
         >
           Commander un numero
         </button>
       </div>
 
       {/* Table */}
-      <div style={{ ...CARD, overflow: 'hidden' }}>
+      <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl overflow-hidden">
         {/* Table header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 100px 1fr 1.2fr 120px 140px', gap: 12, padding: '12px 20px', borderBottom: '1px solid #1e1e3a' }}>
+        <div className="grid gap-3 px-5 py-3 border-b border-[#1f1f2a]" style={{ gridTemplateColumns: '2fr 100px 1fr 1.2fr 120px 140px' }}>
           {['Numero', 'Pays', 'Region', 'Action assignee', 'Statut', 'Actions'].map(h => (
-            <div key={h} style={{ fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>{h}</div>
+            <div key={h} className="text-[10px] text-[#4a4a6a] uppercase tracking-wider font-semibold">{h}</div>
           ))}
         </div>
 
         {/* Loading */}
         {loading && (
-          <div style={{ padding: 32, textAlign: 'center', color: '#4a4a6a', fontSize: 13 }}>Chargement des numeros...</div>
+          <div className="py-8 text-center text-[#4a4a6a] text-[13px]">Chargement des numeros...</div>
         )}
 
         {/* Error */}
         {!loading && error && (
-          <div style={{ padding: 20, margin: 16, background: '#ff4d6d10', border: '1px solid #ff4d6d33', borderRadius: 8, color: '#ff4d6d', fontSize: 13 }}>
+          <div className="mx-4 my-4 p-4 bg-red-500/5 border border-red-500/20 rounded-lg text-red-400 text-[13px]">
             {error}
           </div>
         )}
 
         {/* Empty */}
         {!loading && !error && numbers.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#4a4a6a' }}>
-            <div style={{ fontSize: 14, marginBottom: 6 }}>Aucun numero</div>
-            <div style={{ fontSize: 12, color: '#3a3a5a' }}>Commandez votre premier numero en cliquant sur "Commander un numero".</div>
+          <div className="py-10 text-center text-[#4a4a6a]">
+            <div className="text-sm mb-1.5">Aucun numero</div>
+            <div className="text-xs text-[#3a3a5a]">Commandez votre premier numero en cliquant sur "Commander un numero".</div>
           </div>
         )}
 
@@ -449,28 +440,23 @@ export default function NumbersPage() {
         {numbers.map((n, i) => (
           <div
             key={n.id}
-            style={{
-              display: 'grid', gridTemplateColumns: '2fr 100px 1fr 1.2fr 120px 140px',
-              gap: 12, padding: '14px 20px', alignItems: 'center',
-              borderBottom: i < numbers.length - 1 ? '1px solid #1a1a2e' : 'none',
-            }}
+            className={`grid gap-3 px-5 py-3.5 items-center hover:bg-[#1f1f2a] transition-colors ${i < numbers.length - 1 ? 'border-b border-[#1f1f2a]' : ''}`}
+            style={{ gridTemplateColumns: '2fr 100px 1fr 1.2fr 120px 140px' }}
           >
             {/* Numero */}
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f8', fontFamily: 'monospace' }}>
-              {n.phone_number}
-            </div>
+            <div className="text-sm font-semibold text-[#eeeef8] font-mono">{n.phone_number}</div>
 
             {/* Pays */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="flex items-center gap-1.5">
               <CountryDot code={n.country} size={10} />
-              <span style={{ fontSize: 12, color: '#9898b8' }}>{n.country}</span>
+              <span className="text-xs text-[#9898b8]">{n.country}</span>
             </div>
 
             {/* Region */}
-            <div style={{ fontSize: 13, color: '#9898b8' }}>{n.region || '—'}</div>
+            <div className="text-[13px] text-[#9898b8]">{n.region || '--'}</div>
 
             {/* Action assignee */}
-            <div style={{ fontSize: 13, color: n.action_target ? '#c8c8e8' : '#3a3a5a', fontStyle: n.action_target ? 'normal' : 'italic' }}>
+            <div className={`text-[13px] ${n.action_target ? 'text-[#c8c8e8]' : 'text-[#3a3a5a] italic'}`}>
               {findActionLabel(n.action_target)}
             </div>
 
@@ -478,16 +464,16 @@ export default function NumbersPage() {
             <StatusBadge status={n.status} />
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div className="flex gap-1.5">
               <button
                 onClick={() => openEdit(n)}
-                style={{ padding: '5px 12px', background: '#7b61ff18', border: '1px solid #7b61ff44', borderRadius: 6, color: '#a695ff', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}
+                className="px-3 py-1 bg-[#7b61ff]/10 border border-[#7b61ff]/25 rounded-md text-[#a695ff] text-[11px] font-medium hover:bg-[#7b61ff]/20 transition-colors"
               >
                 Editer
               </button>
               <button
                 onClick={() => setReleaseNum(n)}
-                style={{ padding: '5px 12px', background: '#ff4d6d10', border: '1px solid #ff4d6d33', borderRadius: 6, color: '#ff4d6d99', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}
+                className="px-3 py-1 bg-red-500/5 border border-red-500/20 rounded-md text-red-400/60 text-[11px] font-medium hover:bg-red-500/10 transition-colors"
               >
                 Liberer
               </button>
@@ -496,29 +482,29 @@ export default function NumbersPage() {
         ))}
       </div>
 
-      {/* ── Release Confirm Modal ── */}
+      {/* -- Release Confirm Modal -- */}
       {releaseNum && (
-        <div style={OVERLAY} onClick={() => !releasing && setReleaseNum(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#0f0f1e', border: '1px solid #2a2a4a', borderRadius: 16, padding: 32, width: 460, maxWidth: '90vw' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8f8', marginBottom: 6 }}>Liberer le numero</div>
-            <div style={{ fontSize: 13, color: '#7b61ff', fontFamily: 'monospace', marginBottom: 20 }}>{releaseNum.phone_number}</div>
-            <div style={{ background: '#ff4d6d10', border: '1px solid #ff4d6d33', borderRadius: 10, padding: '14px 18px', marginBottom: 24 }}>
-              <div style={{ fontSize: 13, color: '#ff8a9e', lineHeight: 1.5 }}>
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center" onClick={() => !releasing && setReleaseNum(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-8 w-[460px] max-w-[90vw]">
+            <div className="text-base font-bold text-[#eeeef8] mb-1.5">Liberer le numero</div>
+            <div className="text-[13px] text-[#7b61ff] font-mono mb-5">{releaseNum.phone_number}</div>
+            <div className="bg-red-500/5 border border-red-500/20 rounded-lg px-4 py-3.5 mb-6">
+              <div className="text-[13px] text-red-300 leading-relaxed">
                 Attention : cette action est irreversible. Le numero sera libere et ne pourra plus etre recupere.
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => setReleaseNum(null)}
                 disabled={releasing}
-                style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 8, color: '#6a6a8a', fontSize: 13, cursor: 'pointer' }}
+                className="px-5 py-2.5 bg-transparent border border-[#2e2e44] rounded-lg text-[#6a6a8a] text-[13px] hover:border-[#3e3e54] transition-colors"
               >
                 Annuler
               </button>
               <button
                 onClick={confirmRelease}
                 disabled={releasing}
-                style={{ padding: '10px 20px', background: '#ff4d6d', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: releasing ? 0.6 : 1 }}
+                className="px-5 py-2.5 bg-red-500 border-none rounded-lg text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-60"
               >
                 {releasing ? 'Liberation...' : 'Confirmer'}
               </button>
@@ -527,29 +513,24 @@ export default function NumbersPage() {
         </div>
       )}
 
-      {/* ── Edit Drawer (right side) ── */}
+      {/* -- Edit Drawer (right side) -- */}
       {editNum && (
         <>
-          <div style={{ position: 'fixed', inset: 0, background: '#000000aa', zIndex: 50 }} onClick={() => !editSaving && setEditNum(null)} />
-          <div style={{
-            position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '95vw',
-            background: '#0c0c1a', borderLeft: '1px solid #1e1e3a', zIndex: 51,
-            display: 'flex', flexDirection: 'column',
-            transform: 'translateX(0)', transition: 'transform .2s ease',
-          }}>
+          <div className="fixed inset-0 bg-black/65 z-50" onClick={() => !editSaving && setEditNum(null)} />
+          <div className="fixed top-0 right-0 bottom-0 w-[440px] max-w-[95vw] bg-[#18181f] border-l border-[#2e2e44] z-[51] flex flex-col">
             {/* Drawer header */}
-            <div style={{ padding: '24px 28px 20px', borderBottom: '1px solid #1e1e3a' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="px-7 pt-6 pb-5 border-b border-[#2e2e44]">
+              <div className="flex justify-between items-start">
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8f8', marginBottom: 4 }}>Editer le numero</div>
-                  <div style={{ fontSize: 13, color: '#7b61ff', fontFamily: 'monospace' }}>{editNum.phone_number}</div>
+                  <div className="text-base font-bold text-[#eeeef8] mb-1">Editer le numero</div>
+                  <div className="text-[13px] text-[#7b61ff] font-mono">{editNum.phone_number}</div>
                 </div>
-                <button onClick={() => setEditNum(null)} style={{ background: 'transparent', border: 'none', color: '#5a5a7a', cursor: 'pointer', fontSize: 22, padding: 0 }}>x</button>
+                <button onClick={() => setEditNum(null)} className="text-[#5a5a7a] hover:text-[#8a8aa8] transition-colors text-xl p-0 bg-transparent border-none cursor-pointer">x</button>
               </div>
             </div>
 
             {/* Drawer body */}
-            <div style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
+            <div className="flex-1 px-7 py-6 overflow-y-auto">
               <FL label="Action assignee">
                 <GroupedActionSelect value={editAction} onChange={setEditAction} />
               </FL>
@@ -559,39 +540,39 @@ export default function NumbersPage() {
                   value={editDesc}
                   onChange={e => setEditDesc(e.target.value)}
                   rows={4}
-                  style={{ ...IS, resize: 'vertical' }}
+                  className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff] resize-y"
                   placeholder="Description du numero..."
                 />
               </FL>
 
               {/* Info block */}
-              <div style={{ background: '#080810', borderRadius: 10, padding: '14px 18px', marginBottom: 20 }}>
-                <div style={{ fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Informations</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                  <span style={{ color: '#5a5a7a' }}>Pays</span>
-                  <span style={{ color: '#9898b8', display: 'flex', alignItems: 'center', gap: 6 }}><CountryDot code={editNum.country} size={8} /> {editNum.country}</span>
-                  <span style={{ color: '#5a5a7a' }}>Region</span>
-                  <span style={{ color: '#9898b8' }}>{editNum.region || '—'}</span>
-                  <span style={{ color: '#5a5a7a' }}>Cout mensuel</span>
-                  <span style={{ color: '#7b61ff', fontWeight: 600 }}>{(editNum.monthly_cost ?? 0).toFixed(2)} CAD$/mois</span>
-                  <span style={{ color: '#5a5a7a' }}>Statut</span>
+              <div className="bg-[#0f0f18] rounded-xl p-4 mb-5">
+                <div className="text-[10px] text-[#4a4a6a] uppercase tracking-wider mb-2.5">Informations</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-[#5a5a7a]">Pays</span>
+                  <span className="text-[#9898b8] flex items-center gap-1.5"><CountryDot code={editNum.country} size={8} /> {editNum.country}</span>
+                  <span className="text-[#5a5a7a]">Region</span>
+                  <span className="text-[#9898b8]">{editNum.region || '--'}</span>
+                  <span className="text-[#5a5a7a]">Cout mensuel</span>
+                  <span className="text-[#7b61ff] font-semibold">{(editNum.monthly_cost ?? 0).toFixed(2)} CAD$/mois</span>
+                  <span className="text-[#5a5a7a]">Statut</span>
                   <span><StatusBadge status={editNum.status} /></span>
                 </div>
               </div>
             </div>
 
             {/* Drawer footer */}
-            <div style={{ padding: '16px 28px', borderTop: '1px solid #1e1e3a', display: 'flex', gap: 10 }}>
+            <div className="px-7 py-4 border-t border-[#2e2e44] flex gap-2.5">
               <button
                 onClick={saveEdit}
                 disabled={editSaving}
-                style={{ flex: 1, padding: '11px', background: '#7b61ff', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: editSaving ? 0.6 : 1 }}
+                className="flex-1 py-2.5 bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg text-[13px] font-bold transition-colors disabled:opacity-60"
               >
                 {editSaving ? 'Sauvegarde...' : 'Sauvegarder'}
               </button>
               <button
                 onClick={() => setEditNum(null)}
-                style={{ padding: '11px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 8, color: '#6a6a8a', fontSize: 13, cursor: 'pointer' }}
+                className="px-5 py-2.5 bg-transparent border border-[#2e2e44] rounded-lg text-[#6a6a8a] text-[13px] hover:border-[#3e3e54] transition-colors"
               >
                 Annuler
               </button>
@@ -600,67 +581,64 @@ export default function NumbersPage() {
         </>
       )}
 
-      {/* ── Order Wizard Modal ── */}
+      {/* -- Order Wizard Modal -- */}
       {wizardOpen && (
-        <div style={OVERLAY} onClick={() => { if (!wizOrdering) resetWizard() }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#0f0f1e', border: '1px solid #2a2a4a', borderRadius: 16, padding: 0, width: 560, maxWidth: '95vw', overflow: 'hidden' }}>
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center" onClick={() => { if (!wizOrdering) resetWizard() }}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-xl w-[560px] max-w-[95vw] overflow-hidden">
 
             {/* Step indicators */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, padding: '24px 32px 20px' }}>
+            <div className="flex items-center justify-center gap-0 px-8 pt-6 pb-5">
               {[1, 2, 3].map(step => {
                 const isDone = wizardStep > step
                 const isActive = wizardStep === step
                 return (
-                  <div key={step} style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 13, fontWeight: 700,
-                      background: isDone ? '#00d4aa' : isActive ? '#7b61ff' : '#1e1e3a',
-                      color: isDone ? '#080810' : isActive ? '#fff' : '#4a4a6a',
-                      border: `2px solid ${isDone ? '#00d4aa' : isActive ? '#7b61ff' : '#2a2a4a'}`,
-                      transition: 'all .2s',
-                    }}>
-                      {isDone ? '✓' : step}
+                  <div key={step} className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold border-2 transition-all ${
+                      isDone ? 'bg-emerald-400 text-[#080810] border-emerald-400' :
+                      isActive ? 'bg-[#7b61ff] text-white border-[#7b61ff]' :
+                      'bg-[#1e1e3a] text-[#4a4a6a] border-[#2e2e44]'
+                    }`}>
+                      {isDone ? 'v' : step}
                     </div>
                     {step < 3 && (
-                      <div style={{ width: 60, height: 2, background: isDone ? '#00d4aa44' : '#1e1e3a', margin: '0 8px' }} />
+                      <div className={`w-[60px] h-0.5 mx-2 ${isDone ? 'bg-emerald-400/25' : 'bg-[#1e1e3a]'}`} />
                     )}
                   </div>
                 )
               })}
             </div>
 
-            <div style={{ padding: '0 32px 28px' }}>
+            <div className="px-8 pb-7">
 
               {/* Step titles */}
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8f8', marginBottom: 4 }}>
+              <div className="text-base font-bold text-[#eeeef8] mb-1">
                 {wizardStep === 1 && 'Choisir Region'}
                 {wizardStep === 2 && 'Choisir Action'}
                 {wizardStep === 3 && 'Resume'}
               </div>
-              <div style={{ fontSize: 12, color: '#4a4a6a', marginBottom: 20 }}>
+              <div className="text-xs text-[#4a4a6a] mb-5">
                 {wizardStep === 1 && 'Selectionnez le pays et la region pour votre nouveau numero.'}
                 {wizardStep === 2 && 'Definissez l\'action a executer lorsque ce numero recoit un appel.'}
                 {wizardStep === 3 && 'Verifiez les informations avant de confirmer votre commande.'}
               </div>
 
-              {/* ── Step 1: Region ── */}
+              {/* -- Step 1: Region -- */}
               {wizardStep === 1 && (
                 <>
                   <FL label="Pays">
                     <select
                       value={wizCountry}
                       onChange={e => { setWizCountry(e.target.value); setWizRegionIdx(0) }}
-                      style={IS}
+                      className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]"
                     >
                       {COUNTRY_OPTIONS.map(c => (
                         <option key={c.code} value={c.code}>{c.label} ({c.code})</option>
                       ))}
                     </select>
                     {/* Country dot display */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                    <div className="flex items-center gap-2 mt-2">
                       <CountryDot code={wizCountry} size={14} />
-                      <span style={{ fontSize: 12, color: '#6a6a8a' }}>{COUNTRY_OPTIONS.find(c => c.code === wizCountry)?.label}</span>
+                      <span className="text-xs text-[#6a6a8a]">{COUNTRY_OPTIONS.find(c => c.code === wizCountry)?.label}</span>
                     </div>
                   </FL>
 
@@ -668,7 +646,7 @@ export default function NumbersPage() {
                     <select
                       value={wizRegionIdx}
                       onChange={e => setWizRegionIdx(Number(e.target.value))}
-                      style={IS}
+                      className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]"
                     >
                       {wizRegions.map((r, i) => (
                         <option key={i} value={i}>{r.label} ({r.areaCode})</option>
@@ -678,17 +656,17 @@ export default function NumbersPage() {
 
                   {/* Info table */}
                   {wizSelectedRegion && (
-                    <div style={{ background: '#080810', borderRadius: 10, padding: '14px 18px' }}>
-                      <div style={{ fontSize: 10, color: '#4a4a6a', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Informations de provisionnement</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12 }}>
-                        <span style={{ color: '#5a5a7a' }}>Adresse requise</span>
-                        <span style={{ color: wizSelectedRegion.addressRequired ? '#ff9f43' : '#00d4aa', fontWeight: 600 }}>
+                    <div className="bg-[#0f0f18] rounded-xl p-4">
+                      <div className="text-[10px] text-[#4a4a6a] uppercase tracking-wider mb-2.5">Informations de provisionnement</div>
+                      <div className="grid grid-cols-2 gap-2.5 text-xs">
+                        <span className="text-[#5a5a7a]">Adresse requise</span>
+                        <span className={`font-semibold ${wizSelectedRegion.addressRequired ? 'text-amber-400' : 'text-emerald-400'}`}>
                           {wizSelectedRegion.addressRequired ? 'Oui' : 'Non'}
                         </span>
-                        <span style={{ color: '#5a5a7a' }}>Delai provisionnement</span>
-                        <span style={{ color: '#9898b8' }}>{wizSelectedRegion.delay}</span>
-                        <span style={{ color: '#5a5a7a' }}>Documents requis</span>
-                        <span style={{ color: wizSelectedRegion.documentsRequired === 'Aucun' ? '#00d4aa' : '#ff9f43', fontWeight: 500 }}>
+                        <span className="text-[#5a5a7a]">Delai provisionnement</span>
+                        <span className="text-[#9898b8]">{wizSelectedRegion.delay}</span>
+                        <span className="text-[#5a5a7a]">Documents requis</span>
+                        <span className={`font-medium ${wizSelectedRegion.documentsRequired === 'Aucun' ? 'text-emerald-400' : 'text-amber-400'}`}>
                           {wizSelectedRegion.documentsRequired}
                         </span>
                       </div>
@@ -697,7 +675,7 @@ export default function NumbersPage() {
                 </>
               )}
 
-              {/* ── Step 2: Action ── */}
+              {/* -- Step 2: Action -- */}
               {wizardStep === 2 && (
                 <>
                   <FL label="Action assignee">
@@ -709,46 +687,46 @@ export default function NumbersPage() {
                       value={wizDesc}
                       onChange={e => setWizDesc(e.target.value)}
                       rows={3}
-                      style={{ ...IS, resize: 'vertical' }}
+                      className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff] resize-y"
                       placeholder="Description facultative..."
                     />
                   </FL>
                 </>
               )}
 
-              {/* ── Step 3: Summary ── */}
+              {/* -- Step 3: Summary -- */}
               {wizardStep === 3 && (
                 <>
                   {wizDone ? (
-                    <div style={{ textAlign: 'center', padding: '30px 0' }}>
-                      <div style={{ fontSize: 36, marginBottom: 12, color: '#00d4aa' }}>OK</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: '#00d4aa', marginBottom: 6 }}>Commande envoyee</div>
-                      <div style={{ fontSize: 12, color: '#6a6a8a' }}>Votre numero sera provisionne sous 1-3 jours ouvrables.</div>
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-3 text-emerald-400">OK</div>
+                      <div className="text-base font-bold text-emerald-400 mb-1.5">Commande envoyee</div>
+                      <div className="text-xs text-[#6a6a8a]">Votre numero sera provisionne sous 1-3 jours ouvrables.</div>
                     </div>
                   ) : (
-                    <div style={{ background: '#080810', borderRadius: 10, padding: '18px 22px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 12, fontSize: 13 }}>
-                        <span style={{ color: '#5a5a7a' }}>Pays</span>
-                        <span style={{ color: '#e8e8f8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="bg-[#0f0f18] rounded-xl p-5">
+                      <div className="grid gap-3 text-[13px]" style={{ gridTemplateColumns: '140px 1fr' }}>
+                        <span className="text-[#5a5a7a]">Pays</span>
+                        <span className="text-[#eeeef8] flex items-center gap-1.5">
                           <CountryDot code={wizCountry} size={10} />
                           {COUNTRY_OPTIONS.find(c => c.code === wizCountry)?.label} ({wizCountry})
                         </span>
 
-                        <span style={{ color: '#5a5a7a' }}>Region</span>
-                        <span style={{ color: '#e8e8f8' }}>{wizSelectedRegion?.label}</span>
+                        <span className="text-[#5a5a7a]">Region</span>
+                        <span className="text-[#eeeef8]">{wizSelectedRegion?.label}</span>
 
-                        <span style={{ color: '#5a5a7a' }}>Indicatif</span>
-                        <span style={{ color: '#e8e8f8', fontFamily: 'monospace' }}>{wizSelectedRegion?.areaCode}</span>
+                        <span className="text-[#5a5a7a]">Indicatif</span>
+                        <span className="text-[#eeeef8] font-mono">{wizSelectedRegion?.areaCode}</span>
 
-                        <span style={{ color: '#5a5a7a' }}>Action</span>
-                        <span style={{ color: '#e8e8f8' }}>{wizAction ? findActionLabel(wizAction) : '— Aucune —'}</span>
+                        <span className="text-[#5a5a7a]">Action</span>
+                        <span className="text-[#eeeef8]">{wizAction ? findActionLabel(wizAction) : '-- Aucune --'}</span>
 
-                        <span style={{ color: '#5a5a7a' }}>Prix</span>
-                        <span style={{ color: '#7b61ff', fontWeight: 700, fontSize: 15 }}>7 CAD$/mois</span>
+                        <span className="text-[#5a5a7a]">Prix</span>
+                        <span className="text-[#7b61ff] font-bold text-[15px]">7 CAD$/mois</span>
                       </div>
 
-                      <div style={{ marginTop: 18, padding: '12px 16px', background: '#7b61ff10', border: '1px solid #7b61ff33', borderRadius: 8 }}>
-                        <div style={{ fontSize: 12, color: '#a695ff', lineHeight: 1.5 }}>
+                      <div className="mt-4 px-4 py-3 bg-[#7b61ff]/5 border border-[#7b61ff]/20 rounded-lg">
+                        <div className="text-xs text-[#a695ff] leading-relaxed">
                           Provisionnement sous 1-3 jours ouvrables
                         </div>
                       </div>
@@ -759,19 +737,19 @@ export default function NumbersPage() {
 
               {/* Buttons */}
               {!wizDone && (
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
+                <div className="flex gap-2.5 justify-end mt-6">
                   {wizardStep === 1 && (
-                    <button onClick={resetWizard} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 8, color: '#6a6a8a', fontSize: 13, cursor: 'pointer' }}>
+                    <button onClick={resetWizard} className="px-5 py-2.5 bg-transparent border border-[#2e2e44] rounded-lg text-[#6a6a8a] text-[13px] hover:border-[#3e3e54] transition-colors">
                       Fermer
                     </button>
                   )}
                   {wizardStep > 1 && (
-                    <button onClick={() => setWizardStep(s => s - 1)} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #2a2a4a', borderRadius: 8, color: '#6a6a8a', fontSize: 13, cursor: 'pointer' }}>
+                    <button onClick={() => setWizardStep(s => s - 1)} className="px-5 py-2.5 bg-transparent border border-[#2e2e44] rounded-lg text-[#6a6a8a] text-[13px] hover:border-[#3e3e54] transition-colors">
                       Retour
                     </button>
                   )}
                   {wizardStep < 3 && (
-                    <button onClick={() => setWizardStep(s => s + 1)} style={{ padding: '10px 22px', background: '#7b61ff', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    <button onClick={() => setWizardStep(s => s + 1)} className="bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold transition-colors">
                       Suivant
                     </button>
                   )}
@@ -779,7 +757,7 @@ export default function NumbersPage() {
                     <button
                       onClick={submitOrder}
                       disabled={wizOrdering}
-                      style={{ padding: '10px 22px', background: '#7b61ff', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: wizOrdering ? 0.6 : 1 }}
+                      className="bg-[#7b61ff] text-white hover:bg-[#6145ff] rounded-lg px-4 py-2 text-sm font-bold transition-colors disabled:opacity-60"
                     >
                       {wizOrdering ? 'Commande en cours...' : 'Confirmer l\'achat'}
                     </button>
