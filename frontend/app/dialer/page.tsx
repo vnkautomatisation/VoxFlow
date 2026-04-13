@@ -244,12 +244,21 @@ export default function DialerPage() {
                             <div style={{ marginTop: '8px' }}>
                                 <div style={{ fontSize: '9px', color: 'var(--tx3)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '6px' }}>Agents disponibles</div>
                                 {d.qAgentsXfer.map(a => (
-                                    <div key={a.id} className="axfer-row">
-                                        <div><span style={{ fontSize: '11px', fontWeight: 600 }}>{a.name || a.first_name + ' ' + a.last_name}</span><span className="aext" style={{ marginLeft: '6px' }}>{a.extension || a.ext || '—'}</span></div>
-                                        <button className="btn-take" onClick={() => d.xferToAgent(a.extension || a.ext || '')}>Transférer</button>
+                                    <div key={a.id} className="axfer-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--ink3)', borderRadius: 8, marginBottom: 4 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: a.status === 'ONLINE' ? '#00d4aa' : '#55557a', boxShadow: a.status === 'ONLINE' ? '0 0 6px #00d4aa' : 'none' }} />
+                                            <div>
+                                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt)' }}>{a.name || ((a.first_name || '') + ' ' + (a.last_name || '')).trim()}</span>
+                                                <span style={{ fontSize: 10, color: 'var(--violet)', fontFamily: 'var(--mono)', marginLeft: 6, fontWeight: 700 }}>EXT {a.extension || a.ext}</span>
+                                            </div>
+                                        </div>
+                                        <button className="btn-take" style={{ fontSize: 10, padding: '4px 10px' }} onClick={() => d.xferToAgent(a.extension || a.ext || '')}>Transferer</button>
                                     </div>
                                 ))}
                             </div>
+                        )}
+                        {d.qAgentsXfer.length === 0 && d.agents.length > 0 && (
+                            <div style={{ marginTop: 8, fontSize: 10, color: 'var(--tx3)', textAlign: 'center' }}>Aucun agent disponible pour le transfert</div>
                         )}
                     </div>
 
