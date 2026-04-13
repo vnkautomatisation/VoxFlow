@@ -34,12 +34,12 @@ router.get('/plans-catalog', async (_req, res) => {
       .eq('is_public', true)
       .order('sort_order')
 
-    const { data: addons } = await supabase
+    const { data: addonsRaw } = await supabase
       .from('products')
       .select('*')
-      .eq('category', 'ADDON')
       .eq('is_active', true)
       .order('sort_order')
+    const addons = (addonsRaw || []).filter((a: any) => a.sku?.startsWith('ADDON_'))
 
     const grouped: Record<string, any[]> = {}
     for (const p of plans || []) {

@@ -384,7 +384,7 @@ export default function PlansPage() {
             {subQty > 0 ? subQty : '-'}
           </div>
 
-          {/* Quantite +/- */}
+          {/* Quantite +/- ou bouton Souscrire */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {hasSub ? (
               <>
@@ -395,7 +395,10 @@ export default function PlansPage() {
                   style={{ width: 30, height: 30, borderRadius: 6, background: '#7b61ff22', border: '1px solid #7b61ff44', color: '#a695ff', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
               </>
             ) : (
-              <span style={{ fontSize: 12, color: '#3a3a5a' }}>-</span>
+              <button onClick={() => adjustQty(a.sku, 1)}
+                style={{ padding: '6px 16px', background: '#7b61ff22', border: '1px solid #7b61ff44', borderRadius: 8, color: '#a695ff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                Souscrire
+              </button>
             )}
           </div>
         </div>
