@@ -80,9 +80,17 @@ export default function AgentsPage() {
     const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
     const [agentCalls, setAgentCalls] = useState<any[]>([])
 
+    const translateError = (msg: string) => {
+        if (msg.includes('idx_users_extension_org')) return 'Cette extension est deja assignee a un autre agent'
+        if (msg.includes('duplicate key')) return 'Doublon detecte — cette valeur existe deja'
+        if (msg.includes('Email deja utilise')) return msg
+        if (msg.includes('violates foreign key')) return 'Reference invalide'
+        if (msg.includes('not-null constraint')) return 'Un champ obligatoire est vide'
+        return msg
+    }
     const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
-        setToast({ msg, type })
-        setTimeout(() => setToast(null), 3000)
+        setToast({ msg: type === 'err' ? translateError(msg) : msg, type })
+        setTimeout(() => setToast(null), 4000)
     }
 
     const load = useCallback(async () => {
@@ -222,8 +230,8 @@ export default function AgentsPage() {
 
             {/* Toast */}
             {toast && (
-                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-2.5 rounded-full text-sm font-bold shadow-xl transition-all
-          ${toast.type === 'ok' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                <div className={`fixed top-16 right-6 z-[100] px-5 py-3 rounded-xl text-sm font-semibold shadow-2xl border max-w-sm
+          ${toast.type === 'ok' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border-rose-500/30'}`}>
                     {toast.msg}
                 </div>
             )}
