@@ -471,7 +471,7 @@ export function useDialer() {
 
     const startPoll = useCallback(() => {
         stopPoll()
-        pollRef.current = setInterval(loadData, 15000)
+        pollRef.current = setInterval(loadData, 10000)
     }, [loadData])
 
     const stopPoll = useCallback(() => {
@@ -927,5 +927,8 @@ export function useDialer() {
         has, planName, featuresVersion,
         // Caller ID picker (multi-pays)
         myNumbers, fromNumber, setFromNumber,
+        // Refresh externe (postMessage du portail)
+        refreshData: loadData,
+        setNum: setDialNum,
     }
 }

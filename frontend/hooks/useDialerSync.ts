@@ -37,10 +37,15 @@ export function useDialerSync() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
                     body: JSON.stringify({ status: 'ONLINE' }),
+                }).then(() => {
+                    // Notifier le dialer iframe de recharger ses donnees
+                    const iframe = document.querySelector('iframe[title="VoxFlow Dialer"]') as HTMLIFrameElement
+                    if (iframe?.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'vf:refresh' }, '*')
+                    }
                 }).catch(() => { })
             }
-            sendHeartbeat() // Premier ping immediat
-            // Deuxieme ping rapide apres 3s pour que le snapshot se mette a jour vite
+            sendHeartbeat()
             setTimeout(sendHeartbeat, 3000)
             heartbeatRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
 
