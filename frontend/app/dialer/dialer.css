@@ -415,17 +415,11 @@ html, body {
         flex: 1 1 auto;
         min-height: 0;
         height: 100%;
-        overflow-y: auto;
-        overflow-x: hidden;
-        scrollbar-width: none;
-    }
-
-    .pane.on::-webkit-scrollbar {
-        display: none;
+        overflow: hidden;
     }
 
 .p12 {
-    padding: 12px
+    padding: 8px 10px
 }
 
 .slbl {
@@ -545,10 +539,10 @@ html, body {
     border-radius: var(--rb);
     color: var(--txt);
     font-family: var(--mono);
-    font-size: 22px;
+    font-size: 18px;
     text-align: center;
-    letter-spacing: 4px;
-    padding: 12px 14px 11px;
+    letter-spacing: 3px;
+    padding: 10px 14px 9px;
     outline: none;
     transition: border-color .15s;
     margin-bottom: 10px
@@ -572,15 +566,15 @@ html, body {
     background: var(--line);
     border-radius: var(--rb);
     overflow: hidden;
-    margin-bottom: 10px
+    margin-bottom: 6px
 }
 
 .key {
     background: var(--ink3);
     border: none;
     color: var(--txt);
-    padding: 12px 4px;
-    font-size: 17px;
+    padding: 10px 4px;
+    font-size: 16px;
     font-family: var(--font);
     font-weight: 600;
     cursor: pointer;
@@ -615,7 +609,7 @@ html, body {
     background: linear-gradient(135deg,var(--mint),var(--mi2));
     border: none;
     color: #001a14;
-    padding: 12px;
+    padding: 10px;
     border-radius: var(--rb);
     font-size: 13px;
     font-weight: 700;
