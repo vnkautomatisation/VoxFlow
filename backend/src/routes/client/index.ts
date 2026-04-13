@@ -1,4 +1,5 @@
-import { Router } from "express"
+import { Router, Request, Response } from "express"
+import { createClient } from "@supabase/supabase-js"
 import { authenticate } from "../../middleware/auth"
 import extensionsRouter from "./extensions"
 import numbersRouter    from "./numbers"
@@ -16,12 +17,63 @@ import portalRouter     from "./portal"
 
 const router = Router()
 
-// Public route for plans catalog (no auth required)
-router.get("/portal/plans-catalog", (req, res, next) => {
-  // Forward to portal router without auth
-  portalRouter(req, res, next)
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+)
+
+// ── Route publique: catalogue des plans (pas d'auth) ──
+router.get("/portal/plans-catalog", async (_req: Request, res: Response) => {
+  try {
+    const { data: plans } = await supabase
+      .from('plan_definitions')
+      .select('*')
+      .eq('is_public', true)
+      .order('sort_order')
+
+    const { data: addons } = await supabase
+      .from('products')
+      .select('*')
+      .eq('category', 'ADDON')
+      .eq('is_active', true)
+      .order('sort_order')
+
+    const grouped: Record<string, any[]> = {}
+    for (const p of plans || []) {
+      const st = p.service_type || 'TELEPHONY'
+      if (!grouped[st]) grouped[st] = []
+      grouped[st].push({
+        id: p.id, name: p.name, description: p.description,
+        price_monthly: p.price_monthly, price_yearly: p.price_yearly,
+        currency: p.currency || 'CAD', max_agents: p.max_agents,
+        max_dids: p.max_dids, features: p.features || {},
+        features_list: p.features_list || [],
+        service_type: st, sort_order: p.sort_order,
+        highlight: p.highlight || false,
+      })
+    }
+
+    res.json({
+      success: true,
+      data: {
+        services: grouped,
+        addons: (addons || []).map((a: any) => {
+          const [desc, unit] = (a.description || '|per_unit').split('|')
+          return {
+            sku: a.sku, name: a.name, description: desc.trim(),
+            price_monthly: a.price_monthly,
+            price_yearly: (a.price_monthly || 0) * 10,
+            billing_unit: unit?.trim() || 'per_unit',
+          }
+        }),
+      },
+    })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
+  }
 })
 
+// ── Auth requise pour tout le reste ──
 router.use(authenticate)
 
 router.use("/portal",        portalRouter)
