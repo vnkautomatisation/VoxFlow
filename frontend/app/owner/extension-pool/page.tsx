@@ -65,21 +65,23 @@ export default function ExtensionPoolPage() {
       </div>
 
       {loading ? <div className="text-xs text-[#55557a] py-8 text-center">Chargement...</div> : (
-        <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-16 lg:grid-cols-20 gap-1">
-          {data.slots.slice(0, 200).map((s: any) => (
-            <div key={s.id} title={`${s.extension_number} — ${s.status}${s.organization_id ? ` (${s.organization_id})` : ''}`}
-              className={`text-center text-[9px] font-mono py-1 rounded ${
-                s.status === 'FREE'      ? 'bg-[#00d4aa]/10 text-[#00d4aa]' :
-                s.status === 'ALLOCATED' ? 'bg-[#7b61ff]/15 text-[#7b61ff]' :
-                s.status === 'RESERVED'  ? 'bg-[#ffb547]/15 text-[#ffb547]' :
-                'bg-[#2e2e44]/30 text-[#35355a]'
-              }`}>
-              {s.extension_number}
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-14 lg:grid-cols-20 gap-1">
+            {data.slots.map((s: any) => (
+              <div key={s.id} title={`${s.extension_number} — ${s.status}${s.organization_id ? ` (${s.organization_id})` : ''}`}
+                className={`text-center text-[9px] font-mono py-1 rounded ${
+                  s.status === 'FREE'      ? 'bg-[#00d4aa]/10 text-[#00d4aa]' :
+                  s.status === 'ALLOCATED' ? 'bg-[#7b61ff]/15 text-[#7b61ff]' :
+                  s.status === 'RESERVED'  ? 'bg-[#ffb547]/15 text-[#ffb547]' :
+                  'bg-[#2e2e44]/30 text-[#35355a]'
+                }`}>
+                {s.extension_number}
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] text-[#55557a] text-center mt-2">{data.slots.length} extensions</div>
+        </>
       )}
-      {!loading && data.slots.length > 200 && <div className="text-[10px] text-[#55557a] text-center mt-2">Affiche 200 / {data.slots.length}</div>}
 
       {result && <div className="fixed bottom-6 right-6 bg-[#18181f] border border-[#2e2e44] rounded-xl px-4 py-2.5 text-sm text-[#eeeef8] shadow-xl z-50">{result}</div>}
 

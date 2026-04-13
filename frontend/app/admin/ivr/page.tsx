@@ -86,6 +86,7 @@ export default function IVRPage() {
     const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
     const [selectedNode, setSelectedNode] = useState<IVRNode | null>(null)
     const [showNodeEditor, setShowNodeEditor] = useState(false)
+    const [twimlPreview, setTwimlPreview] = useState<string | null>(null)
 
     const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
         setToast({ msg, type })
@@ -330,6 +331,19 @@ export default function IVRPage() {
                                 <div className="text-xs text-[#55557a]">Configurer le menu IVR</div>
                             </div>
                             <div className="flex items-center gap-2">
+                                <button onClick={async () => {
+                                    try {
+                                        const r = await apiFetch(`/api/v1/admin/ivr/${selectedIVR.id}/compile`, { method: 'POST' })
+                                        if (r.success && r.data?.twiml) {
+                                            setTwimlPreview(r.data.twiml)
+                                        } else {
+                                            showToast(r.error || 'Erreur compilation', 'err')
+                                        }
+                                    } catch { showToast('Erreur compilation TwiML', 'err') }
+                                }}
+                                    className="px-3 py-1.5 bg-emerald-400/15 border border-emerald-400/30 text-emerald-400 rounded-lg text-[11px] font-bold hover:bg-emerald-400/25 transition-colors">
+                                    Compiler TwiML
+                                </button>
                                 <button onClick={() => { setShowBuilder(true); setShowDrawer(false) }}
                                     className="px-3 py-1.5 bg-[#7b61ff]/15 border border-[#7b61ff]/30 text-[#7b61ff] rounded-lg text-[11px] font-bold hover:bg-[#7b61ff]/25 transition-colors">
                                     Builder visuel
@@ -616,6 +630,27 @@ export default function IVRPage() {
                                 className="flex-1 bg-[#7b61ff] text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-[#6145ff] disabled:opacity-50 transition-colors">
                                 {saving ? 'Création...' : 'Créer le menu'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL TWIML PREVIEW ── */}
+            {twimlPreview && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setTwimlPreview(null)}>
+                    <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
+                        <div className="px-6 pt-5 pb-3 border-b border-[#2e2e44] flex items-center justify-between flex-shrink-0">
+                            <div className="font-bold text-[#eeeef8]">TwiML genere</div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => { navigator.clipboard.writeText(twimlPreview); showToast('TwiML copie') }}
+                                    className="text-xs font-bold text-[#7b61ff] border border-[#7b61ff]/30 bg-[#7b61ff]/10 px-3 py-1.5 rounded-lg hover:bg-[#7b61ff]/20 transition-colors">Copier</button>
+                                <button onClick={() => setTwimlPreview(null)} className="text-[#55557a] hover:text-[#9898b8]">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4">
+                            <pre className="text-xs font-mono text-emerald-400 bg-[#0a0a14] rounded-lg p-4 whitespace-pre-wrap break-all border border-[#2e2e44]">{twimlPreview}</pre>
                         </div>
                     </div>
                 </div>

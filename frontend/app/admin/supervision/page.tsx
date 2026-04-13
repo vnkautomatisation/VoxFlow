@@ -297,7 +297,7 @@ function SupervisionModal({ callId, agentName, callNum, onClose }: SupervisionMo
 // ─── Page principale ────────────────────────────────────────────────────────
 export default function LivePage() {
     const router = useRouter()
-    const { isAuth } = useAuthStore()
+    const { isAuth, user } = useAuthStore()
     const [snapshot, setSnapshot] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [supModal, setSupModal] = useState<{ callId: string; agentName: string; callNum: string } | null>(null)
@@ -421,7 +421,7 @@ export default function LivePage() {
                         const st = isOnCall ? 'BUSY' : (a.status || 'OFFLINE')
                         const cfg = STATUS_CFG[st] || STATUS_CFG.OFFLINE
                         const dur = a.callStarted
-                            ? Math.floor((Date.now() - new Date(a.callStarted).getTime()) / 1000) + tick * 0
+                            ? Math.floor((Date.now() - new Date(a.callStarted).getTime()) / 1000) + tick
                             : (a.callDuration || 0)
                         return (
                             <div key={a.agentId} className={`bg-[#18181f] border rounded-xl overflow-hidden transition-all ${isOnCall ? 'border-rose-400/40' : cfg.border}`}>
@@ -604,7 +604,7 @@ export default function LivePage() {
                 <SupervisorChat
                     agentId={chatAgent.id}
                     agentName={chatAgent.name}
-                    currentUserId="supervisor"
+                    currentUserId={user?.id || 'supervisor'}
                     onClose={() => setChatAgent(null)}
                 />
             )}

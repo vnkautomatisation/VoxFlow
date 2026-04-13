@@ -26,4 +26,8 @@ export const queuesApi = {
 
   getRules:      (token: string) => apiRequest<any>(base + "/rules", { token }),
   createRule:    (token: string, body: any) => apiRequest<any>(base + "/rules", { method: "POST", body, token }),
+  deleteQueue:   (token: string, id: string) => apiRequest<any>(base + "/" + id, { method: "DELETE", token }),
+  deleteRule:    (token: string, id: string) => apiRequest<any>(base + "/rules/" + id, { method: "DELETE", token }),
+  deleteSchedule:(token: string, id: string) => apiRequest<any>(base + "/schedules/" + id, { method: "DELETE", token }),
+  deleteCallback:(token: string, id: string) => apiRequest<any>(base + "/callbacks/" + id, { method: "DELETE", token }),
 }

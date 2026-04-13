@@ -206,13 +206,21 @@ export function useAdminDashboard() {
   }
 
   const createAgent = async (data: { email: string; name: string; password: string; extension?: string }) => {
-    const r = await apiFetch('/api/v1/admin/agent/create').catch(() => ({ success: false }))
+    const r = await apiFetch('/api/v1/admin/agent/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).catch(() => ({ success: false }))
     loadAll()
     return r
   }
 
   const createQueue = async (name: string, strategy: string) => {
-    await apiFetch('/api/v1/admin/queue/create').catch(() => {})
+    await apiFetch('/api/v1/admin/queue/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, strategy }),
+    }).catch(() => {})
     loadAll()
   }
 

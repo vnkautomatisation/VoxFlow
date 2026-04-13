@@ -24,6 +24,31 @@ export default function WebhooksPanel({ token, webhooks, onRefresh }: Props) {
   const [logs,    setLogs]    = useState<Record<string, any[]>>({})
   const [showLogs, setShowLogs] = useState<string | null>(null)
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ name: "", url: "", events: [] as string[] })
+
+  const startEdit = (wh: any) => {
+    setEditId(wh.id)
+    setEditForm({ name: wh.name, url: wh.url, events: wh.events || [] })
+  }
+
+  const handleUpdate = async () => {
+    if (!editId || !editForm.name || !editForm.url) return
+    setSaving(true)
+    try {
+      await integrationsApi.updateWebhook(token, editId, editForm)
+      setEditId(null)
+      onRefresh()
+    } catch {}
+    setSaving(false)
+  }
+
+  const toggleEditEvent = (ev: string) => {
+    setEditForm(f => ({
+      ...f,
+      events: f.events.includes(ev) ? f.events.filter(e => e !== ev) : [...f.events, ev]
+    }))
+  }
 
   const toggleEvent = (ev: string) => {
     setForm((f) => ({
@@ -164,6 +189,9 @@ export default function WebhooksPanel({ token, webhooks, onRefresh }: Props) {
                 </div>
 
                 <div className="flex gap-2 flex-shrink-0">
+                  <button onClick={() => startEdit(wh)}
+                    className="text-[10px] font-bold bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-2.5 py-1 rounded-lg hover:text-[#eeeef8] hover:border-[#7b61ff]/30 transition-colors"
+                  >Editer</button>
                   <button onClick={() => handleTest(wh.id)} disabled={testing === wh.id}
                     className="text-[10px] font-bold bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-2.5 py-1 rounded-lg hover:text-[#7b61ff] hover:border-[#7b61ff]/30 transition-colors"
                   >
@@ -248,6 +276,46 @@ export default function WebhooksPanel({ token, webhooks, onRefresh }: Props) {
               )}
             </div>
           ))}
+        </div>
+      )}
+      {/* ── MODAL EDIT WEBHOOK ── */}
+      {editId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setEditId(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#18181f] border border-[#2e2e44] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="px-6 pt-6 pb-2">
+              <div className="font-bold text-[#eeeef8] mb-4">Modifier le webhook</div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Nom</label>
+                  <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">URL</label>
+                  <input value={editForm.url} onChange={e => setEditForm(p => ({ ...p, url: e.target.value }))}
+                    className="w-full bg-[#111118] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] font-mono outline-none focus:border-[#7b61ff]" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#55557a] mb-1">Evenements</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEBHOOK_EVENTS.map(ev => (
+                      <button key={ev} type="button" onClick={() => toggleEditEvent(ev)}
+                        className={`text-[9px] font-bold px-2 py-1 rounded-lg border transition-colors ${editForm.events.includes(ev) ? 'bg-[#7b61ff]/15 border-[#7b61ff]/40 text-[#7b61ff]' : 'bg-[#1f1f2a] border-[#2e2e44] text-[#55557a] hover:text-[#9898b8]'}`}>
+                        {ev}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 flex gap-3">
+              <button onClick={() => setEditId(null)} className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] py-2.5 rounded-xl text-sm font-bold hover:text-[#eeeef8] transition-colors">Annuler</button>
+              <button onClick={handleUpdate} disabled={saving}
+                className="flex-1 bg-[#7b61ff] text-white py-2.5 rounded-xl text-sm font-bold hover:bg-[#6145ff] disabled:opacity-50 transition-colors">
+                {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

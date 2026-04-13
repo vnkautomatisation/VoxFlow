@@ -30,6 +30,8 @@ const NAV_GROUPS = [
         items: [
             { label: 'Live', href: '/admin/supervision', desc: 'Appels en temps réel' },
             { label: 'Rapports', href: '/admin/reports', desc: 'Graphiques, export CSV, par agent' },
+            { label: 'Analytics', href: '/admin/analytics', desc: 'Heatmap et tendances' },
+            { label: 'IA', href: '/admin/ia', desc: 'Coaching, quality scores' },
         ],
     },
     {

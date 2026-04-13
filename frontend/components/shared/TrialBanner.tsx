@@ -70,7 +70,7 @@ export default function TrialBanner({
           </svg>
           {tone === 'expired'
             ? 'ESSAI EXPIRÉ'
-            : `ESSAI · ${days}J${days > 1 ? '' : ''} RESTANT${days > 1 ? 'S' : ''}`}
+            : `ESSAI · ${days}J RESTANT${days > 1 ? 'S' : ''}`}
         </span>
         <button
           onClick={goToPlans}
@@ -97,7 +97,7 @@ export default function TrialBanner({
   const message = {
     info:    `Essai gratuit · ${days} jours restants sur votre forfait ${planName || ''}`,
     warning: `Plus que ${days} jours d'essai · Pensez à choisir un forfait`,
-    urgent:  days === 0 ? 'Dernier jour d\'essai' : `Dernier jour d'essai — ${days} jour restant`,
+    urgent:  days === 0 ? 'Dernier jour d\'essai' : `Dernier jour d'essai — ${days} jour${days > 1 ? 's' : ''} restant${days > 1 ? 's' : ''}`,
     expired: 'Essai expiré · Choisissez un forfait pour continuer à utiliser VoxFlow',
   }[tone]
 
