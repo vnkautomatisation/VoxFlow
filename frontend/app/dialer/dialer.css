@@ -2044,19 +2044,13 @@ html, body {
     }
 
 #recents-wrap {
-    max-height: 180px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--line2) transparent
+    max-height: none;
+    overflow-y: visible;
+    scrollbar-width: none;
 }
 
     #recents-wrap::-webkit-scrollbar {
-        width: 3px
-    }
-
-    #recents-wrap::-webkit-scrollbar-thumb {
-        background: var(--line2);
-        border-radius: 2px
+        display: none;
     }
 
 /* ── WAVEFORM ── */
