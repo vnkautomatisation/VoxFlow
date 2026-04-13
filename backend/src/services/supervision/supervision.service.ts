@@ -99,6 +99,8 @@ export class SupervisionService {
                 agentId: a.user_id,
                 name: user?.name || "Agent",
                 email: user?.email || "",
+                role: user?.role || "AGENT",
+                extension: user?.extension || null,
                 status: realStatus,
                 callStatus: activeCall ? activeCall.status : null,
                 callId: activeCall?.id || null,
