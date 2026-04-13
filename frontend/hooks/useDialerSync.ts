@@ -16,6 +16,8 @@ export function useDialerSync() {
                 localStorage.setItem('vf_tok', accessToken)
                 localStorage.setItem('vf_url', API_URL)
                 localStorage.setItem('vf_role', user.role)
+                if ((user as any).extension) localStorage.setItem('vf_ext', (user as any).extension)
+                if (user.name) localStorage.setItem('vf_name', user.name)
             } catch { }
 
             // Notifier Electron via port 9876
