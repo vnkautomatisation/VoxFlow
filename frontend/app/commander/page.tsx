@@ -152,6 +152,80 @@ const DEST_FLAGS: Record<string, string> = {
   'France fixes et mobiles': 'FR', 'Europe 30+ pays fixes et mobiles': 'EU',
 }
 
+// ── DialerStep2: predictive dialer plan selection ─────────
+function DialerStep2({ onBack, onAddToCart }: { onBack: () => void; onAddToCart: (item: CartItem) => void }) {
+  const api = useApi()
+  const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [dialerPlans, setDialerPlans] = useState<any[]>([])
+  const [selectedPlan, setSelectedPlan] = useState('DIALER_CA_US_FR')
+
+  useEffect(() => {
+    api('/api/v1/billing/dialer/plans').then(r => {
+      if (r.success) { setDialerPlans(r.data || []); const pop = (r.data || []).find((p: any) => p.popular); if (pop) setSelectedPlan(pop.plan_code) }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any) => cycle === 'yearly' && p.price_yearly ? Math.round(p.price_yearly / 12) : p.price_monthly
+
+  const handleNext = () => {
+    const plan = dialerPlans.find(p => p.plan_code === selectedPlan); if (!plan) return
+    onAddToCart({ planId: plan.plan_code, planName: plan.name, serviceType: 'DIALER', priceCents: getPrice(plan), cycle, quantity: 1 })
+  }
+
+  const COMMON_FEATURES = ['Appels sortants illimites','Appels entrants illimites','Import CSV prospects','Detection repondeur AMD','Ratio appels ajustable','Max tentatives configurable','Scripts d\'appel','Recyclage auto','CRM integre','Supervision live','Enregistrements','Stats campagnes','Export CSV','RGPD liste noire','Presence locale']
+
+  return (
+    <div style={{ padding: '40px 32px' }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: '#e8e8f8', marginBottom: 8, marginTop: 0 }}>2. Predictive Dialer — configurer votre forfait</h2>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'flex', background: '#0f0f1e', borderRadius: 10, border: '1px solid #1e1e3a', overflow: 'hidden' }}>
+          <button onClick={() => setCycle('monthly')} style={{ padding: '10px 24px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: cycle === 'monthly' ? '#7b61ff' : 'transparent', color: cycle === 'monthly' ? '#fff' : '#8888a8' }}>Mensuel</button>
+          <button onClick={() => setCycle('yearly')} style={{ padding: '10px 24px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: cycle === 'yearly' ? '#7b61ff' : 'transparent', color: cycle === 'yearly' ? '#fff' : '#8888a8' }}>Annuel</button>
+        </div>
+        {cycle === 'yearly' && <span style={{ padding: '4px 12px', borderRadius: 20, background: '#00d4aa22', color: '#00d4aa', fontSize: 12, fontWeight: 600 }}>Economisez 2 mois</span>}
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#e8e8f8', marginBottom: 6 }}>Inclus dans tous les plans Predictive Dialer</div>
+        <div style={{ fontSize: 12, color: '#8888a8', marginBottom: 12 }}>La seule difference entre les plans est la destination des appels et le nombre de lignes simultanees.</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {COMMON_FEATURES.map(f => <span key={f} style={{ padding: '5px 12px', borderRadius: 8, background: '#1a1a2e', color: '#9898b8', fontSize: 12, fontWeight: 500 }}>{f}</span>)}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+        {dialerPlans.map(p => {
+          const isSel = selectedPlan === p.plan_code
+          return (
+            <div key={p.plan_code} onClick={() => setSelectedPlan(p.plan_code)}
+              style={{ background: isSel ? '#0f0f2a' : '#0f0f1e', border: `2px solid ${isSel ? '#7b61ff' : '#1e1e3a'}`, borderRadius: 14, padding: '22px 18px', cursor: 'pointer', position: 'relative' }}>
+              {p.popular && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', padding: '4px 14px', borderRadius: 20, background: '#7b61ff', color: '#fff', fontSize: 11, fontWeight: 700 }}>Populaire</div>}
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e8e8f8', marginBottom: 8, marginTop: p.popular ? 4 : 0 }}>{p.name}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#e8e8f8' }}>{fmtPrice(getPrice(p))} <span style={{ fontSize: 12, color: '#8888a8' }}>CAD$/agent/mois</span></div>
+              {p.destinations && p.destinations.length > 0 && (
+                <div style={{ padding: '10px 12px', background: '#111128', borderRadius: 8, border: '1px solid #1e1e3a', marginTop: 12 }}>
+                  <div style={{ fontSize: 11, color: '#8888a8', fontWeight: 600, marginBottom: 6 }}>Appels illimites vers:</div>
+                  {p.destinations.map((d: string, i: number) => <div key={i} style={{ fontSize: 12, color: '#c0c0d8', marginBottom: 2 }}>{DEST_FLAGS[d] || ''} {d.replace(' fixes et mobiles', '')}</div>)}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: '#5a5a7a', marginTop: 8 }}>{p.max_concurrent_calls} appels simultanes — {p.max_lines_per_agent} lignes/agent</div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ fontSize: 12, color: '#5a5a7a', marginBottom: 8 }}>Facture selon le nombre d&apos;agents actifs. Service independant de la telephonie.</div>
+      <div style={{ fontSize: 12, color: '#5a5a7a', marginBottom: 24 }}>14 jours gratuits. Aucune carte requise pendant l&apos;essai.</div>
+
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+        <button onClick={onBack} style={{ padding: '12px 28px', background: '#1a1a3a', border: '1px solid #2a2a3e', borderRadius: 10, color: '#8888a8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Retour</button>
+        <button onClick={handleNext} disabled={!selectedPlan} style={{ padding: '12px 28px', background: selectedPlan ? '#7b61ff' : '#2a2a3e', border: 'none', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 700, cursor: selectedPlan ? 'pointer' : 'not-allowed' }}>Suivant</button>
+      </div>
+    </div>
+  )
+}
+
 // ── RobotStep2: robot plan or credits selection ──────────
 function RobotStep2({ onBack, onAddToCart }: { onBack: () => void; onAddToCart: (item: CartItem) => void }) {
   const api = useApi()
@@ -613,8 +687,8 @@ function Step1({ onSelect }: { onSelect: (service: string) => void }) {
       key: 'DIALER',
       title: 'Predictive Dialer',
       icon: <ChartIcon />,
-      price: 'A partir de 80 CAD$/mois',
-      desc: 'Campagnes sortantes massives avec detection repondeur',
+      price: 'A partir de 80 CAD$/agent/mois',
+      desc: 'Jusqu\'a 10x plus d\'appels par agent. AMD, scripts, ratio ajustable.',
     },
     {
       key: 'ROBOT',
@@ -1490,7 +1564,13 @@ export default function CommanderPage() {
             onAddToCart={handleAddToCart}
           />
         )}
-        {step === 2 && service && service !== 'TELEPHONY' && service !== 'ADDONS' && service !== 'ROBOT' && (
+        {step === 2 && service === 'DIALER' && (
+          <DialerStep2
+            onBack={() => setStep(1)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+        {step === 2 && service && service !== 'TELEPHONY' && service !== 'ADDONS' && service !== 'ROBOT' && service !== 'DIALER' && (
           <Step2
             service={service}
             plans={plans}

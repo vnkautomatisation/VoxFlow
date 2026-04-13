@@ -107,6 +107,7 @@ export default function ClientDashboardPage() {
   const [telSummary, setTelSummary] = useState<TelSummary | null>(null)
   const [addonSummary, setAddonSummary] = useState<AddonSummaryDash | null>(null)
   const [robotSummary, setRobotSummary] = useState<RobotSummaryDash | null>(null)
+  const [dialerSummary, setDialerSummary] = useState<any>(null)
   const [didSummary, setDidSummary] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -115,12 +116,13 @@ export default function ClientDashboardPage() {
     let cancelled = false
     async function load() {
       try {
-        const [dashRes, telRes, addonRes, robotRes, didRes] = await Promise.all([
+        const [dashRes, telRes, addonRes, robotRes, didRes, dialerRes] = await Promise.all([
           api('/api/v1/client/portal/dashboard'),
           api('/api/v1/billing/telephony/summary').catch(() => ({ success: false })),
           api('/api/v1/billing/addons/summary').catch(() => ({ success: false })),
           api('/api/v1/billing/robot/summary').catch(() => ({ success: false })),
           api('/api/v1/telephony/did/summary').catch(() => ({ success: false })),
+          api('/api/v1/billing/dialer/summary').catch(() => ({ success: false })),
         ])
         const d = dashRes.data || dashRes
         if (!cancelled) {
@@ -133,6 +135,7 @@ export default function ClientDashboardPage() {
           if ((addonRes as any).success) setAddonSummary((addonRes as any).data)
           if ((robotRes as any).success) setRobotSummary((robotRes as any).data)
           if ((didRes as any).success) setDidSummary((didRes as any).data)
+          if ((dialerRes as any).success) setDialerSummary((dialerRes as any).data)
         }
       } catch {
         if (!cancelled) setError('Erreur de connexion au serveur')
@@ -453,6 +456,35 @@ export default function ClientDashboardPage() {
             <Link href="/tarifs#modules" className="inline-flex items-center gap-2 bg-[#7b61ff]/10 border border-[#7b61ff]/30 text-[#7b61ff] rounded-lg px-5 py-2 text-[13px] font-semibold no-underline hover:bg-[#7b61ff]/20 transition-colors">
               Decouvrir les modules
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* -- Dialer card -- */}
+      {dialerSummary?.activePlan && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-900/50 text-orange-400">Dialer</span>
+              <span className="text-sm font-semibold text-[#eeeef8]">{dialerSummary.activePlan.name}</span>
+              <span className="text-[12px] text-[#55557a]">{dialerSummary.nbAgentsActive} agent{dialerSummary.nbAgentsActive > 1 ? 's' : ''}</span>
+              {dialerSummary.status && <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dialerSummary.status === 'active' ? 'bg-emerald-900/40 text-emerald-400' : dialerSummary.status === 'trialing' ? 'bg-blue-900/40 text-blue-400' : 'bg-orange-900/40 text-orange-400'}`}>{dialerSummary.status === 'active' ? 'Actif' : dialerSummary.status === 'trialing' ? 'Essai' : dialerSummary.status}</span>}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-[#eeeef8]">{formatCAD(dialerSummary.monthlyTotal / 100)}<span className="text-[11px] text-[#55557a] font-normal"> /mois</span></span>
+              <Link href="/client/plans" className="inline-block text-[11px] font-semibold text-[#7b61ff] px-3 py-1 border border-[#7b61ff]/25 rounded-lg no-underline bg-[#7b61ff]/5 hover:bg-[#7b61ff]/15 transition-colors">Gerer</Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialer CTA */}
+      {(!dialerSummary || !dialerSummary.activePlan) && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl py-8 px-6 text-center">
+            <h3 className="text-base font-bold text-[#eeeef8] mb-2">Multipliez les appels de vos agents</h3>
+            <p className="text-[12px] text-[#55557a] mb-4">Predictive Dialer — jusqu&apos;a 10x plus d&apos;appels par agent. AMD, scripts, ratio ajustable.</p>
+            <Link href="/commander?service=dialer" className="inline-flex items-center gap-2 bg-[#7b61ff]/10 border border-[#7b61ff]/30 text-[#7b61ff] rounded-lg px-5 py-2 text-[13px] font-semibold no-underline hover:bg-[#7b61ff]/20 transition-colors">Decouvrir le Dialer</Link>
           </div>
         </div>
       )}

@@ -395,6 +395,45 @@ function DIDPricingTable() {
   )
 }
 
+function DialerCards({ annual }: { annual: boolean }) {
+  const api = useApiPublic()
+  const [plans, setPlans] = useState<any[]>([])
+
+  useEffect(() => {
+    api('/api/v1/billing/dialer/plans').then(r => { if (r.success) setPlans(r.data || []) }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getPrice = (p: any): number => annual && p.price_yearly ? Math.round(p.price_yearly / 12) : p.price_monthly
+
+  if (plans.length === 0) return null
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+      {plans.map((p: any) => (
+        <div key={p.plan_code} style={{ background: CARD_BG, border: p.popular ? `2px solid ${PURPLE}` : `1px solid ${CARD_BORDER}`, borderRadius: '16px', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {p.popular && <span style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: PURPLE, color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '3px 14px', borderRadius: '20px' }}>Populaire</span>}
+          <h3 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.3rem' }}>{p.name}</h3>
+          <div style={{ marginBottom: '0.8rem' }}>
+            <span style={{ fontSize: '2.2rem', fontWeight: 800 }}>{fmtCentsT(getPrice(p))}</span>
+            <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}> CAD$/agent/mois</span>
+            {annual && p.price_yearly && <div style={{ color: '#64748b', fontSize: '0.78rem' }}>facture {fmtCentsT(p.price_yearly)} CAD$/an</div>}
+          </div>
+          {p.destinations && p.destinations.length > 0 && (
+            <div style={{ padding: '10px 12px', background: '#111128', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#8888a8', fontWeight: 600, marginBottom: 6 }}>Appels illimites vers:</div>
+              {p.destinations.map((d: string, i: number) => <div key={i} style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: 2 }}>{d.replace(' fixes et mobiles', '')}</div>)}
+            </div>
+          )}
+          <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1rem' }}>{p.max_concurrent_calls} appels simultanes — {p.max_lines_per_agent} lignes/agent</div>
+          <div style={{ flex: 1 }} />
+          <Link href={`/commander?service=dialer&plan=${p.plan_code}`} style={{ display: 'block', textAlign: 'center', background: p.popular ? PURPLE : 'transparent', color: '#fff', border: p.popular ? 'none' : `1px solid ${CARD_BORDER}`, borderRadius: '10px', padding: '0.7rem 1rem', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>Commencer l&apos;essai gratuit</Link>
+          <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#475569', marginTop: 6 }}>14 jours gratuits · Sans carte requise</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function RobotCards({ annual }: { annual: boolean }) {
   const api = useApiPublic()
   const [plans, setPlans] = useState<any[]>([])
@@ -685,49 +724,10 @@ export default function TarifsPage() {
       {/* ============================================================ */}
       <section style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem' }}>
         <h2 style={sectionTitle}>Predictive Dialer</h2>
-        <p style={sectionSub}>Composeur predictif pour maximiser le volume d&apos;appels sortants</p>
+        <p style={sectionSub}>Decuplez la productivite de vos agents. Jusqu&apos;a 10x plus d&apos;appels par agent.</p>
+        <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#64748b', marginBottom: 16 }}>Service independant de la telephonie d&apos;entreprise.</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', maxWidth: 700, margin: '0 auto' }}>
-          {DIALER_PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              style={{
-                background: CARD_BG,
-                border: `1px solid ${CARD_BORDER}`,
-                borderRadius: '16px',
-                padding: '2rem 1.5rem',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>{plan.name}</h3>
-              <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1rem', flex: 1 }}>{plan.desc}</p>
-              <div style={{ marginBottom: '1.2rem' }}>
-                <span style={{ fontSize: '2.2rem', fontWeight: 800 }}>
-                  {price(plan.monthlyPrice, plan.annualMonthly)}
-                </span>
-                <span style={{ color: '#94a3b8', fontSize: '0.95rem' }}> CAD$/mois</span>
-              </div>
-              <Link
-                href={`/commander?service=dialer&plan=${plan.id}`}
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  background: 'transparent',
-                  color: '#fff',
-                  border: `1px solid ${CARD_BORDER}`,
-                  borderRadius: '10px',
-                  padding: '0.7rem 1rem',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                }}
-              >
-                Commencer l&apos;essai gratuit
-              </Link>
-            </div>
-          ))}
-        </div>
+        <DialerCards annual={annual} />
       </section>
 
       {/* ============================================================ */}

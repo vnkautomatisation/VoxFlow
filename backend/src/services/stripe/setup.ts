@@ -69,6 +69,28 @@ export async function syncAddonStripeProducts(): Promise<void> {
   }
 }
 
+export async function syncDialerStripeProducts(): Promise<void> {
+  if (!stripe) return
+  try {
+    const { data: plans } = await supabase
+      .from('plan_definitions')
+      .select('id, name, price_monthly, price_yearly, service_type, stripe_price_id_monthly, stripe_product_id')
+      .like('id', 'DIALER_%')
+
+    if (!plans) return
+    for (const plan of plans) {
+      if (plan.stripe_price_id_monthly) continue
+      console.log(`[Stripe Setup] Creating Stripe product for dialer ${plan.id}...`)
+      const product = await stripe.products.create({ name: plan.name, metadata: { plan_code: plan.id, service_type: 'dialer' } })
+      const monthlyPrice = await stripe.prices.create({ unit_amount: plan.price_monthly, currency: 'cad', recurring: { interval: 'month' }, product: product.id })
+      const yearlyPrice = await stripe.prices.create({ unit_amount: plan.price_yearly || plan.price_monthly * 10, currency: 'cad', recurring: { interval: 'year' }, product: product.id })
+      await supabase.from('plan_definitions').update({ stripe_product_id: product.id, stripe_price_id_monthly: monthlyPrice.id, stripe_price_id_yearly: yearlyPrice.id }).eq('id', plan.id)
+      console.log(`[Stripe Setup] ${plan.id} -> product=${product.id}`)
+    }
+    console.log('[Stripe Setup] Dialer product sync complete')
+  } catch (err: any) { console.warn('[Stripe Setup] Dialer sync error:', err.message) }
+}
+
 export async function syncRobotStripeProducts(): Promise<void> {
   if (!stripe) return
   try {

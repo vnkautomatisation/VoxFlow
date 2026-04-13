@@ -24,10 +24,12 @@ import crmRoutes        from './routes/crm/index'
 import onboardingRoutes from './routes/onboarding/index'
 import agentRoutes   from './routes/agent/index'
 import { startRobotWorker } from './services/robot/robot-worker'
-import { syncTelcoStripeProducts, syncAddonStripeProducts, syncRobotStripeProducts, syncRobotCreditProducts } from './services/stripe/setup'
+import { syncTelcoStripeProducts, syncAddonStripeProducts, syncRobotStripeProducts, syncRobotCreditProducts, syncDialerStripeProducts } from './services/stripe/setup'
 import { startSmsOverageJob } from './jobs/smsOverageBilling'
 import { startRobotJobs } from './jobs/robotJobs'
 import { startDidSuspensionJob } from './jobs/didSuspensionRelease'
+import { startDialerJobs } from './jobs/dialerJobs'
+import dialerCampaignRoutes from './routes/dialer/campaigns'
 import robotCampaignRoutes from './routes/robot/campaigns'
 import webhookRoutes from './routes/webhooks/index'
 import billingRoutes from './routes/billing/index'
@@ -71,6 +73,7 @@ app.use('/api/v1/crm',        crmRoutes)
 app.use('/api/v1/onboarding', onboardingRoutes)
 app.use('/api/v1/agent',    agentRoutes)
 app.use('/api/v1/robot', robotCampaignRoutes)
+app.use('/api/v1/dialer', dialerCampaignRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
 app.use('/api/v1/billing', billingRoutes)
 app.use('/api/v1/client',  clientRoutes)
@@ -123,11 +126,13 @@ syncTelcoStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Telco s
 syncAddonStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Addon sync failed:', e.message))
 syncRobotStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Robot sync failed:', e.message))
 syncRobotCreditProducts().catch((e: any) => console.warn('[Stripe Setup] Robot credits sync failed:', e.message))
+syncDialerStripeProducts().catch((e: any) => console.warn('[Stripe Setup] Dialer sync failed:', e.message))
 
 // ── Cron Jobs ───────────────────────────────────────────
 try { startSmsOverageJob() } catch (e: any) { console.warn('[SMS Overage Job] Start failed:', e.message) }
 try { startRobotJobs() } catch (e: any) { console.warn('[Robot Jobs] Start failed:', e.message) }
 try { startDidSuspensionJob() } catch (e: any) { console.warn('[DID Suspension Job] Start failed:', e.message) }
+try { startDialerJobs() } catch (e: any) { console.warn('[Dialer Jobs] Start failed:', e.message) }
 
 app.listen(config.app.port, () => {
   console.log('')

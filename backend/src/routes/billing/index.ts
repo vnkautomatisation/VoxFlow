@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../../middleware/auth'
 import telephonyRouter, { telcoPlansHandler } from './telephony'
 import addonsRouter, { addonPlansHandler } from './addons'
 import robotBillingRouter, { robotPlansHandler, creditsPlansHandler } from './robot'
+import dialerBillingRouter, { dialerPlansHandler } from './dialer'
 
 const router = Router()
 
@@ -28,8 +29,13 @@ router.get('/robot/credits-plans', creditsPlansHandler)
 // ── Robot billing — authenticated routes ──────────────────
 router.use('/robot', authenticate, robotBillingRouter)
 
+// ── Dialer billing — public route first ───────────────────
+router.get('/dialer/plans', dialerPlansHandler)
+// ── Dialer billing — authenticated routes ─────────────────
+router.use('/dialer', authenticate, dialerBillingRouter)
+
 // ── Auth middleware selectif ───────────────────────────────
-const PUBLIC_PATHS = new Set(['/plans', '/modules', '/webhook', '/telephony/plans', '/addons/plans', '/robot/plans', '/robot/credits-plans'])
+const PUBLIC_PATHS = new Set(['/plans', '/modules', '/webhook', '/telephony/plans', '/addons/plans', '/robot/plans', '/robot/credits-plans', '/dialer/plans'])
 router.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path)) return next()
   return authenticate(req as AuthRequest, res, next)
