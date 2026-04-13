@@ -28,12 +28,18 @@ const fmtD = (dt: string) => {
 const ACP = ['#2d1a80', '#1a356b', '#1a4d3a', '#4d1a5a', '#4d2a1a', '#1a3a4d', '#3a4d1a']
 const ini = (name: string) => (name || 'A').split(' ').map((n: string) => n[0] || '').join('').substring(0, 2).toUpperCase()
 
+// Statuts temps reel (presence) — PAS le statut du compte
+// ONLINE = connecte et pret a recevoir des appels
+// BUSY = en appel actif
+// BREAK = en pause volontaire
+// OFFLINE = deconnecte ou pas encore connecte
+// ACTIVE/INACTIVE = statut du COMPTE (affiche separement)
 const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; bg: string }> = {
     ONLINE: { label: 'Disponible', dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-400/10' },
     BUSY: { label: 'En appel', dot: 'bg-rose-400', text: 'text-rose-400', bg: 'bg-rose-400/10' },
     BREAK: { label: 'En pause', dot: 'bg-amber-400', text: 'text-amber-400', bg: 'bg-amber-400/10' },
     OFFLINE: { label: 'Hors ligne', dot: 'bg-zinc-500', text: 'text-zinc-500', bg: 'bg-zinc-500/10' },
-    ACTIVE: { label: 'Actif', dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    INACTIVE: { label: 'Desactive', dot: 'bg-zinc-700', text: 'text-zinc-600', bg: 'bg-zinc-700/10' },
 }
 
 interface Agent {
@@ -193,15 +199,18 @@ export default function AgentsPage() {
     const filtered = agents.filter(a => {
         const q = search.toLowerCase()
         const matchSearch = !q || a.name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.extension?.includes(q)
-        const st = a.current_call ? 'BUSY' : (a.agentStatus || a.status)
+        // Statut presence : agentStatus vient du snapshot supervision
+        // Si pas de snapshot, l'agent est OFFLINE (pas "Actif")
+        // status = compte (ACTIVE/INACTIVE), agentStatus = presence (ONLINE/OFFLINE/BUSY/BREAK)
+        const st = a.status === 'INACTIVE' ? 'INACTIVE' : a.current_call ? 'BUSY' : (a.agentStatus || 'OFFLINE')
         const matchStatus = filterStatus === 'all' || st === filterStatus
         return matchSearch && matchStatus
     })
 
-    // Stats rapides
-    const online = agents.filter(a => (a.agentStatus || a.status) === 'ONLINE' && !a.current_call).length
+    // Stats rapides — base sur presence (agentStatus), pas le compte (status)
+    const online = agents.filter(a => a.agentStatus === 'ONLINE' && !a.current_call).length
     const busy = agents.filter(a => a.current_call).length
-    const onBreak = agents.filter(a => (a.agentStatus || a.status) === 'BREAK').length
+    const onBreak = agents.filter(a => a.agentStatus === 'BREAK').length
     const offline = agents.filter(a => !['ONLINE', 'BUSY'].includes(a.agentStatus || a.status) && !a.current_call).length
 
     // Logique forfait courant
@@ -318,7 +327,7 @@ export default function AgentsPage() {
                     </thead>
                     <tbody>
                         {filtered.map((a, i) => {
-                            const st = a.current_call ? 'BUSY' : (a.agentStatus || a.status || 'OFFLINE')
+                            const st = a.status === 'INACTIVE' ? 'INACTIVE' : a.current_call ? 'BUSY' : (a.agentStatus || 'OFFLINE')
                             const sc = STATUS_CONFIG[st] || STATUS_CONFIG.OFFLINE
                             const color = ACP[i % ACP.length]
                             return (
@@ -357,10 +366,10 @@ export default function AgentsPage() {
                                             {a.role}
                                         </span>
                                     </td>
-                                    {/* Statut */}
+                                    {/* Statut presence */}
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                                            <div className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} style={st === 'ONLINE' ? { boxShadow: '0 0 6px #34d399' } : undefined} />
                                             <span className={`text-xs font-semibold ${sc.text}`}>{sc.label}</span>
                                             {a.current_call && a.call_duration && (
                                                 <span className="text-[10px] font-mono text-[#55557a]">{fmtT(a.call_duration)}</span>
