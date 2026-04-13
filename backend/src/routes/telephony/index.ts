@@ -475,7 +475,7 @@ router.get("/calls", authenticate, async (req: AuthRequest, res: Response) => {
     try {
         const orgId = getOrgId(req), limit = parseInt(String(req.query.limit || "30"))
         let q = supabaseAdmin.from("calls")
-            .select(`id, from_number, to_number, direction, status, duration, started_at, ended_at, notes, transcription, recording_url, twilio_sid, quality_score, contact:contacts(id, first_name, last_name, company, phone)`)
+            .select(`id, from_number, to_number, direction, status, duration, started_at, ended_at, notes, transcription, recording_url, ai_summary, agent_id, twilio_sid, quality_score, contact:contacts(id, first_name, last_name, company, phone)`)
             .eq("organization_id", orgId).order("started_at", { ascending: false }).limit(limit)
         if (req.user!.role === "AGENT") q = q.eq("agent_id", req.user!.userId)
         const { data } = await q

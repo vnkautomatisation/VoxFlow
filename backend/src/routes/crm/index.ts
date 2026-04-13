@@ -173,7 +173,7 @@ router.get("/contacts", authenticate, async (req: AuthRequest, res: Response) =>
                 .select(`
           id, first_name, last_name, email, phone, company, position, status,
           address, city, province, postal_code, country,
-          notes, created_at, last_called_at, call_count,
+          notes, custom_fields, created_at, last_called_at, call_count,
           tags:contact_tags(tag:tags(id, name, color))
         `)
                 .eq("organization_id", orgId)
@@ -598,7 +598,7 @@ router.get("/appointments", authenticate, async (req: AuthRequest, res: Response
         const orgId = getOrgId(req)
         const { start, end } = req.query as { start?: string; end?: string }
         let query = supabaseAdmin.from("appointments")
-            .select("id, title, description, starts_at, ends_at, status, location, contact_id, agent_id, reminder_minutes")
+            .select("id, title, description, starts_at, ends_at, status, location, contact_id, agent_id, reminder_minutes, type, notes")
             .eq("organization_id", orgId)
             .order("starts_at")
         if (start) query = query.gte("starts_at", start)

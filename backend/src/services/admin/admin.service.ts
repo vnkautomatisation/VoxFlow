@@ -334,7 +334,7 @@ export class AdminService {
 
     const { data: calls } = await supabaseAdmin
       .from("calls")
-      .select("id, duration, status, direction, started_at, agent_id")
+      .select("id, duration, status, direction, started_at, agent_id, from_number, to_number, recording_url, notes, contact:contacts(id, first_name, last_name, company)")
       .eq("organization_id", organizationId)
       .gte("started_at", since)
       .order("started_at", { ascending: false })
