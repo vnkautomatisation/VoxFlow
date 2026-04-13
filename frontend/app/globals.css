@@ -153,37 +153,29 @@ html, body {
   }
 }
 
-/* ─ Augmenter la lisibilité des petits textes sur desktop ─
-   Les classes text-[9px], text-[10px], text-xs et text-sm sont courantes
-   pour badges, labels, descriptions, emails et noms dans le portail admin.
-   Elles deviennent dures à lire sur grand écran (>= lg / xl / 2xl).
-   On bump progressivement selon la résolution pour rester compact sur
-   les petits écrans mais lisible en HD. !important override Tailwind. */
+/* ─ Bump subtil des petits textes sur desktop ─
+   Valeurs reduites : les anciens bumps etaient trop agressifs
+   (text-xs 12px -> 15px, text-sm 14px -> 16px) ce qui rendait
+   la police "grosse et agressive". Nouveau bump : +1px max par
+   palier pour que le texte reste compact mais lisible. */
 
-/* lg — laptops standard (1024-1279) */
+/* lg — laptops standard (1024-1279) : +0.5px */
 @media (min-width: 1024px) {
-  body .text-\[9px\]   { font-size: 11px !important; line-height: 1.35 !important; }
-  body .text-\[10px\]  { font-size: 12px !important; line-height: 1.4 !important; }
-  body .text-\[11px\]  { font-size: 13px !important; line-height: 1.45 !important; }
-  body .text-xs        { font-size: 13.5px !important; }
-  body .text-sm        { font-size: 15px !important; }
+  body .text-\[9px\]   { font-size: 9.5px !important; }
+  body .text-\[10px\]  { font-size: 10.5px !important; }
+  body .text-\[11px\]  { font-size: 11.5px !important; }
 }
 
-/* xl — desktops (1280-1535) */
+/* xl — desktops (1280-1535) : +1px */
 @media (min-width: 1280px) {
-  body .text-\[9px\]   { font-size: 11.5px !important; }
-  body .text-\[10px\]  { font-size: 12.5px !important; }
-  body .text-\[11px\]  { font-size: 13.5px !important; }
-  body .text-xs        { font-size: 14px !important; }
-  body .text-sm        { font-size: 15.5px !important; }
+  body .text-\[9px\]   { font-size: 10px !important; }
+  body .text-\[10px\]  { font-size: 11px !important; }
+  body .text-\[11px\]  { font-size: 12px !important; }
 }
 
-/* 2xl — HD et + (1536+) */
+/* 2xl — HD et + (1536+) : +1.5px */
 @media (min-width: 1536px) {
-  body .text-\[9px\]   { font-size: 12px !important; }
-  body .text-\[10px\]  { font-size: 13px !important; }
-  body .text-\[11px\]  { font-size: 14px !important; }
-  body .text-xs        { font-size: 14.5px !important; }
-  body .text-sm        { font-size: 16px !important; }
-  body .text-base      { font-size: 17px !important; }
+  body .text-\[9px\]   { font-size: 10.5px !important; }
+  body .text-\[10px\]  { font-size: 11.5px !important; }
+  body .text-\[11px\]  { font-size: 12.5px !important; }
 }
