@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npx --no-install tsc --noEmit --pretty)",
+      "Bash(ls node_modules/.bin/tsc*)",
+      "Bash(npx --yes typescript -- tsc --noEmit --pretty frontend/app/client/numbers/page.tsx)",
+      "Bash(node -e \"try { require\\('fs'\\).readFileSync\\('frontend/app/client/numbers/page.tsx','utf8'\\); console.log\\('File reads OK'\\) } catch\\(e\\) { console.log\\(e.message\\) }\")",
+      "Bash(npx next:*)",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.devDependencies || {}, null, 2\\)\\)\")",
+      "Bash(grep -E \"\\\\.\\(sql|ts|tsx\\)$\")",
+      "Bash(npx ts-node:*)",
+      "Bash(curl -s http://localhost:4000/api/v1/client/portal/plans-catalog)",
+      "Bash(curl -s http://localhost:4000/api/v1/health)",
+      "Bash(curl -s http://localhost:3001/tarifs)",
+      "Bash(curl -s http://localhost:3001/commander)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :4000)",
+      "Bash(findstr LISTEN)",
+      "Bash(taskkill /PID 30544 /F)",
+      "Bash(cmd.exe /c \"taskkill /PID 30544 /F\")",
+      "Bash(cmd.exe /c \"taskkill /F /PID 30544\")",
+      "Bash(powershell -Command \"Stop-Process -Id 30544 -Force\")",
+      "Read(//f/Logiciel/Developpement/GIT/VoxFlow/backend/**)",
+      "Bash(npm run:*)",
+      "Bash(powershell -Command 'Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }')"
+    ]
+  }
+}

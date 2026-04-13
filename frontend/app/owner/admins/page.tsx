@@ -123,8 +123,9 @@ export default function OwnerAdminsPage() {
       })
       if (search.trim()) params.set('search', search.trim())
       const res = await apiFetch('/api/v1/owner/admins?' + params.toString())
-      setOrgs(res.organizations || [])
-      setTotal(res.total || 0)
+      const d = res.data || res
+      setOrgs(d.organizations || [])
+      setTotal(d.total || 0)
     } catch (err) {
       console.error('Erreur chargement admins:', err)
     } finally {
@@ -153,14 +154,15 @@ export default function OwnerAdminsPage() {
       const res = await apiFetch('/api/v1/owner/admins/' + org.id + '/impersonate', {
         method: 'POST',
       })
-      if (res.token) {
+      const d = res.data || res
+      if (d.token) {
         const currentToken = getTok()
         localStorage.setItem('vf_impersonate', JSON.stringify({
           originalToken: currentToken,
-          impersonatingOrgId: res.org_id,
-          impersonatingOrgName: res.org_name,
+          impersonatingOrgId: d.org_id,
+          impersonatingOrgName: d.org_name,
         }))
-        localStorage.setItem('vf_tok', res.token)
+        localStorage.setItem('vf_tok', d.token)
         router.push('/admin/dashboard')
       }
     } catch (err) {

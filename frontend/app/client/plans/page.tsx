@@ -164,15 +164,17 @@ export default function PlansPage() {
         api('/api/v1/client/portal/plans-catalog'),
         api('/api/v1/client/portal/subscriptions'),
       ])
-      if (catalogRes.services) {
+      const cd = catalogRes.data || catalogRes
+      if (cd.services) {
         setPlans({
-          TELEPHONY: catalogRes.services.TELEPHONY || [],
-          DIALER: catalogRes.services.DIALER || [],
-          ROBOT: catalogRes.services.ROBOT || [],
+          TELEPHONY: cd.services.TELEPHONY || [],
+          DIALER: cd.services.DIALER || [],
+          ROBOT: cd.services.ROBOT || [],
         })
       }
-      if (catalogRes.addons) setAddons(catalogRes.addons)
-      if (Array.isArray(subsRes)) setSubs(subsRes)
+      if (cd.addons) setAddons(cd.addons)
+      const sd = subsRes.data || subsRes
+      if (Array.isArray(sd)) setSubs(sd)
     } catch { /* silent */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
