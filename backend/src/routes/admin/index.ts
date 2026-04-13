@@ -54,8 +54,13 @@ router.patch("/agents/:id", async (req: AuthRequest, res: Response) => {
   try {
     const orgId   = getOrgId(req)
     const agentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
-    sendSuccess(res, await adminService.updateAgent(agentId, orgId, req.body))
-  } catch (err: any) { sendError(res, err.message) }
+    console.log('[PATCH agent]', agentId, 'body keys:', Object.keys(req.body))
+    const result = await adminService.updateAgent(agentId, orgId, req.body)
+    sendSuccess(res, result)
+  } catch (err: any) {
+    console.error('[PATCH agent ERROR]', err.message)
+    sendError(res, err.message)
+  }
 })
 
 router.delete("/agents/:id", async (req: AuthRequest, res: Response) => {

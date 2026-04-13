@@ -132,8 +132,8 @@ export default function AgentsPage() {
             const r = await apiFetch(`/api/v1/admin/agents/${selectedAgent.id}`, {
                 method: 'PATCH', body: JSON.stringify(payload),
             })
-            if (r.success) { showToast('Agent mis à jour ✓'); setShowDrawer(false); load() }
-            else showToast(r.message || 'Erreur', 'err')
+            if (r.success) { showToast('Agent mis a jour'); setShowDrawer(false); load() }
+            else showToast(r.error || r.message || 'Erreur sauvegarde', 'err')
         } catch { showToast('Erreur réseau', 'err') }
         setSaving(false)
     }
