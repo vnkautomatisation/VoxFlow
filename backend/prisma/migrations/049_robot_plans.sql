@@ -6,6 +6,7 @@
 
 -- 1) Nouvelles colonnes sur plan_definitions
 ALTER TABLE plan_definitions ADD COLUMN IF NOT EXISTS minutes_included INTEGER DEFAULT 0;
+ALTER TABLE plan_definitions ADD COLUMN IF NOT EXISTS overage_rate DECIMAL(10,4) DEFAULT 0;
 ALTER TABLE plan_definitions ADD COLUMN IF NOT EXISTS max_concurrent_calls INTEGER DEFAULT 20;
 ALTER TABLE plan_definitions ADD COLUMN IF NOT EXISTS max_contacts_per_campaign INTEGER DEFAULT 10000;
 
