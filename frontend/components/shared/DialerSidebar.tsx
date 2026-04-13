@@ -66,8 +66,8 @@ export default function DialerSidebar() {
             bottom: 24,
             right: 24,
             zIndex: 9998,
-            width: 56,
-            height: 56,
+            width: 64,
+            height: 64,
             borderRadius: '50%',
             background: 'linear-gradient(135deg, #7b61ff, #6145ff)',
             border: 'none',
@@ -81,7 +81,7 @@ export default function DialerSidebar() {
           }}
           title="Dialer (Ctrl+D)"
         >
-          <svg width="22" height="22" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
+          <svg width="26" height="26" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.64A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.19a16 16 0 006.36 6.36l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
           </svg>
           <kbd style={{
