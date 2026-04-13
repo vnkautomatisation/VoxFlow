@@ -90,13 +90,21 @@ export default function OwnerDashboard() {
                   {tab.label}
                 </button>
               ))}
-              {/* Lien séparé vers la page /owner/plans (vraie page, pas un tab) */}
-              <button
-                onClick={() => router.push("/owner/plans")}
-                className="px-3 py-1.5 rounded-lg text-sm text-[#7b61ff] hover:text-white hover:bg-[#7b61ff]/20 transition-colors font-bold"
-              >
-                Forfaits →
-              </button>
+              {/* Liens vers les pages owner */}
+              {[
+                { href: '/owner/plans',          label: 'Forfaits' },
+                { href: '/owner/features',       label: 'Features' },
+                { href: '/owner/products',       label: 'Catalogue' },
+                { href: '/owner/extension-pool', label: 'Pool ext.' },
+                { href: '/owner/twilio-config',  label: 'Twilio' },
+              ].map(l => (
+                <button key={l.href}
+                  onClick={() => router.push(l.href)}
+                  className="px-3 py-1.5 rounded-lg text-xs text-[#7b61ff] hover:text-white hover:bg-[#7b61ff]/20 transition-colors font-bold"
+                >
+                  {l.label}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-3">
