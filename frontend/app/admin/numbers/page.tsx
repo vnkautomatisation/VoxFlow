@@ -14,6 +14,7 @@ const apiFetch = async (path: string, opts: RequestInit = {}) => {
 interface DIDNumber { sid: string; phoneNumber: string; friendlyName: string; voiceUrl?: string; statusCallback?: string }
 interface IVRConfig { id: string; name: string }
 interface Queue { id: string; name: string }
+interface BlockedNumber { id: string; phone: string; reason: string | null; created_at: string }
 
 export default function NumbersPage() {
     const router = useRouter()
@@ -28,20 +29,29 @@ export default function NumbersPage() {
     const [saving, setSaving] = useState(false)
     const [agents, setAgents] = useState<any[]>([])
 
+    // Blocked numbers
+    const [blocked, setBlocked] = useState<BlockedNumber[]>([])
+    const [showBlockModal, setShowBlockModal] = useState(false)
+    const [blockPhone, setBlockPhone] = useState('')
+    const [blockReason, setBlockReason] = useState('')
+    const [blockSaving, setBlockSaving] = useState(false)
+
     const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
     const load = useCallback(async () => {
         try {
-            const [nr, ir, qr, ar] = await Promise.all([
+            const [nr, ir, qr, ar, br] = await Promise.all([
                 apiFetch('/api/v1/telephony/numbers'),
                 apiFetch('/api/v1/admin/ivr'),
                 apiFetch('/api/v1/admin/queues'),
                 apiFetch('/api/v1/admin/agents'),
+                apiFetch('/api/v1/telephony/blocked-numbers'),
             ])
             if (nr.success) setNumbers(nr.data || [])
             if (ir.success) setIvrs(ir.data || [])
             if (qr.success) setQueues(qr.data || [])
             if (ar.success) setAgents(ar.data || [])
+            if (br.success) setBlocked(br.data || [])
         } catch { }
         setLoading(false)
     }, [])
@@ -143,6 +153,98 @@ export default function NumbersPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* ── Numeros bloques ────────────────────────────── */}
+            <div className="mt-10">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-[#eeeef8]">Numeros bloques</h2>
+                        <div className="text-xs text-[#55557a] mt-0.5">{blocked.length} numero{blocked.length > 1 ? 's' : ''} bloque{blocked.length > 1 ? 's' : ''}</div>
+                    </div>
+                    <button onClick={() => { setShowBlockModal(true); setBlockPhone(''); setBlockReason('') }}
+                        className="flex items-center gap-2 bg-rose-500/15 text-rose-400 border border-rose-500/30 text-xs font-bold px-4 py-2 rounded-lg hover:bg-rose-500/25 transition-colors">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        Bloquer un numero
+                    </button>
+                </div>
+
+                {blocked.length === 0 ? (
+                    <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-8 text-center">
+                        <svg className="mx-auto mb-2 text-[#2e2e44]" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                        </svg>
+                        <p className="text-sm text-[#55557a]">Aucun numero bloque</p>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {blocked.map(b => (
+                            <div key={b.id} className="bg-[#18181f] border border-[#2e2e44] rounded-xl px-5 py-3 flex items-center gap-4 hover:border-[#3a3a55] transition-all">
+                                <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
+                                    <svg width="16" height="16" fill="none" stroke="#f43f5e" strokeWidth="2" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <span className="font-bold text-[#eeeef8] font-mono text-sm">{b.phone}</span>
+                                    {b.reason && <span className="text-xs text-[#55557a] ml-3">{b.reason}</span>}
+                                    <div className="text-[10px] text-[#3a3a55] mt-0.5">{new Date(b.created_at).toLocaleDateString('fr-CA')}</div>
+                                </div>
+                                <button onClick={async () => {
+                                    const r = await apiFetch(`/api/v1/telephony/blocked-numbers/${b.id}`, { method: 'DELETE' })
+                                    if (r.success) { setBlocked(p => p.filter(x => x.id !== b.id)); showToast('Numero debloque') }
+                                    else showToast(r.error || 'Erreur', 'err')
+                                }}
+                                    className="text-[10px] font-bold text-emerald-400 border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 rounded-lg hover:bg-emerald-400/20 transition-colors flex-shrink-0">
+                                    Debloquer
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Modal bloquer un numero */}
+            {showBlockModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockModal(false)} />
+                    <div className="relative bg-[#111118] border border-[#2e2e44] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+                        <h3 className="text-base font-bold text-[#eeeef8] mb-4">Bloquer un numero</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-[#55557a] block mb-1.5">Numero de telephone</label>
+                                <input value={blockPhone} onChange={e => setBlockPhone(e.target.value)}
+                                    placeholder="+15141234567"
+                                    className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff] font-mono" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-[#55557a] block mb-1.5">Raison (optionnel)</label>
+                                <input value={blockReason} onChange={e => setBlockReason(e.target.value)}
+                                    placeholder="Spam, harcelement..."
+                                    className="w-full bg-[#1f1f2a] border border-[#2e2e44] rounded-lg px-3 py-2.5 text-sm text-[#eeeef8] outline-none focus:border-[#7b61ff]" />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 mt-6">
+                            <button onClick={() => setShowBlockModal(false)}
+                                className="flex-1 bg-[#1f1f2a] border border-[#2e2e44] text-[#9898b8] px-4 py-2.5 rounded-lg text-sm font-bold">Annuler</button>
+                            <button disabled={!blockPhone.trim() || blockSaving} onClick={async () => {
+                                setBlockSaving(true)
+                                const r = await apiFetch('/api/v1/telephony/blocked-numbers', {
+                                    method: 'POST', body: JSON.stringify({ phone: blockPhone.trim(), reason: blockReason.trim() || null })
+                                })
+                                if (r.success) {
+                                    setBlocked(p => [r.data, ...p])
+                                    setShowBlockModal(false)
+                                    showToast('Numero bloque')
+                                } else showToast(r.error || 'Erreur', 'err')
+                                setBlockSaving(false)
+                            }}
+                                className="flex-1 bg-rose-500 text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-rose-600 disabled:opacity-50 transition-colors">
+                                {blockSaving ? 'Enregistrement...' : 'Bloquer'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
