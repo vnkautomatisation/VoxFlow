@@ -107,6 +107,7 @@ export default function ClientDashboardPage() {
   const [telSummary, setTelSummary] = useState<TelSummary | null>(null)
   const [addonSummary, setAddonSummary] = useState<AddonSummaryDash | null>(null)
   const [robotSummary, setRobotSummary] = useState<RobotSummaryDash | null>(null)
+  const [didSummary, setDidSummary] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -114,11 +115,12 @@ export default function ClientDashboardPage() {
     let cancelled = false
     async function load() {
       try {
-        const [dashRes, telRes, addonRes, robotRes] = await Promise.all([
+        const [dashRes, telRes, addonRes, robotRes, didRes] = await Promise.all([
           api('/api/v1/client/portal/dashboard'),
           api('/api/v1/billing/telephony/summary').catch(() => ({ success: false })),
           api('/api/v1/billing/addons/summary').catch(() => ({ success: false })),
           api('/api/v1/billing/robot/summary').catch(() => ({ success: false })),
+          api('/api/v1/telephony/did/summary').catch(() => ({ success: false })),
         ])
         const d = dashRes.data || dashRes
         if (!cancelled) {
@@ -130,6 +132,7 @@ export default function ClientDashboardPage() {
           if (telRes.success) setTelSummary(telRes.data)
           if ((addonRes as any).success) setAddonSummary((addonRes as any).data)
           if ((robotRes as any).success) setRobotSummary((robotRes as any).data)
+          if ((didRes as any).success) setDidSummary((didRes as any).data)
         }
       } catch {
         if (!cancelled) setError('Erreur de connexion au serveur')
@@ -505,6 +508,27 @@ export default function ClientDashboardPage() {
             <p className="text-[12px] text-[#55557a] mb-4">Robot d&apos;appel masse — TTS, audio MP3, IVR, detection repondeur.</p>
             <Link href="/commander?service=robot" className="inline-flex items-center gap-2 bg-[#7b61ff]/10 border border-[#7b61ff]/30 text-[#7b61ff] rounded-lg px-5 py-2 text-[13px] font-semibold no-underline hover:bg-[#7b61ff]/20 transition-colors">Decouvrir le Robot</Link>
           </div>
+        </div>
+      )}
+
+      {/* -- DID card -- */}
+      {didSummary && didSummary.totalActive > 0 && (
+        <div className="mb-7">
+          <div className="bg-[#18181f] border border-[#2e2e44] rounded-xl p-5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-9 h-9 rounded-lg bg-[#ffb547]/10 border border-[#ffb547]/20 flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffb547" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.79a16 16 0 0 0 6.29 6.29l1.86-1.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </div>
+              <div>
+                <span className="text-[14px] font-semibold text-[#eeeef8]">{didSummary.totalActive} numero{didSummary.totalActive > 1 ? 's' : ''} DID actif{didSummary.totalActive > 1 ? 's' : ''}</span>
+                <span className="text-[12px] text-[#55557a] ml-3">{formatCAD(didSummary.monthlyCost)}/mois</span>
+              </div>
+            </div>
+            <Link href="/client/numbers" className="inline-block text-[11px] font-semibold text-[#7b61ff] px-3 py-1 border border-[#7b61ff]/25 rounded-lg no-underline bg-[#7b61ff]/5 hover:bg-[#7b61ff]/15 transition-colors">Gerer</Link>
+          </div>
+          {didSummary.portingRequests > 0 && (
+            <div className="bg-blue-950/40 border border-blue-800/30 rounded-lg px-4 py-2 mt-2 text-[12px] text-blue-300">Portabilite en cours pour {didSummary.portingRequests} numero(s).</div>
+          )}
         </div>
       )}
 

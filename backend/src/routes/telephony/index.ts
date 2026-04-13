@@ -5,6 +5,8 @@ import { twilioService } from "../../services/twilio/twilio.service"
 import { supabaseAdmin } from "../../config/supabase"
 import { sendSuccess, sendError } from "../../utils/response"
 import voiceRoutes from './voice'
+import didRoutes, { didCountriesHandler } from './did'
+import portingRoutes from './porting'
 
 const router = Router()
 const BACKEND = () => process.env.BACKEND_URL || "http://localhost:4000"
@@ -812,4 +814,12 @@ router.delete("/blocked-numbers/:id", authenticate, async (req: AuthRequest, res
 })
 
 router.use('/', voiceRoutes)
+
+// DID routes — public countries endpoint first, then auth
+router.get('/did/countries', didCountriesHandler)
+router.use('/did', authenticate, didRoutes)
+
+// Porting routes — authenticated
+router.use('/porting', authenticate, portingRoutes)
+
 export default router
