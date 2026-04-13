@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { PromptModal, ConfirmModal } from '@/components/shared/VFModal'
 
 const API = () => typeof window !== 'undefined' ? localStorage.getItem('vf_url') || 'http://localhost:4000' : 'http://localhost:4000'
 const TOK = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') || '' : ''
@@ -605,8 +606,12 @@ export default function CRMPage() {
         setSaving(false)
     }
 
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [showNewAppt, setShowNewAppt] = useState(false)
+    const [showNewTpl, setShowNewTpl] = useState(false)
+    const [showNewField, setShowNewField] = useState(false)
+
     const deleteContact = async (id: string) => {
-        if (!confirm('Supprimer ce contact ?')) return
         try {
             const r = await apiFetch(`/api/v1/crm/contacts/${id}`, { method: 'DELETE' })
             if (r.success) { showToast('Contact supprimé'); setSelContact(null); load() }
@@ -921,7 +926,7 @@ export default function CRMPage() {
                                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                     Modifier
                                 </button>
-                                <button onClick={() => deleteContact(selContact.id)}
+                                <button onClick={() => setDeleteId(selContact.id)}
                                     className="flex items-center justify-center text-[#55557a] border border-[#2e2e44] bg-[#1f1f2a] px-3 py-2 rounded-lg hover:text-rose-400 hover:border-rose-400/30 transition-colors">
                                     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" /></svg>
                                 </button>
@@ -981,18 +986,43 @@ export default function CRMPage() {
                 </div>
             )}
 
+            {/* ── MODALS (remplacent prompt/confirm natifs) ── */}
+            {deleteId && (
+                <ConfirmModal title="Supprimer ce contact ?" message="Cette action est irreversible." confirmLabel="Supprimer" danger
+                    onConfirm={() => { deleteContact(deleteId); setDeleteId(null) }} onCancel={() => setDeleteId(null)} />
+            )}
+            {showNewAppt && (
+                <PromptModal title="Nouveau rendez-vous" submitLabel="Creer"
+                    fields={[
+                        { key: 'title', label: 'Titre', placeholder: 'Appel de suivi', required: true },
+                        { key: 'starts_at', label: 'Date et heure', type: 'datetime-local', required: true },
+                        { key: 'location', label: 'Lieu (optionnel)', placeholder: 'Bureau, Teams, Telephone...' },
+                    ]}
+                    onSubmit={vals => { createAppointment({ title: vals.title, starts_at: new Date(vals.starts_at).toISOString(), ends_at: new Date(new Date(vals.starts_at).getTime()+3600000).toISOString(), location: vals.location }); setShowNewAppt(false) }}
+                    onCancel={() => setShowNewAppt(false)} />
+            )}
+            {showNewTpl && (
+                <PromptModal title="Nouveau template email" submitLabel="Creer"
+                    fields={[
+                        { key: 'name', label: 'Nom du template', placeholder: 'Bienvenue, Suivi, Relance...', required: true },
+                        { key: 'subject', label: 'Sujet', placeholder: 'Objet du mail', required: true },
+                    ]}
+                    onSubmit={async vals => { await apiFetch('/api/v1/crm/email-templates', { method: 'POST', body: JSON.stringify({ name: vals.name, subject: vals.subject, body_html: '<p>Bonjour,</p>' }) }); loadTemplates(); setShowNewTpl(false) }}
+                    onCancel={() => setShowNewTpl(false)} />
+            )}
+            {showNewField && (
+                <PromptModal title="Nouveau champ personnalise" submitLabel="Ajouter"
+                    fields={[{ key: 'fieldName', label: 'Nom du champ', placeholder: 'Langue, Secteur, ID client...', required: true }]}
+                    onSubmit={vals => { setForm(p => ({ ...p, custom_fields: { ...p.custom_fields, [vals.fieldName]: '' } })); setShowNewField(false) }}
+                    onCancel={() => setShowNewField(false)} />
+            )}
+
             {/* ── VUE CALENDRIER ── */}
             {view === 'calendar' && (
                 <div>
                     <div className="flex items-center justify-between mb-4">
                         <div className="text-sm font-bold text-[#eeeef8]">Rendez-vous</div>
-                        <button onClick={() => {
-                            const title = prompt('Titre du rendez-vous')
-                            if (!title) return
-                            const starts = prompt('Date debut (YYYY-MM-DD HH:mm)', new Date().toISOString().slice(0,16).replace('T',' '))
-                            if (!starts) return
-                            createAppointment({ title, starts_at: new Date(starts).toISOString(), ends_at: new Date(new Date(starts).getTime()+3600000).toISOString() })
-                        }} className="text-xs bg-[#00d4aa] text-white px-3 py-1.5 rounded-lg font-bold">+ Rendez-vous</button>
+                        <button onClick={() => setShowNewAppt(true)} className="text-xs bg-[#00d4aa] text-white px-3 py-1.5 rounded-lg font-bold">+ Rendez-vous</button>
                     </div>
                     {loadingCal && <div className="text-xs text-[#55557a] text-center py-8">Chargement...</div>}
                     {!loadingCal && appointments.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun rendez-vous</div>}
@@ -1040,12 +1070,7 @@ export default function CRMPage() {
                 <div>
                     <div className="flex items-center justify-between mb-4">
                         <div className="text-sm font-bold text-[#eeeef8]">Templates email</div>
-                        <button onClick={async () => {
-                            const name = prompt('Nom du template')
-                            if (!name) return
-                            await apiFetch('/api/v1/crm/email-templates', { method: 'POST', body: JSON.stringify({ name, subject: name, body_html: '<p>Bonjour {{prenom}},</p>' }) })
-                            loadTemplates()
-                        }} className="text-xs bg-[#38b6ff] text-white px-3 py-1.5 rounded-lg font-bold">+ Template</button>
+                        <button onClick={() => setShowNewTpl(true)} className="text-xs bg-[#38b6ff] text-white px-3 py-1.5 rounded-lg font-bold">+ Template</button>
                     </div>
                     {templates.length === 0 && <div className="text-xs text-[#35355a] text-center py-8 border border-dashed border-[#2e2e44] rounded-xl">Aucun template</div>}
                     <div className="space-y-2">
@@ -1154,15 +1179,7 @@ export default function CRMPage() {
                             <div className="border-t border-[#2e2e44] pt-4 mt-2">
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-[#55557a]">Champs personnalises</label>
-                                    <button type="button" onClick={() => {
-                                        const key = prompt('Nom du champ (ex: Langue, Secteur, ID client)')
-                                        if (key && key.trim()) {
-                                            setForm(p => ({
-                                                ...p,
-                                                custom_fields: { ...p.custom_fields, [key.trim()]: '' }
-                                            }))
-                                        }
-                                    }}
+                                    <button type="button" onClick={() => setShowNewField(true)}
                                         className="text-[10px] text-[#7b61ff] hover:text-[#a695ff] font-bold cursor-pointer bg-transparent border-none">
                                         + Ajouter un champ
                                     </button>
