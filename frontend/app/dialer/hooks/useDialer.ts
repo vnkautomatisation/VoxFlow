@@ -851,14 +851,7 @@ export function useDialer() {
         window.open(S.current.url.replace(':4000', ':3001') + '/admin/crm', '_blank')
     }, [])
 
-    // ── Xfer agents list ───────────────────────────────────────
-    useEffect(() => {
-        if ((xferType === 'attended' || xferType === 'conf') && isAdmin()) {
-            setQAgentsXfer(agents.filter(a => a.status === 'ONLINE' && !a.current_call))
-        } else {
-            setQAgentsXfer([])
-        }
-    }, [xferType, agents, isAdmin])
+    // qAgentsXfer est maintenant un derive de agents (plus de useEffect/setState)
 
     // ── Sync logout/login temps réel avec le portail ────────────────
     useEffect(() => {

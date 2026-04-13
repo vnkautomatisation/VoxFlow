@@ -97,7 +97,7 @@ export default function DialerSidebar() {
           right: 24,
           width: 380,
           height: 'calc(100vh - 48px)',
-          maxHeight: 920,
+          maxHeight: 800,
           zIndex: 9999,
           borderRadius: 20,
           overflow: 'hidden',
