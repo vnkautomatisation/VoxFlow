@@ -10,16 +10,13 @@ const supabase = createClient(
 )
 
 // ── Auth middleware selectif ───────────────────────────────
-// Toutes les routes /billing/* requierent authenticate SAUF :
-//  - GET /plans  (catalogue public)
-//  - POST /webhook (Stripe, authentifie par signature verification)
-const PUBLIC_PATHS = new Set(['/plans', '/webhook'])
+const PUBLIC_PATHS = new Set(['/plans', '/modules', '/webhook'])
 router.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path)) return next()
   return authenticate(req as AuthRequest, res, next)
 })
 
-// Stripe optionnel — fonctionne sans clé (mode démo)
+// Stripe optionnel — fonctionne sans cle (mode demo)
 let stripe: any = null
 try {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -28,18 +25,31 @@ try {
   }
 } catch {}
 
-const PLANS: Record<string, { name: string; price: number; stripe_price_id?: string; limits: any }> = {
-  basic:   { name: 'Basic',   price: 29, stripe_price_id: process.env.STRIPE_PRICE_BASIC,   limits: { agents: 5,  did: 3,  recording_days: 30,  ai: false, robot: false } },
-  confort: { name: 'Confort', price: 59, stripe_price_id: process.env.STRIPE_PRICE_CONFORT, limits: { agents: 25, did: 10, recording_days: 365, ai: true,  robot: false } },
-  premium: { name: 'Premium', price: 99, stripe_price_id: process.env.STRIPE_PRICE_PREMIUM, limits: { agents: -1, did: -1, recording_days: -1,  ai: true,  robot: true  } },
+// ── Plan cache (60s) ─────────────────────────────────────────
+let planCache: { data: any[]; ts: number } | null = null
+const PLAN_CACHE_TTL = 60_000
+
+async function getPlansFromDB(): Promise<any[]> {
+  if (planCache && Date.now() - planCache.ts < PLAN_CACHE_TTL) return planCache.data
+  const { data, error } = await supabase
+    .from('plan_definitions')
+    .select('*')
+    .eq('is_public', true)
+    .order('sort_order')
+  const plans = data || []
+  planCache = { data: plans, ts: Date.now() }
+  return plans
 }
 
-// getOrgId / getUserId : sources de verite = JWT decode par authenticate.
-// Les fallbacks hardcodes (org_test_001, user_test_001) ont ete retires —
-// ils causaient un data leak critique : un attaquant non authentifie se
-// faisait passer pour l'org de test et accedait a toutes ses donnees.
-// Les routes publiques (plans, webhook) n'appellent PAS ces helpers,
-// donc elles ne sont pas affectees.
+async function getPlanById(planId: string): Promise<any | null> {
+  const plans = await getPlansFromDB()
+  return plans.find((p: any) => p.id === planId.toUpperCase()) || null
+}
+
+function invalidatePlanCache() {
+  planCache = null
+}
+
 function getOrgId(req: Request): string {
   const orgId = (req as any).user?.organizationId || (req as any).user?.organization_id
   if (!orgId) throw new Error('Organisation introuvable (auth requise)')
@@ -52,22 +62,91 @@ function getUserId(req: Request): string {
 }
 
 // ──────────────────────────────────────────────────────────
-// GET /plans
+// GET /plans — catalogue public (depuis plan_definitions)
 // ──────────────────────────────────────────────────────────
 router.get('/plans', async (_req, res) => {
-  res.json({
-    success: true,
-    data: Object.entries(PLANS).map(([id, p]) => ({
-      id, name: p.name, price: p.price, currency: 'CAD',
-      popular: id === 'confort',
-      features: {
-        basic:   ['3 numéros DID', '5 agents max', 'Appels entrants/sortants', 'Historique 30 jours', 'Support par email'],
-        confort: ['10 numéros DID', '25 agents max', 'Enregistrement appels', 'Transcription IA', 'Supervision live', 'Historique 1 an', 'Support prioritaire'],
-        premium: ['Numéros illimités', 'Agents illimités', 'Robot dialer 150k/h', 'API publique', 'SLA 99.9%', 'Support dédié 24/7'],
-      }[id] || [],
-      limits: p.limits,
-    })),
-  })
+  try {
+    const plans = await getPlansFromDB()
+
+    // Modules depuis products
+    const { data: modules } = await supabase
+      .from('products')
+      .select('*')
+      .in('category', ['ADDON', 'SERVICE', 'AI_CREDIT'])
+      .eq('is_active', true)
+      .order('sort_order')
+
+    res.json({
+      success: true,
+      data: {
+        plans: plans.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price_monthly: p.price_monthly,
+          price_yearly: p.price_yearly,
+          currency: p.currency || 'CAD',
+          max_agents: p.max_agents,
+          max_dids: p.max_dids,
+          max_calls_month: p.max_calls_month,
+          features: p.features || {},
+          is_default: p.is_default,
+          sort_order: p.sort_order,
+          popular: p.id === 'CONFORT',
+        })),
+        modules: (modules || []).map((m: any) => {
+          const [desc, billingUnit] = (m.description || '|per_user').split('|')
+          return {
+            id: m.id,
+            sku: m.sku,
+            name: m.name,
+            description: desc.trim(),
+            category: m.category,
+            price_monthly: m.price_monthly,
+            setup_fee: m.setup_fee,
+            billing_unit: billingUnit?.trim() || 'per_user',
+            is_active: m.is_active,
+          }
+        }),
+      },
+    })
+  } catch (err: any) {
+    console.error('[billing/plans]', err.message)
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// ──────────────────────────────────────────────────────────
+// GET /modules — catalogue modules public
+// ──────────────────────────────────────────────────────────
+router.get('/modules', async (_req, res) => {
+  try {
+    const { data: modules } = await supabase
+      .from('products')
+      .select('*')
+      .in('category', ['ADDON', 'SERVICE', 'AI_CREDIT'])
+      .eq('is_active', true)
+      .order('sort_order')
+
+    res.json({
+      success: true,
+      data: (modules || []).map((m: any) => {
+        const [desc, billingUnit] = (m.description || '|per_user').split('|')
+        return {
+          id: m.id,
+          sku: m.sku,
+          name: m.name,
+          description: desc.trim(),
+          category: m.category,
+          price_monthly: m.price_monthly,
+          setup_fee: m.setup_fee,
+          billing_unit: billingUnit?.trim() || 'per_user',
+        }
+      }),
+    })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
+  }
 })
 
 // ──────────────────────────────────────────────────────────
@@ -79,64 +158,162 @@ router.get('/subscription', async (req, res) => {
     const { data: org, error } = await supabase
       .from('organizations').select('*').eq('id', org_id).single()
     if (error || !org) {
-      return res.status(404).json({
-        success: false,
-        error: 'Organisation introuvable',
-      })
+      return res.status(404).json({ success: false, error: 'Organisation introuvable' })
     }
 
-    const planKey = String(org.plan || 'basic').toLowerCase()
-    const planData = PLANS[planKey] || PLANS.basic
+    const planKey = String(org.plan || 'STARTER').toUpperCase()
+    const planData = await getPlanById(planKey)
     const seats = org.seats || 1
+    const priceMonthly = planData ? planData.price_monthly / 100 : 0
     const renews_at = org.billing_cycle_end ||
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    // Statut Stripe (vraie check si stripe_customer_id existe ET stripe configure)
     let stripe_customer = false
-    if (stripe && org.stripe_customer_id) {
-      stripe_customer = true
-    }
+    if (stripe && org.stripe_customer_id) stripe_customer = true
+
+    // Modules actifs de l'org
+    const { data: orgModules } = await supabase
+      .from('organization_modules')
+      .select('*, product:product_sku(name, price_monthly, description)')
+      .eq('organization_id', org_id)
+      .eq('status', 'ACTIVE')
+
+    const activeModules = (orgModules || []).map((m: any) => {
+      const [desc, billingUnit] = (m.product?.description || '|per_user').split('|')
+      return {
+        sku: m.product_sku,
+        name: m.product?.name || m.product_sku,
+        quantity: m.quantity,
+        unit_price: (m.product?.price_monthly || 0) / 100,
+        billing_unit: billingUnit?.trim() || 'per_user',
+        total: ((m.product?.price_monthly || 0) / 100) * m.quantity,
+      }
+    })
+
+    const modulesTotal = activeModules.reduce((s: number, m: any) => s + m.total, 0)
 
     res.json({
       success: true,
       data: {
         plan: planKey,
-        plan_name:  planData.name,
-        plan_price: planData.price,
-        status:     org.subscription_status || 'active',
+        plan_name: planData?.name || planKey,
+        plan_price: priceMonthly,
+        status: org.subscription_status || 'active',
         seats,
         renews_at,
-        amount:     seats * planData.price,
-        currency:   'CAD',
-        limits:     planData.limits,
+        amount: seats * priceMonthly,
+        modules_total: modulesTotal,
+        grand_total: seats * priceMonthly + modulesTotal,
+        currency: 'CAD',
+        limits: planData ? {
+          max_agents: planData.max_agents,
+          max_dids: planData.max_dids,
+          max_calls_month: planData.max_calls_month,
+        } : {},
+        features: planData?.features || {},
+        active_modules: activeModules,
         stripe_customer,
         trial_ends_at: org.trial_ends_at || null,
       },
     })
   } catch (err: any) {
-    // Retrait du fallback silencieux qui retournait { plan: 'confort', _fallback: true }.
-    // Maintenant on propage l'erreur — le client verra qu'il y a un probleme
-    // au lieu de croire qu'il a un plan confort fictif.
     console.error('[billing/subscription]', err.message)
     res.status(500).json({ success: false, error: err.message })
   }
 })
 
 // ──────────────────────────────────────────────────────────
-// POST /subscription/change (changement direct sans Stripe)
+// POST /subscription/change
 // ──────────────────────────────────────────────────────────
 router.post('/subscription/change', async (req, res) => {
   const org_id = getOrgId(req)
   const { plan_id, seats = 1 } = req.body
-  if (!PLANS[plan_id]) return res.status(400).json({ success: false, message: 'Plan invalide' })
+  const planKey = String(plan_id).toUpperCase()
+  const plan = await getPlanById(planKey)
+  if (!plan) return res.status(400).json({ success: false, message: 'Plan invalide' })
   try {
     await supabase.from('organizations').update({
-      plan: plan_id, seats,
+      plan: planKey, seats,
       billing_cycle_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }).eq('id', org_id)
-    res.json({ success: true, data: { message: `Plan changé à ${PLANS[plan_id].name}` } })
+    invalidatePlanCache()
+    res.json({ success: true, data: { message: `Plan change a ${plan.name}` } })
   } catch {
-    res.json({ success: true, data: { message: `Plan changé à ${PLANS[plan_id].name}` } })
+    res.json({ success: true, data: { message: `Plan change a ${plan.name}` } })
+  }
+})
+
+// ──────────────────────────────────────────────────────────
+// POST /modules/subscribe — souscrire a un module
+// ──────────────────────────────────────────────────────────
+router.post('/modules/subscribe', async (req, res) => {
+  try {
+    const org_id = getOrgId(req)
+    const { sku, quantity = 1 } = req.body
+    if (!sku) return res.status(400).json({ success: false, message: 'SKU requis' })
+
+    // Verifier que le produit existe
+    const { data: product } = await supabase
+      .from('products').select('*').eq('sku', sku).eq('is_active', true).single()
+    if (!product) return res.status(404).json({ success: false, message: 'Module introuvable' })
+
+    // Upsert
+    const { data, error } = await supabase
+      .from('organization_modules')
+      .upsert({
+        organization_id: org_id,
+        product_sku: sku,
+        quantity: Math.max(1, quantity),
+        status: 'ACTIVE',
+        activated_at: new Date().toISOString(),
+        cancelled_at: null,
+      }, { onConflict: 'organization_id,product_sku' })
+      .select()
+      .single()
+
+    if (error) throw error
+    res.json({ success: true, data })
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message })
+  }
+})
+
+// ──────────────────────────────────────────────────────────
+// PATCH /modules/:sku — mettre a jour la quantite
+// ──────────────────────────────────────────────────────────
+router.patch('/modules/:sku', async (req, res) => {
+  try {
+    const org_id = getOrgId(req)
+    const { quantity } = req.body
+    const { data, error } = await supabase
+      .from('organization_modules')
+      .update({ quantity: Math.max(1, quantity || 1) })
+      .eq('organization_id', org_id)
+      .eq('product_sku', req.params.sku)
+      .select()
+      .single()
+    if (error) throw error
+    res.json({ success: true, data })
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message })
+  }
+})
+
+// ──────────────────────────────────────────────────────────
+// DELETE /modules/:sku — annuler un module
+// ──────────────────────────────────────────────────────────
+router.delete('/modules/:sku', async (req, res) => {
+  try {
+    const org_id = getOrgId(req)
+    const { error } = await supabase
+      .from('organization_modules')
+      .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() })
+      .eq('organization_id', org_id)
+      .eq('product_sku', req.params.sku)
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message })
   }
 })
 
@@ -186,25 +363,24 @@ router.delete('/payment-methods/:id', async (req, res) => {
 router.post('/checkout', async (req, res) => {
   const org_id = getOrgId(req)
   const { plan_id, seats = 1, success_url, cancel_url } = req.body
-  const plan = PLANS[plan_id]
+  const planKey = String(plan_id).toUpperCase()
+  const plan = await getPlanById(planKey)
   if (!plan) return res.status(400).json({ success: false, message: 'Plan invalide' })
 
-  // Sans Stripe → changer directement
   if (!stripe || !plan.stripe_price_id) {
     try {
       await supabase.from('organizations').update({
-        plan: plan_id, seats,
+        plan: planKey, seats,
         billing_cycle_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         subscription_status: 'active',
       }).eq('id', org_id)
     } catch {}
-    return res.json({ success: true, data: { changed: true, message: `Plan ${plan.name} activé (mode démo — Stripe non configuré)` } })
+    return res.json({ success: true, data: { changed: true, message: `Plan ${plan.name} active (mode demo)` } })
   }
 
   try {
     const { data: org } = await supabase.from('organizations').select('stripe_customer_id, name, email').eq('id', org_id).single()
 
-    // Créer ou récupérer le customer Stripe
     let customerId = org?.stripe_customer_id
     if (!customerId) {
       const customer = await stripe.customers.create({ name: org?.name, email: org?.email, metadata: { organization_id: org_id } })
@@ -218,7 +394,7 @@ router.post('/checkout', async (req, res) => {
       line_items: [{ price: plan.stripe_price_id, quantity: seats }],
       success_url: success_url || `${process.env.FRONTEND_URL}/client/plans?success=1`,
       cancel_url: cancel_url || `${process.env.FRONTEND_URL}/client/plans`,
-      subscription_data: { metadata: { organization_id: org_id, plan_id, seats: String(seats) } },
+      subscription_data: { metadata: { organization_id: org_id, plan_id: planKey, seats: String(seats) } },
     })
 
     res.json({ success: true, data: { url: session.url } })
@@ -280,9 +456,10 @@ router.post('/webhook', async (req, res) => {
       const org_id = session.metadata?.organization_id
       const plan_id = session.metadata?.plan_id
       const seats = parseInt(session.metadata?.seats || '1')
-      if (org_id && plan_id && PLANS[plan_id]) {
+      const plan = plan_id ? await getPlanById(plan_id) : null
+      if (org_id && plan) {
         await supabase.from('organizations').update({
-          plan: plan_id, seats, subscription_status: 'active',
+          plan: plan.id, seats, subscription_status: 'active',
           stripe_subscription_id: session.subscription,
           billing_cycle_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         }).eq('id', org_id)
@@ -297,15 +474,14 @@ router.post('/webhook', async (req, res) => {
       if (!org_id) break
 
       const { data: org } = await supabase.from('organizations').select('name, plan, seats').eq('id', org_id).single()
-      const plan = org?.plan || 'confort'
-      const planData = PLANS[plan]
+      const planKey = String(org?.plan || 'CONFORT').toUpperCase()
+      const planData = await getPlanById(planKey)
       const seats = org?.seats || 1
       const subtotal = invoice.subtotal / 100
       const tax_tps  = subtotal * 0.05
       const tax_tvq  = subtotal * 0.09975
       const total    = subtotal + tax_tps + tax_tvq
 
-      // Créer la facture dans Supabase
       const now = new Date()
       await supabase.from('invoices').upsert({
         organization_id: org_id,
@@ -318,7 +494,10 @@ router.post('/webhook', async (req, res) => {
         subtotal, tax_tps, tax_tvq, total,
         currency: 'CAD',
         stripe_invoice_id: invoice.id,
-        lines: JSON.stringify([{ description: `Plan ${planData.name} — ${seats} siège${seats > 1 ? 's' : ''} × ${planData.price.toFixed(2)} $`, qty: 1, unit_price: total, total }]),
+        lines: JSON.stringify([{
+          description: `Plan ${planData?.name || planKey} — ${seats} siege${seats > 1 ? 's' : ''} x ${((planData?.price_monthly || 0) / 100).toFixed(2)} $`,
+          qty: 1, unit_price: total, total,
+        }]),
         org_name: org?.name || 'Organisation',
       }, { onConflict: 'stripe_invoice_id' })
       break
@@ -370,9 +549,9 @@ router.get('/invoices', async (req, res) => {
     res.json({
       success: true,
       data: [
-        { id: '3', number: 'VF-2026-003', period_label: 'Avril 2026', status: 'paid', issued_at: '2026-03-31', due_at: '2026-04-15', paid_at: '2026-04-01', subtotal: 155.06, tax_tps: 7.75, tax_tvq: 14.19, total: 177.00, currency: 'CAD', lines: [{ description: 'Plan Confort — 3 sièges × 59,00 $', qty: 1, unit_price: 177.00, total: 177.00 }], org_name: 'Mon Organisation', org_address: 'Montréal, QC, Canada', org_email: '' },
-        { id: '2', number: 'VF-2026-002', period_label: 'Mars 2026',  status: 'paid', issued_at: '2026-02-28', due_at: '2026-03-15', paid_at: '2026-03-01', subtotal: 155.06, tax_tps: 7.75, tax_tvq: 14.19, total: 177.00, currency: 'CAD', lines: [{ description: 'Plan Confort — 3 sièges × 59,00 $', qty: 1, unit_price: 177.00, total: 177.00 }], org_name: 'Mon Organisation', org_address: 'Montréal, QC, Canada', org_email: '' },
-        { id: '1', number: 'VF-2026-001', period_label: 'Février 2026', status: 'paid', issued_at: '2026-01-31', due_at: '2026-02-15', paid_at: '2026-02-01', subtotal: 135.40, tax_tps: 6.77, tax_tvq: 12.39, total: 154.56, currency: 'CAD', lines: [{ description: 'Plan Confort — 3 sièges × 59,00 $', qty: 1, unit_price: 177.00, total: 177.00 }, { description: 'Crédit de bienvenue', qty: 1, unit_price: -22.60, total: -22.60 }], org_name: 'Mon Organisation', org_address: 'Montréal, QC, Canada', org_email: '' },
+        { id: '3', number: 'VF-2026-003', period_label: 'Avril 2026', status: 'paid', issued_at: '2026-03-31', due_at: '2026-04-15', paid_at: '2026-04-01', subtotal: 155.06, tax_tps: 7.75, tax_tvq: 14.19, total: 177.00, currency: 'CAD', lines: [{ description: 'Plan Confort — 3 sieges x 59,00 $', qty: 1, unit_price: 177.00, total: 177.00 }], org_name: 'Mon Organisation', org_address: 'Montreal, QC, Canada', org_email: '' },
+        { id: '2', number: 'VF-2026-002', period_label: 'Mars 2026',  status: 'paid', issued_at: '2026-02-28', due_at: '2026-03-15', paid_at: '2026-03-01', subtotal: 155.06, tax_tps: 7.75, tax_tvq: 14.19, total: 177.00, currency: 'CAD', lines: [{ description: 'Plan Confort — 3 sieges x 59,00 $', qty: 1, unit_price: 177.00, total: 177.00 }], org_name: 'Mon Organisation', org_address: 'Montreal, QC, Canada', org_email: '' },
+        { id: '1', number: 'VF-2026-001', period_label: 'Fevrier 2026', status: 'paid', issued_at: '2026-01-31', due_at: '2026-02-15', paid_at: '2026-02-01', subtotal: 135.40, tax_tps: 6.77, tax_tvq: 12.39, total: 154.56, currency: 'CAD', lines: [{ description: 'Plan Confort — 3 sieges x 59,00 $', qty: 1, unit_price: 177.00, total: 177.00 }, { description: 'Credit de bienvenue', qty: 1, unit_price: -22.60, total: -22.60 }], org_name: 'Mon Organisation', org_address: 'Montreal, QC, Canada', org_email: '' },
       ],
     })
   }
@@ -455,7 +634,7 @@ router.post('/tickets/:id/messages', async (req, res) => {
 })
 
 // ──────────────────────────────────────────────────────────
-// Campagnes Dialer (persistées)
+// Campagnes Dialer (persistees)
 // ──────────────────────────────────────────────────────────
 router.get('/campaigns', async (req, res) => {
   const org_id = getOrgId(req)
