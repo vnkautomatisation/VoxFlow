@@ -166,8 +166,9 @@ export default function InvoicesPage() {
         method: 'POST',
         body: JSON.stringify({}),
       })
-      if (res.url) {
-        window.open(res.url, '_blank')
+      const d = res.data || res
+      if (d.url) {
+        window.open(d.url, '_blank')
       } else {
         showToast('Mode demo -- Portail Stripe non disponible')
       }

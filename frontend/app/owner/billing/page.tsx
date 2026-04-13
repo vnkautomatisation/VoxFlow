@@ -85,11 +85,14 @@ export default function OwnerBillingPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [statsRes, txRes, promoRes] = await Promise.all([
+      const [statsRaw, txRaw, promoRaw] = await Promise.all([
         apiFetch('/api/v1/owner/billing-stats'),
         apiFetch('/api/v1/owner/billing-stats/transactions?limit=50'),
         apiFetch('/api/v1/owner/billing-stats/promo-codes'),
       ])
+      const statsRes = statsRaw.data || statsRaw
+      const txRes = txRaw.data || txRaw
+      const promoRes = promoRaw.data || promoRaw
       if (statsRes && !statsRes.error) setStats(statsRes)
       if (Array.isArray(txRes)) setTransactions(txRes)
       if (Array.isArray(promoRes)) setPromoCodes(promoRes)

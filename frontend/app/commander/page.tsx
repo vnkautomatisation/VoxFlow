@@ -938,13 +938,14 @@ export default function CommanderPage() {
     (async () => {
       try {
         const res = await api('/api/v1/client/portal/plans-catalog')
+        const d = res.data || res
         const allPlans: PlanDef[] = [
-          ...(res.services?.TELEPHONY || []),
-          ...(res.services?.DIALER || []),
-          ...(res.services?.ROBOT || []),
+          ...(d.services?.TELEPHONY || []),
+          ...(d.services?.DIALER || []),
+          ...(d.services?.ROBOT || []),
         ]
         setPlans(allPlans)
-        setAddons(res.addons || [])
+        setAddons(d.addons || [])
       } catch {
         // silent
       }
