@@ -153,29 +153,18 @@ html, body {
   }
 }
 
-/* ─ Bump subtil des petits textes sur desktop ─
-   Valeurs reduites : les anciens bumps etaient trop agressifs
-   (text-xs 12px -> 15px, text-sm 14px -> 16px) ce qui rendait
-   la police "grosse et agressive". Nouveau bump : +1px max par
-   palier pour que le texte reste compact mais lisible. */
+/* ─ Portail admin : police compacte pour dashboard dense ─
+   Le portail admin a beaucoup de donnees affichees. On reduit
+   legerement les tailles par defaut de Tailwind pour un look
+   plus pro et moins "gros". Ne s'applique PAS au dialer (qui
+   a son propre CSS) ni aux pages auth. */
 
-/* lg — laptops standard (1024-1279) : +0.5px */
+/* Base font-size reduit sur desktop (14px → 13px) */
 @media (min-width: 1024px) {
-  body .text-\[9px\]   { font-size: 9.5px !important; }
-  body .text-\[10px\]  { font-size: 10.5px !important; }
-  body .text-\[11px\]  { font-size: 11.5px !important; }
-}
-
-/* xl — desktops (1280-1535) : +1px */
-@media (min-width: 1280px) {
-  body .text-\[9px\]   { font-size: 10px !important; }
-  body .text-\[10px\]  { font-size: 11px !important; }
-  body .text-\[11px\]  { font-size: 12px !important; }
-}
-
-/* 2xl — HD et + (1536+) : +1.5px */
-@media (min-width: 1536px) {
-  body .text-\[9px\]   { font-size: 10.5px !important; }
-  body .text-\[10px\]  { font-size: 11.5px !important; }
-  body .text-\[11px\]  { font-size: 12.5px !important; }
+  body { font-size: 13px; }
+  body .text-base { font-size: 14px !important; }
+  body .text-sm   { font-size: 12.5px !important; }
+  body .text-xs   { font-size: 11px !important; }
+  body .text-lg   { font-size: 16px !important; }
+  body .text-xl   { font-size: 18px !important; }
 }
