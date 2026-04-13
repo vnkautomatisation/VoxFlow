@@ -385,10 +385,11 @@ router.get("/my-numbers", authenticate, async (req: AuthRequest, res: Response) 
         const seen = new Set<string>()
 
         for (const t of twilioNums) {
-            if (!dbBySid[t.sid]) continue // pas mappé à cette org
+            // Inclure tous les DIDs Twilio (mappes a l'org OU non encore mappes)
             seen.add(t.phoneNumber)
+            const dbMatch = dbBySid[t.sid]
             const detected = detectCountry(t.phoneNumber)
-            const country  = dbBySid[t.sid]?.country || detected
+            const country  = dbMatch?.country || detected
             merged.push({
                 number:        t.phoneNumber,
                 friendly_name: t.friendlyName || t.phoneNumber,
