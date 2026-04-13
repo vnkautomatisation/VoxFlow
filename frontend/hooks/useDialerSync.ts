@@ -40,6 +40,8 @@ export function useDialerSync() {
                 }).catch(() => { })
             }
             sendHeartbeat() // Premier ping immediat
+            // Deuxieme ping rapide apres 3s pour que le snapshot se mette a jour vite
+            setTimeout(sendHeartbeat, 3000)
             heartbeatRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
 
         } else if (!isAuth) {
