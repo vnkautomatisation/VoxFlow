@@ -8,10 +8,31 @@ export class SupervisionService {
         const now = new Date()
         const today = now.toISOString().split("T")[0]
 
-        const { data: agents } = await supabaseAdmin
+        // Lire la table agents
+        const { data: agentsRaw } = await supabaseAdmin
             .from("agents")
-            .select("user_id, status, last_seen_at, users!inner(id, name, email)")
+            .select("user_id, status, last_seen_at, users!inner(id, name, email, role, extension)")
             .eq("organization_id", organizationId)
+
+        // Aussi lire les users ADMIN/SUPERVISOR sans entree agents (ils peuvent avoir une extension)
+        const { data: adminUsers } = await supabaseAdmin
+            .from("users")
+            .select("id, name, email, role, extension, status")
+            .eq("organization_id", organizationId)
+            .in("role", ["ADMIN", "SUPERVISOR"])
+
+        // Fusionner : agents + admins sans doublon
+        const agentUserIds = new Set((agentsRaw || []).map((a: any) => a.user_id))
+        const extraAdmins = (adminUsers || [])
+            .filter((u: any) => !agentUserIds.has(u.id) && u.status === 'ACTIVE')
+            .map((u: any) => ({
+                user_id: u.id,
+                status: 'OFFLINE',
+                last_seen_at: null,
+                users: { id: u.id, name: u.name, email: u.email, role: u.role, extension: u.extension },
+            }))
+
+        const agents = [...(agentsRaw || []), ...extraAdmins]
 
         const { data: activeCalls } = await supabaseAdmin
             .from("calls")
