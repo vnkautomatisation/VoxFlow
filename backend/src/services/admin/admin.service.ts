@@ -45,7 +45,8 @@ export class AdminService {
     name: string
     email: string
     password: string
-    role: string
+    role?: string
+    extension?: string
   }) {
     const { data: existing } = await supabaseAdmin
       .from("users").select("id").eq("email", dto.email).single()
@@ -53,16 +54,19 @@ export class AdminService {
 
     const passwordHash = await hashPassword(dto.password)
 
+    const insert: any = {
+      email:           dto.email,
+      name:            dto.name,
+      role:            dto.role || "AGENT",
+      password_hash:   passwordHash,
+      organization_id: organizationId,
+      status:          "ACTIVE",
+    }
+    if (dto.extension) insert.extension = dto.extension
+
     const { data: user, error } = await supabaseAdmin
       .from("users")
-      .insert({
-        email:           dto.email,
-        name:            dto.name,
-        role:            dto.role || "AGENT",
-        password_hash:   passwordHash,
-        organization_id: organizationId,
-        status:          "ACTIVE",
-      })
+      .insert(insert)
       .select().single()
 
     if (error) throw new Error(error.message)
