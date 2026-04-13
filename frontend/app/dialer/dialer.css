@@ -104,14 +104,14 @@ html, body {
     border: none !important;
     box-shadow: none !important;
 }
-.popup.embedded,
-.popup.embedded .pane {
-    overflow: hidden !important;
+/* Cacher TOUTES les scrollbars en embedded mais garder le scroll */
+.popup.embedded * {
     scrollbar-width: none !important;
 }
-.popup.embedded::-webkit-scrollbar,
-.popup.embedded .pane::-webkit-scrollbar {
+.popup.embedded *::-webkit-scrollbar {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 /* ── TOAST ── */

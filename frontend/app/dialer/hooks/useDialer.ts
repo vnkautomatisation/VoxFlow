@@ -404,7 +404,7 @@ export function useDialer() {
     const loadData = useCallback(async () => {
         try {
             const [cr, vr] = await Promise.all([
-                api('/api/v1/telephony/calls?limit=30'),
+                api('/api/v1/telephony/calls?limit=200'),
                 api('/api/v1/telephony/voicemails'),
             ])
             if (cr.success) setCalls(cr.data || [])
