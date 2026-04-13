@@ -17,6 +17,7 @@ export function useDialerSync() {
                 localStorage.setItem('vf_url', API_URL)
                 localStorage.setItem('vf_role', user.role)
                 if ((user as any).extension) localStorage.setItem('vf_ext', (user as any).extension)
+                else localStorage.removeItem('vf_ext')
                 if (user.name) localStorage.setItem('vf_name', user.name)
             } catch { }
 
