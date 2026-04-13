@@ -377,13 +377,13 @@ export function useDialer() {
             setView('main')
             loadData()
             startPoll()
-            // Re-check role apres 2s (le portail parent peut le setter en retard)
+            // Re-check role + extension apres 2s (le portail parent peut les setter en retard)
             setTimeout(() => {
                 const freshRole = localStorage.getItem('vf_role') || role
-                if (freshRole !== S.current.role) {
-                    S.current.role = freshRole
-                    loadData()
-                }
+                const freshExt = localStorage.getItem('vf_ext') || ''
+                S.current.role = freshRole
+                S.current.ext = freshExt || null
+                loadData()
             }, 2000)
         } else if (isAuth && accessToken && user) {
             // Portail connecté (même contexte) → sync complet depuis Zustand
