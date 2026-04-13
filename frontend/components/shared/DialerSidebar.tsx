@@ -53,8 +53,48 @@ export default function DialerSidebar() {
 
   return (
     <>
-      {/* ── Bouton FAB — toujours visible en bas a droite ── */}
+      {/* ── Boutons FAB — widget + Electron ── */}
       {!open && (
+        <>
+        {/* Bouton Electron (app desktop) — au-dessus du bouton principal */}
+        <button
+          onClick={() => {
+            const tok = localStorage.getItem('vf_tok') || ''
+            const url = localStorage.getItem('vf_url') || 'http://localhost:4000'
+            // Tenter de lancer Electron
+            fetch('http://127.0.0.1:9876/auth-sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'open', token: tok, url }),
+            }).catch(() => {
+              // Fallback : ouvrir dans une fenetre popup
+              window.open('/dialer', '_blank', `width=380,height=800,left=${screen.availWidth - 404},top=24`)
+            })
+          }}
+          style={{
+            position: 'fixed',
+            bottom: 88,
+            right: 32,
+            zIndex: 9998,
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            background: '#18181f',
+            border: '1px solid #2e2e44',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}
+          title="Ouvrir dans l'app desktop"
+        >
+          <svg width="14" height="14" fill="none" stroke="#9898b8" strokeWidth="2" viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+        </button>
+
+        {/* Bouton principal — ouvrir le widget */}
         <button
           onClick={() => setOpen(true)}
           style={{
@@ -87,6 +127,7 @@ export default function DialerSidebar() {
             padding: '1px 5px', fontFamily: 'monospace',
           }}>Ctrl+D</kbd>
         </button>
+        </>
       )}
 
       {/* ── Widget flottant — popup au-dessus du contenu ── */}
