@@ -230,7 +230,7 @@ export default function AgentsPage() {
 
             {/* Toast */}
             {toast && (
-                <div className={`fixed top-16 right-6 z-[100] px-5 py-3 rounded-xl text-sm font-semibold shadow-2xl border max-w-sm
+                <div className={`fixed bottom-6 right-6 z-[100] px-5 py-3 rounded-xl text-sm font-semibold shadow-2xl border max-w-sm
           ${toast.type === 'ok' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border-rose-500/30'}`}>
                     {toast.msg}
                 </div>
