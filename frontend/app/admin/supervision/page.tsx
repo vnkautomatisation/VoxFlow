@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import dynamic from 'next/dynamic'
+const SupervisorChat = dynamic(() => import('@/components/supervision/SupervisorChat'), { ssr: false })
 
 const API = () => typeof window !== 'undefined' ? localStorage.getItem('vf_url') || 'http://localhost:4000' : 'http://localhost:4000'
 const TOK = () => typeof window !== 'undefined' ? localStorage.getItem('vf_tok') || '' : ''
@@ -300,6 +302,7 @@ export default function LivePage() {
     const [loading, setLoading] = useState(true)
     const [supModal, setSupModal] = useState<{ callId: string; agentName: string; callNum: string } | null>(null)
     const [forceModal, setForceModal] = useState<{ agentId: string; agentName: string } | null>(null)
+    const [chatAgent, setChatAgent] = useState<{ id: string; name: string } | null>(null)
     const [actionMsg, setActionMsg] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
     const [now, setNow] = useState(new Date())
     const [tick, setTick] = useState(0)
@@ -435,6 +438,10 @@ export default function LivePage() {
                                     <div className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.border} ${cfg.text}`}>
                                         {cfg.label}
                                     </div>
+                                    <button onClick={() => setChatAgent({ id: a.agentId, name: a.name })}
+                                        className="text-[10px] font-bold px-2 py-1 rounded-md bg-[#38b6ff]/15 text-[#38b6ff] border border-[#38b6ff]/30 hover:bg-[#38b6ff]/25 transition-colors">
+                                        Chat
+                                    </button>
                                     <button onClick={() => setForceModal({ agentId: a.agentId, agentName: a.name })}
                                         className="text-[#55557a] hover:text-[#9898b8] transition-colors ml-1">
                                         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -590,6 +597,16 @@ export default function LivePage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Chat superviseur overlay */}
+            {chatAgent && (
+                <SupervisorChat
+                    agentId={chatAgent.id}
+                    agentName={chatAgent.name}
+                    currentUserId="supervisor"
+                    onClose={() => setChatAgent(null)}
+                />
             )}
 
         </div>
